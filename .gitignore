@@ -1,0 +1,24 @@
+# ============================================================
+# Enterprise Fraud System - Git Ignore
+# ============================================================
+
+# Controlled project documentation
+01-Documentation/
+
+# Commercial material
+07-Commercial/
+
+# Local project tools
+12-Tools/
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+
+# Local environment and secrets
+.env
+.env.*
+
+# Temporary files
+*.tmp
+*.log
