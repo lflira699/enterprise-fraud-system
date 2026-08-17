@@ -1,0 +1,21 @@
+-- EFS-DB-002
+-- Initial database schema
+-- Physical schemas
+
+CREATE SCHEMA IF NOT EXISTS customer;
+
+CREATE SCHEMA IF NOT EXISTS transaction;
+
+CREATE SCHEMA IF NOT EXISTS rules;
+
+CREATE SCHEMA IF NOT EXISTS case_management;
+
+CREATE SCHEMA IF NOT EXISTS administration;
+
+CREATE SCHEMA IF NOT EXISTS audit;
+
+CREATE SCHEMA IF NOT EXISTS catalog;
+
+CREATE SCHEMA IF NOT EXISTS integration;
+
+CREATE SCHEMA IF NOT EXISTS reporting;

@@ -22,3 +22,8 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.log
+
+# Maven build output
+target/
+# Local diagnostic artifacts
+startup-error.txt

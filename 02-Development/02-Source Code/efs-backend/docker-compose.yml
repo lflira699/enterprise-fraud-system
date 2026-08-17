@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:18.4
+    container_name: efs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - efs_postgres_data:/var/lib/postgresql
+
+volumes:
+  efs_postgres_data:
