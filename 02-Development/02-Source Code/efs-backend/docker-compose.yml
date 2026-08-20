@@ -12,5 +12,13 @@ services:
     volumes:
       - efs_postgres_data:/var/lib/postgresql
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: efs-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
 volumes:
   efs_postgres_data:

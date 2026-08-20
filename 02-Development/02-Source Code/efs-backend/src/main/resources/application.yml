@@ -19,6 +19,12 @@ spring:
     user: ${FLYWAY_USERNAME}
     password: ${FLYWAY_PASSWORD}
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
 server:
   port: 8080
 
