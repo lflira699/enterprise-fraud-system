@@ -1,0 +1,4 @@
+-- EFS-DB-002
+-- V119 - Alert Schema
+
+CREATE SCHEMA IF NOT EXISTS alert;

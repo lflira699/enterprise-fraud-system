@@ -24,6 +24,9 @@ public class TransactionDecision {
     @Column(name = "transaction_id", nullable = false)
     private UUID transactionId;
 
+    @Column(name = "risk_assessment_id")
+    private UUID riskAssessmentId;
+
     @Column(name = "decision_type", nullable = false, length = 40)
     private String decisionType;
 
@@ -62,6 +65,14 @@ public class TransactionDecision {
 
     public void setTransactionId(UUID transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public UUID getRiskAssessmentId() {
+        return riskAssessmentId;
+    }
+
+    public void setRiskAssessmentId(UUID riskAssessmentId) {
+        this.riskAssessmentId = riskAssessmentId;
     }
 
     public String getDecisionType() {

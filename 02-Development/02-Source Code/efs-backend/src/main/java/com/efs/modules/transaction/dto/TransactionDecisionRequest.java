@@ -10,6 +10,8 @@ import java.util.UUID;
 
 public class TransactionDecisionRequest {
 
+    private UUID riskAssessmentId;
+
     @NotBlank
     @Size(max = 40)
     private String decisionType;
@@ -29,6 +31,14 @@ public class TransactionDecisionRequest {
 
     @NotNull
     private Boolean finalDecision;
+
+    public UUID getRiskAssessmentId() {
+        return riskAssessmentId;
+    }
+
+    public void setRiskAssessmentId(UUID riskAssessmentId) {
+        this.riskAssessmentId = riskAssessmentId;
+    }
 
     public String getDecisionType() {
         return decisionType;

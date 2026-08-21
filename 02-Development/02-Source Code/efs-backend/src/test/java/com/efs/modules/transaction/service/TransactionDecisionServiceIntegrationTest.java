@@ -41,6 +41,11 @@ class TransactionDecisionServiceIntegrationTest {
                     "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
             );
 
+    private static final UUID RISK_ASSESSMENT_ID =
+            UUID.fromString(
+                    "aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb"
+            );
+
     @Autowired
     private TransactionDecisionServiceInterface service;
 
@@ -105,6 +110,38 @@ class TransactionDecisionServiceIntegrationTest {
                 CREATED_BY,
                 1
         );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO transaction.risk_assessment (
+                    risk_assessment_id,
+                    transaction_id,
+                    assessment_type,
+                    assessment_stage,
+                    overall_risk_score,
+                    risk_level,
+                    assessment_result,
+                    confidence_score,
+                    assessment_timestamp,
+                    created_at,
+                    updated_at,
+                    record_version
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                RISK_ASSESSMENT_ID,
+                TRANSACTION_ID,
+                "TRANSACTION",
+                "DECISION",
+                new BigDecimal("85.00"),
+                "HIGH",
+                "REVIEW",
+                new BigDecimal("90.00"),
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                0
+        );
     }
 
     @Test
@@ -135,6 +172,11 @@ class TransactionDecisionServiceIntegrationTest {
         );
 
         assertEquals(
+                RISK_ASSESSMENT_ID,
+                created.getRiskAssessmentId()
+        );
+
+        assertEquals(
                 "REVIEW",
                 created.getDecisionType()
         );
@@ -157,6 +199,11 @@ class TransactionDecisionServiceIntegrationTest {
         assertEquals(
                 created.getDecisionId(),
                 retrieved.getDecisionId()
+        );
+
+        assertEquals(
+                RISK_ASSESSMENT_ID,
+                retrieved.getRiskAssessmentId()
         );
     }
 
@@ -193,6 +240,11 @@ class TransactionDecisionServiceIntegrationTest {
         assertEquals(
                 2,
                 decisions.size()
+        );
+
+        assertEquals(
+                RISK_ASSESSMENT_ID,
+                decisions.get(0).getRiskAssessmentId()
         );
     }
 
@@ -262,6 +314,10 @@ class TransactionDecisionServiceIntegrationTest {
 
         TransactionDecisionRequest request =
                 new TransactionDecisionRequest();
+
+        request.setRiskAssessmentId(
+                RISK_ASSESSMENT_ID
+        );
 
         request.setDecisionType(
                 decisionType

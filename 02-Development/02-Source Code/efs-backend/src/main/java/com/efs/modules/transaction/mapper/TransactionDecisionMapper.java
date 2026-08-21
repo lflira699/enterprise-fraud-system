@@ -14,6 +14,10 @@ public class TransactionDecisionMapper {
         TransactionDecision decision =
                 new TransactionDecision();
 
+        decision.setRiskAssessmentId(
+                request.getRiskAssessmentId()
+        );
+
         decision.setDecisionType(
                 request.getDecisionType()
         );
@@ -57,6 +61,10 @@ public class TransactionDecisionMapper {
 
         response.setTransactionId(
                 decision.getTransactionId()
+        );
+
+        response.setRiskAssessmentId(
+                decision.getRiskAssessmentId()
         );
 
         response.setDecisionType(

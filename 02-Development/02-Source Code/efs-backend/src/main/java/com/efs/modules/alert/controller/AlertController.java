@@ -1,0 +1,172 @@
+package com.efs.modules.alert.controller;
+
+import com.efs.modules.alert.dto.AlertAssignmentRequest;
+import com.efs.modules.alert.dto.AlertClosureRequest;
+import com.efs.modules.alert.dto.AlertHistoryResponse;
+import com.efs.modules.alert.dto.AlertRequest;
+import com.efs.modules.alert.dto.AlertResponse;
+import com.efs.modules.alert.dto.AlertStatusUpdateRequest;
+import com.efs.modules.alert.service.AlertServiceInterface;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/alerts")
+public class AlertController {
+
+    private final AlertServiceInterface alertService;
+
+    public AlertController(
+            AlertServiceInterface alertService) {
+
+        this.alertService =
+                alertService;
+    }
+
+    @PostMapping
+    public ResponseEntity<AlertResponse> createAlert(
+            @Valid @RequestBody AlertRequest request) {
+
+        AlertResponse response =
+                alertService.createAlert(
+                        request
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+
+    @GetMapping("/{alertId}")
+    public ResponseEntity<AlertResponse> getAlertById(
+            @PathVariable UUID alertId) {
+
+        return ResponseEntity.ok(
+                alertService.getAlertById(
+                        alertId
+                )
+        );
+    }
+
+    @PatchMapping("/{alertId}/status")
+    public ResponseEntity<AlertResponse> updateAlertStatus(
+            @PathVariable UUID alertId,
+            @Valid @RequestBody AlertStatusUpdateRequest request) {
+
+        return ResponseEntity.ok(
+                alertService.updateAlertStatus(
+                        alertId,
+                        request
+                )
+        );
+    }
+
+    @PatchMapping("/{alertId}/assignment")
+    public ResponseEntity<AlertResponse> assignAlert(
+            @PathVariable UUID alertId,
+            @Valid @RequestBody AlertAssignmentRequest request) {
+
+        return ResponseEntity.ok(
+                alertService.assignAlert(
+                        alertId,
+                        request
+                )
+        );
+    }
+
+    @PostMapping("/{alertId}/close")
+    public ResponseEntity<AlertResponse> closeAlert(
+            @PathVariable UUID alertId,
+            @Valid @RequestBody AlertClosureRequest request) {
+
+        return ResponseEntity.ok(
+                alertService.closeAlert(
+                        alertId,
+                        request
+                )
+        );
+    }
+
+    @GetMapping("/{alertId}/history")
+    public ResponseEntity<List<AlertHistoryResponse>>
+    getAlertHistory(
+            @PathVariable UUID alertId) {
+
+        return ResponseEntity.ok(
+                alertService.getAlertHistory(
+                        alertId
+                )
+        );
+    }
+
+    @GetMapping("/transaction/{transactionId}")
+    public ResponseEntity<List<AlertResponse>>
+    getAlertsByTransactionId(
+            @PathVariable UUID transactionId) {
+
+        return ResponseEntity.ok(
+                alertService.getAlertsByTransactionId(
+                        transactionId
+                )
+        );
+    }
+
+    @GetMapping("/decision/{decisionId}")
+    public ResponseEntity<List<AlertResponse>>
+    getAlertsByDecisionId(
+            @PathVariable UUID decisionId) {
+
+        return ResponseEntity.ok(
+                alertService.getAlertsByDecisionId(
+                        decisionId
+                )
+        );
+    }
+
+    @GetMapping
+    public ResponseEntity<List<AlertResponse>> searchAlerts(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) String alertType) {
+
+        if (status != null) {
+            return ResponseEntity.ok(
+                    alertService.getAlertsByStatus(
+                            status
+                    )
+            );
+        }
+
+        if (priority != null) {
+            return ResponseEntity.ok(
+                    alertService.getAlertsByPriority(
+                            priority
+                    )
+            );
+        }
+
+        if (alertType != null) {
+            return ResponseEntity.ok(
+                    alertService.getAlertsByType(
+                            alertType
+                    )
+            );
+        }
+
+        return ResponseEntity.ok(
+                List.of()
+        );
+    }
+}

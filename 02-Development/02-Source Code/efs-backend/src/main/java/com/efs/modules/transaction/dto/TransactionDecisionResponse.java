@@ -8,6 +8,7 @@ public class TransactionDecisionResponse {
 
     private UUID decisionId;
     private UUID transactionId;
+    private UUID riskAssessmentId;
     private String decisionType;
     private String decisionSource;
     private BigDecimal confidenceScore;
@@ -30,6 +31,14 @@ public class TransactionDecisionResponse {
 
     public void setTransactionId(UUID transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public UUID getRiskAssessmentId() {
+        return riskAssessmentId;
+    }
+
+    public void setRiskAssessmentId(UUID riskAssessmentId) {
+        this.riskAssessmentId = riskAssessmentId;
     }
 
     public String getDecisionType() {
