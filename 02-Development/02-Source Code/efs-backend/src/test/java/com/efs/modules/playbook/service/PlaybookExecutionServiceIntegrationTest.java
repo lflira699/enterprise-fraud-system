@@ -1,0 +1,223 @@
+package com.efs.modules.playbook.service;
+
+import com.efs.modules.playbook.dto.PlaybookExecutionRequest;
+import com.efs.modules.playbook.dto.PlaybookExecutionResponse;
+import com.efs.modules.playbook.dto.PlaybookRequest;
+import com.efs.modules.playbook.dto.PlaybookResponse;
+import com.efs.modules.playbook.dto.PlaybookVersionRequest;
+import com.efs.modules.playbook.dto.PlaybookVersionResponse;
+import com.efs.modules.playbook.repository.PlaybookExecutionRepository;
+import com.efs.modules.playbook.repository.PlaybookRepository;
+import com.efs.modules.playbook.repository.PlaybookVersionRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+@SpringBootTest
+class PlaybookExecutionServiceIntegrationTest {
+
+    @Autowired
+    private PlaybookExecutionServiceInterface playbookExecutionService;
+
+    @Autowired
+    private PlaybookVersionServiceInterface playbookVersionService;
+
+    @Autowired
+    private PlaybookServiceInterface playbookService;
+
+    @Autowired
+    private PlaybookExecutionRepository playbookExecutionRepository;
+
+    @Autowired
+    private PlaybookVersionRepository playbookVersionRepository;
+
+    @Autowired
+    private PlaybookRepository playbookRepository;
+
+    @AfterEach
+    void cleanUp() {
+        playbookExecutionRepository.deleteAll();
+        playbookVersionRepository.deleteAll();
+        playbookRepository.deleteAll();
+    }
+
+    @Test
+    void shouldCreatePlaybookExecution() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-EXECUTION-001");
+
+        PlaybookExecutionRequest request =
+                new PlaybookExecutionRequest();
+
+        request.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        request.setStatus("TEST");
+
+        PlaybookExecutionResponse response =
+                playbookExecutionService.create(request);
+
+        assertNotNull(response.getPlaybookExecutionId());
+
+        assertEquals(
+                version.getPlaybookVersionId(),
+                response.getPlaybookVersionId()
+        );
+
+        assertEquals(
+                "TEST",
+                response.getStatus()
+        );
+
+        assertNotNull(response.getStartedAt());
+        assertNotNull(response.getCreatedAt());
+        assertNotNull(response.getUpdatedAt());
+    }
+
+    @Test
+    void shouldGetExecutionById() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-EXECUTION-002");
+
+        PlaybookExecutionRequest request =
+                new PlaybookExecutionRequest();
+
+        request.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        request.setStatus("LOOKUP_TEST");
+
+        PlaybookExecutionResponse created =
+                playbookExecutionService.create(request);
+
+        PlaybookExecutionResponse response =
+                playbookExecutionService.getById(
+                        created.getPlaybookExecutionId()
+                );
+
+        assertEquals(
+                created.getPlaybookExecutionId(),
+                response.getPlaybookExecutionId()
+        );
+
+        assertEquals(
+                "LOOKUP_TEST",
+                response.getStatus()
+        );
+    }
+
+    @Test
+    void shouldRejectInvalidExecutionPeriod() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-EXECUTION-003");
+
+        PlaybookExecutionRequest request =
+                new PlaybookExecutionRequest();
+
+        request.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+
+        request.setStatus("TEST");
+
+        request.setStartedAt(
+                LocalDateTime.of(2026, 8, 24, 10, 0)
+        );
+
+        request.setCompletedAt(
+                LocalDateTime.of(2026, 8, 23, 10, 0)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookExecutionService.create(request)
+        );
+    }
+
+    @Test
+    void shouldReturnExecutionsByPlaybookVersion() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-EXECUTION-004");
+
+        PlaybookExecutionRequest first =
+                new PlaybookExecutionRequest();
+
+        first.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        first.setStatus("TEST");
+
+        first.setStartedAt(
+                LocalDateTime.of(2026, 8, 23, 10, 0)
+        );
+
+        PlaybookExecutionRequest second =
+                new PlaybookExecutionRequest();
+
+        second.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        second.setStatus("TEST");
+
+        second.setStartedAt(
+                LocalDateTime.of(2026, 8, 23, 11, 0)
+        );
+
+        playbookExecutionService.create(first);
+        playbookExecutionService.create(second);
+
+        List<PlaybookExecutionResponse> results =
+                playbookExecutionService
+                        .getByPlaybookVersionId(
+                                version.getPlaybookVersionId()
+                        );
+
+        assertEquals(2, results.size());
+
+        assertEquals(
+                LocalDateTime.of(2026, 8, 23, 11, 0),
+                results.get(0).getStartedAt()
+        );
+
+        assertEquals(
+                LocalDateTime.of(2026, 8, 23, 10, 0),
+                results.get(1).getStartedAt()
+        );
+    }
+
+    private PlaybookVersionResponse createPlaybookVersion(
+            String code
+    ) {
+        PlaybookRequest playbookRequest =
+                new PlaybookRequest();
+
+        playbookRequest.setPlaybookCode(code);
+        playbookRequest.setPlaybookName(code);
+        playbookRequest.setStatus("TEST");
+
+        PlaybookResponse playbook =
+                playbookService.create(playbookRequest);
+
+        PlaybookVersionRequest versionRequest =
+                new PlaybookVersionRequest();
+
+        versionRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        versionRequest.setVersionNumber(1);
+        versionRequest.setStatus("TEST");
+
+        return playbookVersionService.create(
+                versionRequest
+        );
+    }
+}
