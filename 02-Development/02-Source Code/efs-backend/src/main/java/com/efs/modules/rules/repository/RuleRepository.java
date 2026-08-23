@@ -2,11 +2,13 @@ package com.efs.modules.rules.repository;
 
 import com.efs.modules.rules.entity.Rule;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Repository
 public interface RuleRepository
         extends JpaRepository<Rule, UUID> {
 
@@ -29,4 +31,6 @@ public interface RuleRepository
     List<Rule> findBySeverityOrderByPriorityAsc(
             String severity
     );
+
+    List<Rule> findAllByOrderByPriorityAsc();
 }
