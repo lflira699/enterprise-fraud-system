@@ -10,11 +10,7 @@ import com.efs.modules.playbook.dto.PlaybookStepRequest;
 import com.efs.modules.playbook.dto.PlaybookStepResponse;
 import com.efs.modules.playbook.dto.PlaybookVersionRequest;
 import com.efs.modules.playbook.dto.PlaybookVersionResponse;
-import com.efs.modules.playbook.repository.PlaybookExecutionRepository;
-import com.efs.modules.playbook.repository.PlaybookExecutionStepRepository;
-import com.efs.modules.playbook.repository.PlaybookRepository;
-import com.efs.modules.playbook.repository.PlaybookStepRepository;
-import com.efs.modules.playbook.repository.PlaybookVersionRepository;
+import com.efs.modules.playbook.support.PlaybookTestDataCleaner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,32 +47,11 @@ class PlaybookExecutionStepServiceIntegrationTest {
             playbookService;
 
     @Autowired
-    private PlaybookExecutionStepRepository
-            playbookExecutionStepRepository;
-
-    @Autowired
-    private PlaybookExecutionRepository
-            playbookExecutionRepository;
-
-    @Autowired
-    private PlaybookStepRepository
-            playbookStepRepository;
-
-    @Autowired
-    private PlaybookVersionRepository
-            playbookVersionRepository;
-
-    @Autowired
-    private PlaybookRepository
-            playbookRepository;
+    private PlaybookTestDataCleaner playbookTestDataCleaner;
 
     @AfterEach
     void cleanUp() {
-        playbookExecutionStepRepository.deleteAll();
-        playbookExecutionRepository.deleteAll();
-        playbookStepRepository.deleteAll();
-        playbookVersionRepository.deleteAll();
-        playbookRepository.deleteAll();
+        playbookTestDataCleaner.clean();
     }
 
     @Test

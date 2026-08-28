@@ -6,9 +6,7 @@ import com.efs.modules.playbook.dto.PlaybookRequest;
 import com.efs.modules.playbook.dto.PlaybookResponse;
 import com.efs.modules.playbook.dto.PlaybookVersionRequest;
 import com.efs.modules.playbook.dto.PlaybookVersionResponse;
-import com.efs.modules.playbook.repository.PlaybookExecutionRepository;
-import com.efs.modules.playbook.repository.PlaybookRepository;
-import com.efs.modules.playbook.repository.PlaybookVersionRepository;
+import com.efs.modules.playbook.support.PlaybookTestDataCleaner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,19 +32,11 @@ class PlaybookExecutionServiceIntegrationTest {
     private PlaybookServiceInterface playbookService;
 
     @Autowired
-    private PlaybookExecutionRepository playbookExecutionRepository;
-
-    @Autowired
-    private PlaybookVersionRepository playbookVersionRepository;
-
-    @Autowired
-    private PlaybookRepository playbookRepository;
+    private PlaybookTestDataCleaner playbookTestDataCleaner;
 
     @AfterEach
     void cleanUp() {
-        playbookExecutionRepository.deleteAll();
-        playbookVersionRepository.deleteAll();
-        playbookRepository.deleteAll();
+        playbookTestDataCleaner.clean();
     }
 
     @Test
