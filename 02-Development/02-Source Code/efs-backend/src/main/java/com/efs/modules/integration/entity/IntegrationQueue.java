@@ -3,6 +3,7 @@ package com.efs.modules.integration.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Generated;
@@ -62,11 +63,19 @@ public class IntegrationQueue {
 
     @Column(
             name = "created_at",
-            nullable = false
+            nullable = false,
+            updatable = false
     )
     private LocalDateTime createdAt;
 
     public IntegrationQueue() {
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     public UUID getQueueId() {
