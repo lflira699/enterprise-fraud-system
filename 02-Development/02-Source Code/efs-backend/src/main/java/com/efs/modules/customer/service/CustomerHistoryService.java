@@ -38,18 +38,21 @@ public class CustomerHistoryService
             UUID customerId,
             CustomerHistoryRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerHistory history =
                 customerHistoryMapper.toEntity(request);
 
         history.setCustomerId(customerId);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         if (history.getEventTimestamp() == null) {
             history.setEventTimestamp(now);
@@ -86,11 +89,13 @@ public class CustomerHistoryService
     public List<CustomerHistoryResponse> getHistoryByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerHistoryRepository
                 .findByCustomerIdOrderByEventTimestampDesc(customerId)

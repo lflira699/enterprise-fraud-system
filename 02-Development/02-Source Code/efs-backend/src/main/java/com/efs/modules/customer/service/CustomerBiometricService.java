@@ -38,11 +38,13 @@ public class CustomerBiometricService
             UUID customerId,
             CustomerBiometricRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerBiometric biometric =
                 customerBiometricMapper.toEntity(request);
@@ -53,7 +55,8 @@ public class CustomerBiometricService
             biometric.setActive(Boolean.TRUE);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         biometric.setCreatedAt(now);
         biometric.setUpdatedAt(now);
@@ -89,11 +92,13 @@ public class CustomerBiometricService
     public List<CustomerBiometricResponse> getBiometricsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerBiometricRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)
@@ -129,7 +134,9 @@ public class CustomerBiometricService
             biometric.setActive(Boolean.TRUE);
         }
 
-        biometric.setUpdatedAt(LocalDateTime.now());
+        biometric.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         CustomerBiometric savedBiometric =
                 customerBiometricRepository.save(biometric);
@@ -139,7 +146,8 @@ public class CustomerBiometricService
 
     @Override
     @Transactional
-    public void deleteBiometric(UUID biometricId) {
+    public void deleteBiometric(
+            UUID biometricId) {
 
         CustomerBiometric biometric =
                 customerBiometricRepository
@@ -153,7 +161,8 @@ public class CustomerBiometricService
                                 )
                         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         biometric.setDeletedAt(now);
         biometric.setUpdatedAt(now);

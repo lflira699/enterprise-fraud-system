@@ -38,11 +38,13 @@ public class CustomerPhoneService
             UUID customerId,
             CustomerPhoneRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerPhone phone =
                 customerPhoneMapper.toEntity(request);
@@ -61,7 +63,9 @@ public class CustomerPhoneService
             phone.setVerifiedAt(LocalDateTime.now());
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         phone.setCreatedAt(now);
         phone.setUpdatedAt(now);
 
@@ -96,11 +100,13 @@ public class CustomerPhoneService
     public List<CustomerPhoneResponse> getPhonesByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerPhoneRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)
@@ -127,9 +133,13 @@ public class CustomerPhoneService
                                 )
                         );
 
-        Boolean previouslyVerified = phone.getVerified();
+        Boolean previouslyVerified =
+                phone.getVerified();
 
-        customerPhoneMapper.updateEntity(request, phone);
+        customerPhoneMapper.updateEntity(
+                request,
+                phone
+        );
 
         if (phone.getPrimary() == null) {
             phone.setPrimary(Boolean.FALSE);
@@ -141,6 +151,7 @@ public class CustomerPhoneService
 
         if (Boolean.TRUE.equals(phone.getVerified())
                 && !Boolean.TRUE.equals(previouslyVerified)) {
+
             phone.setVerifiedAt(LocalDateTime.now());
         }
 
@@ -148,7 +159,9 @@ public class CustomerPhoneService
             phone.setVerifiedAt(null);
         }
 
-        phone.setUpdatedAt(LocalDateTime.now());
+        phone.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         CustomerPhone savedPhone =
                 customerPhoneRepository.save(phone);
@@ -174,7 +187,8 @@ public class CustomerPhoneService
                                 )
                         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         phone.setDeletedAt(now);
         phone.setDeletedBy(deletedBy);

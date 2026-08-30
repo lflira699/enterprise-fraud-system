@@ -38,11 +38,13 @@ public class CustomerWatchlistService
             UUID customerId,
             CustomerWatchlistRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerWatchlist watchlist =
                 customerWatchlistMapper.toEntity(request);
@@ -93,11 +95,13 @@ public class CustomerWatchlistService
     public List<CustomerWatchlistResponse> getWatchlistsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerWatchlistRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)

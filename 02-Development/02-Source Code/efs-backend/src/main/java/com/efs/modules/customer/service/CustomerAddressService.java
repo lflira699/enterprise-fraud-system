@@ -38,11 +38,13 @@ public class CustomerAddressService
             UUID customerId,
             CustomerAddressRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerAddress address =
                 customerAddressMapper.toEntity(request);
@@ -53,7 +55,9 @@ public class CustomerAddressService
             address.setPrimary(Boolean.FALSE);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         address.setCreatedAt(now);
         address.setUpdatedAt(now);
 
@@ -88,11 +92,13 @@ public class CustomerAddressService
     public List<CustomerAddressResponse> getAddressesByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerAddressRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)
@@ -119,13 +125,18 @@ public class CustomerAddressService
                                 )
                         );
 
-        customerAddressMapper.updateEntity(request, address);
+        customerAddressMapper.updateEntity(
+                request,
+                address
+        );
 
         if (address.getPrimary() == null) {
             address.setPrimary(Boolean.FALSE);
         }
 
-        address.setUpdatedAt(LocalDateTime.now());
+        address.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         CustomerAddress savedAddress =
                 customerAddressRepository.save(address);
@@ -151,7 +162,8 @@ public class CustomerAddressService
                                 )
                         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         address.setDeletedAt(now);
         address.setDeletedBy(deletedBy);

@@ -38,11 +38,13 @@ public class CustomerEmailService
             UUID customerId,
             CustomerEmailRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerEmail email =
                 customerEmailMapper.toEntity(request);
@@ -61,7 +63,9 @@ public class CustomerEmailService
             email.setVerifiedAt(LocalDateTime.now());
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         email.setCreatedAt(now);
         email.setUpdatedAt(now);
 
@@ -96,11 +100,13 @@ public class CustomerEmailService
     public List<CustomerEmailResponse> getEmailsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerEmailRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)
@@ -127,9 +133,13 @@ public class CustomerEmailService
                                 )
                         );
 
-        Boolean previouslyVerified = email.getVerified();
+        Boolean previouslyVerified =
+                email.getVerified();
 
-        customerEmailMapper.updateEntity(request, email);
+        customerEmailMapper.updateEntity(
+                request,
+                email
+        );
 
         if (email.getPrimary() == null) {
             email.setPrimary(Boolean.FALSE);
@@ -141,6 +151,7 @@ public class CustomerEmailService
 
         if (Boolean.TRUE.equals(email.getVerified())
                 && !Boolean.TRUE.equals(previouslyVerified)) {
+
             email.setVerifiedAt(LocalDateTime.now());
         }
 
@@ -148,7 +159,9 @@ public class CustomerEmailService
             email.setVerifiedAt(null);
         }
 
-        email.setUpdatedAt(LocalDateTime.now());
+        email.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         CustomerEmail savedEmail =
                 customerEmailRepository.save(email);
@@ -174,7 +187,8 @@ public class CustomerEmailService
                                 )
                         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         email.setDeletedAt(now);
         email.setDeletedBy(deletedBy);

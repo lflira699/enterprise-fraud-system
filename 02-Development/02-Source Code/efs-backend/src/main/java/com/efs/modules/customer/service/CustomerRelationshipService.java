@@ -39,27 +39,36 @@ public class CustomerRelationshipService
             UUID customerId,
             CustomerRelationshipRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
-        validateRelationship(customerId, request);
+        validateRelationship(
+                customerId,
+                request
+        );
 
         CustomerRelationship relationship =
                 customerRelationshipMapper.toEntity(request);
 
         relationship.setCustomerId(customerId);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         relationship.setCreatedAt(now);
         relationship.setUpdatedAt(now);
 
         CustomerRelationship savedRelationship =
                 customerRelationshipRepository.save(relationship);
 
-        return customerRelationshipMapper.toResponse(savedRelationship);
+        return customerRelationshipMapper.toResponse(
+                savedRelationship
+        );
     }
 
     @Override
@@ -79,7 +88,9 @@ public class CustomerRelationshipService
                                 )
                         );
 
-        return customerRelationshipMapper.toResponse(relationship);
+        return customerRelationshipMapper.toResponse(
+                relationship
+        );
     }
 
     @Override
@@ -87,11 +98,13 @@ public class CustomerRelationshipService
     public List<CustomerRelationshipResponse> getRelationshipsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerRelationshipRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)
@@ -128,12 +141,16 @@ public class CustomerRelationshipService
                 relationship
         );
 
-        relationship.setUpdatedAt(LocalDateTime.now());
+        relationship.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         CustomerRelationship savedRelationship =
                 customerRelationshipRepository.save(relationship);
 
-        return customerRelationshipMapper.toResponse(savedRelationship);
+        return customerRelationshipMapper.toResponse(
+                savedRelationship
+        );
     }
 
     @Override
@@ -154,13 +171,16 @@ public class CustomerRelationshipService
                                 )
                         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         relationship.setDeletedAt(now);
         relationship.setDeletedBy(deletedBy);
         relationship.setUpdatedAt(now);
 
-        customerRelationshipRepository.save(relationship);
+        customerRelationshipRepository.save(
+                relationship
+        );
     }
 
     private void validateRelationship(
@@ -169,20 +189,24 @@ public class CustomerRelationshipService
 
         if (request.getRelatedCustomerId() != null) {
 
-            if (customerId.equals(request.getRelatedCustomerId())) {
+            if (customerId.equals(
+                    request.getRelatedCustomerId())) {
+
                 throw new ValidationException(
                         "A customer cannot be related to itself"
                 );
             }
 
-            if (!customerRepository.existsById(
-                    request.getRelatedCustomerId())) {
-
-                throw new ResourceNotFoundException(
-                        "Related customer not found: "
-                                + request.getRelatedCustomerId()
-                );
-            }
+            customerRepository
+                    .findByCustomerIdAndDeletedAtIsNull(
+                            request.getRelatedCustomerId()
+                    )
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(
+                                    "Related customer not found: "
+                                            + request.getRelatedCustomerId()
+                            )
+                    );
         }
 
         if (request.getEffectiveDate() != null

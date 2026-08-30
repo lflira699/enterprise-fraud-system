@@ -38,11 +38,13 @@ public class CustomerDeviceService
             UUID customerId,
             CustomerDeviceRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         if (customerDeviceRepository
                 .existsByCustomerIdAndDeviceFingerprint(
@@ -71,13 +73,16 @@ public class CustomerDeviceService
 
     @Override
     @Transactional(readOnly = true)
-    public CustomerDeviceResponse getDeviceById(UUID deviceId) {
+    public CustomerDeviceResponse getDeviceById(
+            UUID deviceId) {
 
         CustomerDevice device =
-                customerDeviceRepository.findById(deviceId)
+                customerDeviceRepository
+                        .findById(deviceId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
-                                        "Customer device not found: " + deviceId
+                                        "Customer device not found: "
+                                                + deviceId
                                 )
                         );
 
@@ -89,11 +94,13 @@ public class CustomerDeviceService
     public List<CustomerDeviceResponse> getDevicesByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerDeviceRepository
                 .findByCustomerId(customerId)
@@ -109,10 +116,12 @@ public class CustomerDeviceService
             CustomerDeviceRequest request) {
 
         CustomerDevice device =
-                customerDeviceRepository.findById(deviceId)
+                customerDeviceRepository
+                        .findById(deviceId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
-                                        "Customer device not found: " + deviceId
+                                        "Customer device not found: "
+                                                + deviceId
                                 )
                         );
 
@@ -132,7 +141,10 @@ public class CustomerDeviceService
             );
         }
 
-        customerDeviceMapper.updateEntity(request, device);
+        customerDeviceMapper.updateEntity(
+                request,
+                device
+        );
 
         if (device.getActive() == null) {
             device.setActive(Boolean.TRUE);

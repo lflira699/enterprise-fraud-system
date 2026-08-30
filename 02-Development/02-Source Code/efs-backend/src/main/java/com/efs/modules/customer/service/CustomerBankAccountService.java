@@ -38,11 +38,13 @@ public class CustomerBankAccountService
             UUID customerId,
             CustomerBankAccountRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         CustomerBankAccount bankAccount =
                 customerBankAccountMapper.toEntity(request);
@@ -57,7 +59,9 @@ public class CustomerBankAccountService
             bankAccount.setVerified(Boolean.FALSE);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         bankAccount.setCreatedAt(now);
         bankAccount.setUpdatedAt(now);
 
@@ -92,11 +96,13 @@ public class CustomerBankAccountService
     public List<CustomerBankAccountResponse> getBankAccountsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerBankAccountRepository
                 .findByCustomerIdAndDeletedAtIsNull(customerId)
@@ -123,7 +129,10 @@ public class CustomerBankAccountService
                                 )
                         );
 
-        customerBankAccountMapper.updateEntity(request, bankAccount);
+        customerBankAccountMapper.updateEntity(
+                request,
+                bankAccount
+        );
 
         if (bankAccount.getPrimary() == null) {
             bankAccount.setPrimary(Boolean.FALSE);
@@ -133,7 +142,9 @@ public class CustomerBankAccountService
             bankAccount.setVerified(Boolean.FALSE);
         }
 
-        bankAccount.setUpdatedAt(LocalDateTime.now());
+        bankAccount.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         CustomerBankAccount savedBankAccount =
                 customerBankAccountRepository.save(bankAccount);
@@ -159,7 +170,8 @@ public class CustomerBankAccountService
                                 )
                         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         bankAccount.setDeletedAt(now);
         bankAccount.setDeletedBy(deletedBy);

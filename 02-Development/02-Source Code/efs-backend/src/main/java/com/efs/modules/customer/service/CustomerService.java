@@ -33,13 +33,17 @@ public class CustomerService implements CustomerServiceInterface {
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
 
-        if (customerRepository.existsByCustomerNumber(request.getCustomerNumber())) {
+        if (customerRepository.existsByCustomerNumber(
+                request.getCustomerNumber())) {
+
             throw new DuplicateRecordException(
-                    "Customer number already exists: " + request.getCustomerNumber()
+                    "Customer number already exists: "
+                            + request.getCustomerNumber()
             );
         }
 
-        Customer customer = customerMapper.toEntity(request);
+        Customer customer =
+                customerMapper.toEntity(request);
 
         customer.setRiskLevel(
                 request.getRiskLevel() != null
@@ -62,36 +66,54 @@ public class CustomerService implements CustomerServiceInterface {
         customer.setRecordStatus("ACTIVE");
         customer.setRecordVersion(1);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         customer.setCreatedAt(now);
         customer.setUpdatedAt(now);
 
-        Customer savedCustomer = customerRepository.save(customer);
+        Customer savedCustomer =
+                customerRepository.save(customer);
 
         return customerMapper.toResponse(savedCustomer);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public CustomerResponse getCustomerById(UUID customerId) {
+    public CustomerResponse getCustomerById(
+            UUID customerId) {
 
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found: " + customerId
-                ));
+        Customer customer =
+                customerRepository
+                        .findByCustomerIdAndDeletedAtIsNull(
+                                customerId
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Customer not found: "
+                                                + customerId
+                                )
+                        );
 
         return customerMapper.toResponse(customer);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public CustomerResponse getCustomerByNumber(String customerNumber) {
+    public CustomerResponse getCustomerByNumber(
+            String customerNumber) {
 
-        Customer customer = customerRepository
-                .findByCustomerNumber(customerNumber)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found: " + customerNumber
-                ));
+        Customer customer =
+                customerRepository
+                        .findByCustomerNumberAndDeletedAtIsNull(
+                                customerNumber
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Customer not found: "
+                                                + customerNumber
+                                )
+                        );
 
         return customerMapper.toResponse(customer);
     }
@@ -100,7 +122,8 @@ public class CustomerService implements CustomerServiceInterface {
     @Transactional(readOnly = true)
     public List<CustomerResponse> getAllCustomers() {
 
-        return customerRepository.findAll()
+        return customerRepository
+                .findAllByDeletedAtIsNull()
                 .stream()
                 .map(customerMapper::toResponse)
                 .toList();
@@ -112,12 +135,20 @@ public class CustomerService implements CustomerServiceInterface {
             UUID customerId,
             CustomerRequest request) {
 
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found: " + customerId
-                ));
+        Customer customer =
+                customerRepository
+                        .findByCustomerIdAndDeletedAtIsNull(
+                                customerId
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Customer not found: "
+                                                + customerId
+                                )
+                        );
 
-        if (!customer.getCustomerNumber().equals(request.getCustomerNumber())
+        if (!customer.getCustomerNumber()
+                .equals(request.getCustomerNumber())
                 && customerRepository.existsByCustomerNumber(
                         request.getCustomerNumber())) {
 
@@ -127,7 +158,10 @@ public class CustomerService implements CustomerServiceInterface {
             );
         }
 
-        customerMapper.updateEntity(request, customer);
+        customerMapper.updateEntity(
+                request,
+                customer
+        );
 
         if (customer.getRiskLevel() == null) {
             customer.setRiskLevel("LOW");
@@ -141,23 +175,35 @@ public class CustomerService implements CustomerServiceInterface {
             customer.setCustomerStatus("ACTIVE");
         }
 
-        customer.setUpdatedAt(LocalDateTime.now());
+        customer.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
-        Customer savedCustomer = customerRepository.save(customer);
+        Customer savedCustomer =
+                customerRepository.save(customer);
 
         return customerMapper.toResponse(savedCustomer);
     }
 
     @Override
     @Transactional
-    public void deleteCustomer(UUID customerId) {
+    public void deleteCustomer(
+            UUID customerId) {
 
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found: " + customerId
-                ));
+        Customer customer =
+                customerRepository
+                        .findByCustomerIdAndDeletedAtIsNull(
+                                customerId
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Customer not found: "
+                                                + customerId
+                                )
+                        );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         customer.setRecordStatus("DELETED");
         customer.setDeletedAt(now);

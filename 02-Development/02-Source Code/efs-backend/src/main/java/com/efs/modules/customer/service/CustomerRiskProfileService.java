@@ -39,14 +39,11 @@ public class CustomerRiskProfileService
             UUID customerId,
             CustomerRiskProfileRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        validateActiveCustomer(customerId);
 
         if (customerRiskProfileRepository
                 .existsByCustomerIdAndDeletedAtIsNull(customerId)) {
+
             throw new DuplicateRecordException(
                     "Customer risk profile already exists"
             );
@@ -57,43 +54,10 @@ public class CustomerRiskProfileService
 
         profile.setCustomerId(customerId);
 
-        if (profile.getCurrentRiskScore() == null) {
-            profile.setCurrentRiskScore(BigDecimal.ZERO);
-        }
+        applyDefaultScores(profile);
 
-        if (profile.getBehaviorScore() == null) {
-            profile.setBehaviorScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getFraudScore() == null) {
-            profile.setFraudScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getAmlScore() == null) {
-            profile.setAmlScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getKycScore() == null) {
-            profile.setKycScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getDeviceScore() == null) {
-            profile.setDeviceScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getSanctionsScore() == null) {
-            profile.setSanctionsScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getPepScore() == null) {
-            profile.setPepScore(BigDecimal.ZERO);
-        }
-
-        if (profile.getWatchlistScore() == null) {
-            profile.setWatchlistScore(BigDecimal.ZERO);
-        }
-
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         profile.setLastCalculation(now);
         profile.setCreatedAt(now);
@@ -102,7 +66,9 @@ public class CustomerRiskProfileService
         CustomerRiskProfile savedProfile =
                 customerRiskProfileRepository.save(profile);
 
-        return customerRiskProfileMapper.toResponse(savedProfile);
+        return customerRiskProfileMapper.toResponse(
+                savedProfile
+        );
     }
 
     @Override
@@ -110,15 +76,13 @@ public class CustomerRiskProfileService
     public CustomerRiskProfileResponse getRiskProfileByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        validateActiveCustomer(customerId);
 
         CustomerRiskProfile profile =
                 customerRiskProfileRepository
-                        .findByCustomerIdAndDeletedAtIsNull(customerId)
+                        .findByCustomerIdAndDeletedAtIsNull(
+                                customerId
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Customer risk profile not found: "
@@ -126,7 +90,9 @@ public class CustomerRiskProfileService
                                 )
                         );
 
-        return customerRiskProfileMapper.toResponse(profile);
+        return customerRiskProfileMapper.toResponse(
+                profile
+        );
     }
 
     @Override
@@ -135,9 +101,13 @@ public class CustomerRiskProfileService
             UUID customerId,
             CustomerRiskProfileRequest request) {
 
+        validateActiveCustomer(customerId);
+
         CustomerRiskProfile profile =
                 customerRiskProfileRepository
-                        .findByCustomerIdAndDeletedAtIsNull(customerId)
+                        .findByCustomerIdAndDeletedAtIsNull(
+                                customerId
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Customer risk profile not found: "
@@ -145,7 +115,69 @@ public class CustomerRiskProfileService
                                 )
                         );
 
-        customerRiskProfileMapper.updateEntity(request, profile);
+        customerRiskProfileMapper.updateEntity(
+                request,
+                profile
+        );
+
+        applyDefaultScores(profile);
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        profile.setLastCalculation(now);
+        profile.setUpdatedAt(now);
+
+        CustomerRiskProfile savedProfile =
+                customerRiskProfileRepository.save(profile);
+
+        return customerRiskProfileMapper.toResponse(
+                savedProfile
+        );
+    }
+
+    @Override
+    @Transactional
+    public void deleteRiskProfile(
+            UUID customerId) {
+
+        validateActiveCustomer(customerId);
+
+        CustomerRiskProfile profile =
+                customerRiskProfileRepository
+                        .findByCustomerIdAndDeletedAtIsNull(
+                                customerId
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Customer risk profile not found: "
+                                                + customerId
+                                )
+                        );
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        profile.setDeletedAt(now);
+        profile.setUpdatedAt(now);
+
+        customerRiskProfileRepository.save(profile);
+    }
+
+    private void validateActiveCustomer(
+            UUID customerId) {
+
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
+    }
+
+    private void applyDefaultScores(
+            CustomerRiskProfile profile) {
 
         if (profile.getCurrentRiskScore() == null) {
             profile.setCurrentRiskScore(BigDecimal.ZERO);
@@ -182,37 +214,5 @@ public class CustomerRiskProfileService
         if (profile.getWatchlistScore() == null) {
             profile.setWatchlistScore(BigDecimal.ZERO);
         }
-
-        LocalDateTime now = LocalDateTime.now();
-
-        profile.setLastCalculation(now);
-        profile.setUpdatedAt(now);
-
-        CustomerRiskProfile savedProfile =
-                customerRiskProfileRepository.save(profile);
-
-        return customerRiskProfileMapper.toResponse(savedProfile);
-    }
-
-    @Override
-    @Transactional
-    public void deleteRiskProfile(UUID customerId) {
-
-        CustomerRiskProfile profile =
-                customerRiskProfileRepository
-                        .findByCustomerIdAndDeletedAtIsNull(customerId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Customer risk profile not found: "
-                                                + customerId
-                                )
-                        );
-
-        LocalDateTime now = LocalDateTime.now();
-
-        profile.setDeletedAt(now);
-        profile.setUpdatedAt(now);
-
-        customerRiskProfileRepository.save(profile);
     }
 }

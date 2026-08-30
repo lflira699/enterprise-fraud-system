@@ -39,11 +39,13 @@ public class CustomerDocumentService
             UUID customerId,
             CustomerDocumentRequest request) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         if (customerDocumentRepository
                 .existsByCustomerIdAndDocumentTypeAndDocumentNumber(
@@ -61,12 +63,15 @@ public class CustomerDocumentService
 
         document.setCustomerId(customerId);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         document.setCreatedAt(now);
         document.setUpdatedAt(now);
 
         if (request.getVerificationStatus() != null
                 && request.getVerifiedBy() != null) {
+
             document.setVerifiedAt(now);
         }
 
@@ -78,10 +83,12 @@ public class CustomerDocumentService
 
     @Override
     @Transactional(readOnly = true)
-    public CustomerDocumentResponse getDocumentById(UUID documentId) {
+    public CustomerDocumentResponse getDocumentById(
+            UUID documentId) {
 
         CustomerDocument document =
-                customerDocumentRepository.findById(documentId)
+                customerDocumentRepository
+                        .findById(documentId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Customer document not found: "
@@ -97,11 +104,13 @@ public class CustomerDocumentService
     public List<CustomerDocumentResponse> getDocumentsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException(
-                    "Customer not found: " + customerId
-            );
-        }
+        customerRepository
+                .findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Customer not found: " + customerId
+                        )
+                );
 
         return customerDocumentRepository
                 .findByCustomerId(customerId)
@@ -117,7 +126,8 @@ public class CustomerDocumentService
             CustomerDocumentRequest request) {
 
         CustomerDocument document =
-                customerDocumentRepository.findById(documentId)
+                customerDocumentRepository
+                        .findById(documentId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Customer document not found: "
@@ -144,14 +154,20 @@ public class CustomerDocumentService
             );
         }
 
-        customerDocumentMapper.updateEntity(request, document);
+        customerDocumentMapper.updateEntity(
+                request,
+                document
+        );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
+
         document.setUpdatedAt(now);
 
         if (request.getVerificationStatus() != null
                 && request.getVerifiedBy() != null
                 && document.getVerifiedAt() == null) {
+
             document.setVerifiedAt(now);
         }
 
@@ -163,10 +179,12 @@ public class CustomerDocumentService
 
     @Override
     @Transactional
-    public void deleteDocument(UUID documentId) {
+    public void deleteDocument(
+            UUID documentId) {
 
         CustomerDocument document =
-                customerDocumentRepository.findById(documentId)
+                customerDocumentRepository
+                        .findById(documentId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Customer document not found: "
