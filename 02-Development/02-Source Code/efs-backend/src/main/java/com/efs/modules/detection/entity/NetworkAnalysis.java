@@ -43,10 +43,10 @@ public class NetworkAnalysis {
     private String networkKey;
 
     @Column(name = "entity_count", nullable = false)
-    private Integer entityCount;
+    private Integer entityCount = 0;
 
     @Column(name = "relationship_count", nullable = false)
-    private Integer relationshipCount;
+    private Integer relationshipCount = 0;
 
     @Column(name = "network_confidence", precision = 8, scale = 4)
     private BigDecimal networkConfidence;

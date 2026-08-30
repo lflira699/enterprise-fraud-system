@@ -26,12 +26,16 @@ public class ScenarioEvaluationRequest {
     @NotNull
     private Boolean matched;
 
+    @NotNull
     private Short ruleCount;
 
+    @NotNull
     private Short matchedRuleCount;
 
+    @NotNull
     private Short requiredEvidenceCount;
 
+    @NotNull
     private Short availableEvidenceCount;
 
     private BigDecimal confidence;

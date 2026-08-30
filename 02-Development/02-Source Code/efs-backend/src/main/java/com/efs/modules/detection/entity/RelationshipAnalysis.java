@@ -55,10 +55,10 @@ public class RelationshipAnalysis {
     private BigDecimal relationshipStrength;
 
     @Column(name = "entity_count", nullable = false)
-    private Integer entityCount;
+    private Integer entityCount = 0;
 
     @Column(name = "relationship_count", nullable = false)
-    private Integer relationshipCount;
+    private Integer relationshipCount = 0;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "relationship_indicators", columnDefinition = "jsonb")
