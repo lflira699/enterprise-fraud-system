@@ -46,7 +46,7 @@ public class TransactionService
         }
 
         if (transactionRepository
-                .existsByTransactionReferenceAndDeletedAtIsNull(
+                .existsByTransactionReference(
                         request.getTransactionReference()
                 )) {
 
@@ -173,7 +173,7 @@ public class TransactionService
         }
 
         transactionRepository
-                .findByTransactionReferenceAndDeletedAtIsNull(
+                .findByTransactionReference(
                         request.getTransactionReference()
                 )
                 .filter(existing ->

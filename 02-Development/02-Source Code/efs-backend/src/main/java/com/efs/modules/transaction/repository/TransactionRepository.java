@@ -18,11 +18,19 @@ public interface TransactionRepository
             String transactionReference
     );
 
+    Optional<Transaction> findByTransactionReference(
+            String transactionReference
+    );
+
     List<Transaction> findByCustomerIdAndDeletedAtIsNullOrderByTransactionDatetimeDesc(
             UUID customerId
     );
 
     boolean existsByTransactionReferenceAndDeletedAtIsNull(
+            String transactionReference
+    );
+
+    boolean existsByTransactionReference(
             String transactionReference
     );
 }
