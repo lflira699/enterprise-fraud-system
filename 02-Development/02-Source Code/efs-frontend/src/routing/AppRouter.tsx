@@ -1,6 +1,7 @@
 import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
+import AppLayout from '../shared/layouts/AppLayout'
 import { ROUTE_PATHS, type RoutePath } from './routePaths'
 
 type RouteBoundaryProps = {
@@ -11,27 +12,10 @@ function RouteBoundary({
   path,
 }: RouteBoundaryProps) {
   return (
-    <Box
-      component="main"
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 1,
-      }}
-    >
+    <Box>
       <Typography
-        component="h1"
+        component="h2"
         variant="h4"
-      >
-        Enterprise Fraud System
-      </Typography>
-
-      <Typography
-        component="p"
-        variant="body2"
       >
         {path}
       </Typography>
@@ -41,106 +25,108 @@ function RouteBoundary({
 
 function AppRouter() {
   return (
-    <Routes>
-      <Route
-        path={ROUTE_PATHS.dashboard}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.dashboard}
-          />
-        }
-      />
+    <AppLayout>
+      <Routes>
+        <Route
+          path={ROUTE_PATHS.dashboard}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.dashboard}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.events}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.events}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.events}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.events}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.rules}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.rules}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.rules}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.rules}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.detection}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.detection}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.detection}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.detection}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.risk}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.risk}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.risk}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.risk}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.alerts}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.alerts}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.alerts}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.alerts}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.cases}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.cases}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.cases}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.cases}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.evidence}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.evidence}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.evidence}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.evidence}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.reports}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.reports}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.reports}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.reports}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.administration}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.administration}
-          />
-        }
-      />
+        <Route
+          path={ROUTE_PATHS.administration}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.administration}
+            />
+          }
+        />
 
-      <Route
-        path={ROUTE_PATHS.audit}
-        element={
-          <RouteBoundary
-            path={ROUTE_PATHS.audit}
-          />
-        }
-      />
-    </Routes>
+        <Route
+          path={ROUTE_PATHS.audit}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.audit}
+            />
+          }
+        />
+      </Routes>
+    </AppLayout>
   )
 }
 
