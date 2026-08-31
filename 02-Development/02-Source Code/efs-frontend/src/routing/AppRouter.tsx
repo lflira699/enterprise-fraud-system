@@ -1,6 +1,7 @@
 import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
+import AlertsPage from '../modules/alerts/pages/AlertsPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
 import AppLayout from '../shared/layouts/AppLayout'
 import AppNavigation from './AppNavigation'
@@ -74,11 +75,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.alerts}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.alerts}
-            />
-          }
+          element={<AlertsPage />}
         />
 
         <Route
