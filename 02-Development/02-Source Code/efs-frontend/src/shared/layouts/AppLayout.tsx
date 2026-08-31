@@ -11,10 +11,12 @@ const DRAWER_WIDTH = 240
 
 type AppLayoutProps = {
   children: ReactNode
+  navigation: ReactNode
 }
 
 function AppLayout({
   children,
+  navigation,
 }: AppLayoutProps) {
   return (
     <Box
@@ -54,16 +56,11 @@ function AppLayout({
         <Toolbar />
 
         <Box
-          component="nav"
           sx={{
-            p: 2,
+            py: 2,
           }}
         >
-          <Typography
-            variant="overline"
-          >
-            Navigation
-          </Typography>
+          {navigation}
         </Box>
       </Drawer>
 

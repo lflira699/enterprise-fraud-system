@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
 import AppLayout from '../shared/layouts/AppLayout'
+import AppNavigation from './AppNavigation'
 import { ROUTE_PATHS, type RoutePath } from './routePaths'
 
 type RouteBoundaryProps = {
@@ -25,7 +26,9 @@ function RouteBoundary({
 
 function AppRouter() {
   return (
-    <AppLayout>
+    <AppLayout
+      navigation={<AppNavigation />}
+    >
       <Routes>
         <Route
           path={ROUTE_PATHS.dashboard}
