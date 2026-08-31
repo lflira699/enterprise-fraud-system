@@ -9,7 +9,8 @@ export const ROUTE_PATHS = {
   evidence: '/evidence',
   reports: '/reports',
   administration: '/administration',
-  audit: '/configuration/audit',
+  configuration: '/configuration',
+  audit: '/audit',
 } as const
 
 export type RoutePath =

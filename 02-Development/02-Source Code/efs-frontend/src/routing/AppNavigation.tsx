@@ -52,6 +52,10 @@ const NAVIGATION_ITEMS = [
     path: ROUTE_PATHS.administration,
   },
   {
+    label: 'Configuration',
+    path: ROUTE_PATHS.configuration,
+  },
+  {
     label: 'Audit',
     path: ROUTE_PATHS.audit,
   },

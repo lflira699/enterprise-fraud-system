@@ -121,6 +121,15 @@ function AppRouter() {
         />
 
         <Route
+          path={ROUTE_PATHS.configuration}
+          element={
+            <RouteBoundary
+              path={ROUTE_PATHS.configuration}
+            />
+          }
+        />
+
+        <Route
           path={ROUTE_PATHS.audit}
           element={
             <RouteBoundary
