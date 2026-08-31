@@ -22,6 +22,17 @@ const resources = {
         configuration: 'Configuración',
         audit: 'Auditoría',
       },
+      dashboard: {
+        metrics: {
+          criticalAlerts: 'Alertas críticas',
+          openAlerts: 'Alertas abiertas',
+          openCases: 'Casos abiertos',
+          closedCases: 'Casos cerrados',
+          averageRisk: 'Riesgo promedio',
+          activatedDetectionScenarios:
+            'Detection Scenarios activados',
+        },
+      },
     },
   },
 } as const
