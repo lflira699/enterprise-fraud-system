@@ -1,6 +1,7 @@
 import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
+import DashboardPage from '../modules/dashboard/pages/DashboardPage'
 import AppLayout from '../shared/layouts/AppLayout'
 import AppNavigation from './AppNavigation'
 import { ROUTE_PATHS, type RoutePath } from './routePaths'
@@ -32,11 +33,7 @@ function AppRouter() {
       <Routes>
         <Route
           path={ROUTE_PATHS.dashboard}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.dashboard}
-            />
-          }
+          element={<DashboardPage />}
         />
 
         <Route
