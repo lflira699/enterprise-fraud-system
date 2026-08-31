@@ -3,6 +3,7 @@ import {
   ListItemButton,
   ListItemText,
 } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 import {
   useLocation,
   useNavigate,
@@ -12,63 +13,64 @@ import { ROUTE_PATHS } from './routePaths'
 
 const NAVIGATION_ITEMS = [
   {
-    label: 'Dashboard',
+    labelKey: 'navigation.dashboard',
     path: ROUTE_PATHS.dashboard,
   },
   {
-    label: 'Events',
+    labelKey: 'navigation.events',
     path: ROUTE_PATHS.events,
   },
   {
-    label: 'Rules',
+    labelKey: 'navigation.rules',
     path: ROUTE_PATHS.rules,
   },
   {
-    label: 'Detection',
+    labelKey: 'navigation.detection',
     path: ROUTE_PATHS.detection,
   },
   {
-    label: 'Risk',
+    labelKey: 'navigation.risk',
     path: ROUTE_PATHS.risk,
   },
   {
-    label: 'Alerts',
+    labelKey: 'navigation.alerts',
     path: ROUTE_PATHS.alerts,
   },
   {
-    label: 'Cases',
+    labelKey: 'navigation.cases',
     path: ROUTE_PATHS.cases,
   },
   {
-    label: 'Evidence',
+    labelKey: 'navigation.evidence',
     path: ROUTE_PATHS.evidence,
   },
   {
-    label: 'Reports',
+    labelKey: 'navigation.reports',
     path: ROUTE_PATHS.reports,
   },
   {
-    label: 'Administration',
+    labelKey: 'navigation.administration',
     path: ROUTE_PATHS.administration,
   },
   {
-    label: 'Configuration',
+    labelKey: 'navigation.configuration',
     path: ROUTE_PATHS.configuration,
   },
   {
-    label: 'Audit',
+    labelKey: 'navigation.audit',
     path: ROUTE_PATHS.audit,
   },
 ] as const
 
 function AppNavigation() {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
 
   return (
     <List
       component="nav"
-      aria-label="Primary navigation"
+      aria-label={t('navigation.primary')}
       disablePadding
     >
       {NAVIGATION_ITEMS.map((item) => (
@@ -82,7 +84,7 @@ function AppNavigation() {
           }}
         >
           <ListItemText
-            primary={item.label}
+            primary={t(item.labelKey)}
           />
         </ListItemButton>
       ))}

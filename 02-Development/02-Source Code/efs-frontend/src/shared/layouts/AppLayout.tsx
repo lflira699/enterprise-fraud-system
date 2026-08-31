@@ -6,6 +6,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 
 const DRAWER_WIDTH = 240
 
@@ -18,6 +19,8 @@ function AppLayout({
   children,
   navigation,
 }: AppLayoutProps) {
+  const { t } = useTranslation()
+
   return (
     <Box
       sx={{
@@ -37,7 +40,7 @@ function AppLayout({
             component="h1"
             variant="h6"
           >
-            Enterprise Fraud System
+            {t('app.title')}
           </Typography>
         </Toolbar>
       </AppBar>
