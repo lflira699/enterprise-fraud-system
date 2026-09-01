@@ -7,6 +7,7 @@ const resources = {
       app: {
         title: 'Enterprise Fraud System',
       },
+
       navigation: {
         primary: 'Navegación principal',
         dashboard: 'Dashboard',
@@ -22,6 +23,7 @@ const resources = {
         configuration: 'Configuración',
         audit: 'Auditoría',
       },
+
       dashboard: {
         metrics: {
           criticalAlerts: 'Alertas críticas',
@@ -33,6 +35,7 @@ const resources = {
             'Detection Scenarios activados',
         },
       },
+
       alerts: {
         filters: {
           title: 'Filtros',
@@ -48,6 +51,7 @@ const resources = {
           apply: 'Aplicar filtros',
           reset: 'Limpiar filtros',
         },
+
         list: {
           title: 'Listado de alertas',
           error:
@@ -55,6 +59,7 @@ const resources = {
           noRows:
             'No hay alertas para los filtros seleccionados.',
         },
+
         columns: {
           reference: 'Referencia',
           title: 'Título',
@@ -67,6 +72,46 @@ const resources = {
           assignedTeam: 'Equipo asignado',
           generatedAt: 'Generada',
           dueAt: 'Vencimiento',
+        },
+      },
+
+      cases: {
+        filters: {
+          title: 'Filtros',
+          status: 'Estado',
+          priority: 'Prioridad',
+          assignedUser:
+            'Usuario asignado',
+          assignedTeam:
+            'Equipo asignado',
+          apply: 'Aplicar filtros',
+          reset: 'Limpiar filtros',
+        },
+
+        list: {
+          title: 'Listado de casos',
+          error:
+            'No fue posible cargar los casos.',
+          noRows:
+            'No hay casos para los filtros seleccionados.',
+        },
+
+        columns: {
+          caseNumber:
+            'Número de caso',
+          caseType:
+            'Tipo de caso',
+          status: 'Estado',
+          priority: 'Prioridad',
+          severity: 'Severidad',
+          assignedTeam:
+            'Equipo asignado',
+          assignedUser:
+            'Usuario asignado',
+          createdAt:
+            'Creado',
+          dueDate:
+            'Vencimiento',
         },
       },
     },

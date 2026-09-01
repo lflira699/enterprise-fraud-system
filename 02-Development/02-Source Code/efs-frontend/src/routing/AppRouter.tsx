@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
 import AlertsPage from '../modules/alerts/pages/AlertsPage'
+import CasesPage from '../modules/cases/pages/CasesPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
 import AppLayout from '../shared/layouts/AppLayout'
 import AppNavigation from './AppNavigation'
@@ -80,11 +81,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.cases}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.cases}
-            />
-          }
+          element={<CasesPage />}
         />
 
         <Route
