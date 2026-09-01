@@ -387,7 +387,13 @@ class CaseControllerIntegrationTest {
                                 .param("status", "OPEN")
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].currentStatus").value("OPEN"));
+                .andExpect(jsonPath("$.content[0].currentStatus").value("OPEN"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.hasPrevious").value(false));
     }
 
     @Test

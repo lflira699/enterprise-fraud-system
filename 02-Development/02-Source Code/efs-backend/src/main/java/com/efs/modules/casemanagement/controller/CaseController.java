@@ -24,6 +24,7 @@ import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.modules.casemanagement.service.CaseServiceInterface;
+import com.efs.shared.pagination.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -512,46 +513,27 @@ public class CaseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CaseResponse>> searchCases(
+    public ResponseEntity<PageResponse<CaseResponse>> searchCases(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) UUID assignedUser,
-            @RequestParam(required = false) String assignedTeam) {
-
-        if (status != null) {
-            return ResponseEntity.ok(
-                    caseService.getCasesByStatus(
-                            status
-                    )
-            );
-        }
-
-        if (priority != null) {
-            return ResponseEntity.ok(
-                    caseService.getCasesByPriority(
-                            priority
-                    )
-            );
-        }
-
-        if (assignedUser != null) {
-            return ResponseEntity.ok(
-                    caseService.getCasesByAssignedUser(
-                            assignedUser
-                    )
-            );
-        }
-
-        if (assignedTeam != null) {
-            return ResponseEntity.ok(
-                    caseService.getCasesByAssignedTeam(
-                            assignedTeam
-                    )
-            );
-        }
+            @RequestParam(required = false) String assignedTeam,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "DESC") String direction) {
 
         return ResponseEntity.ok(
-                List.of()
+                caseService.searchCases(
+                        status,
+                        priority,
+                        assignedUser,
+                        assignedTeam,
+                        page,
+                        size,
+                        sort,
+                        direction
+                )
         );
     }
 }

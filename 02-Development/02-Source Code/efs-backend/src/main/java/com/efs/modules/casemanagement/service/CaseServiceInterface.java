@@ -23,6 +23,7 @@ import com.efs.modules.casemanagement.dto.CaseStatusHistoryResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
+import com.efs.shared.pagination.PageResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -197,5 +198,16 @@ public interface CaseServiceInterface {
 
     List<CaseResponse> getCasesByAssignedTeam(
             String assignedTeam
+    );
+
+    PageResponse<CaseResponse> searchCases(
+            String status,
+            String priority,
+            UUID assignedUser,
+            String assignedTeam,
+            int page,
+            int size,
+            String sort,
+            String direction
     );
 }

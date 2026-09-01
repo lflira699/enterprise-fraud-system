@@ -61,11 +61,19 @@ import com.efs.modules.casemanagement.repository.CaseSlaRepository;
 import com.efs.modules.casemanagement.repository.CaseStatusHistoryRepository;
 import com.efs.modules.casemanagement.repository.CaseTaskRepository;
 import com.efs.shared.exception.DuplicateRecordException;
+import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.pagination.PageResponse;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -84,6 +92,18 @@ public class CaseService
 
     private static final String ALERT_SOURCE =
             "ALERT_MANAGEMENT";
+
+    private static final int MAX_PAGE_SIZE =
+            100;
+
+    private static final String DEFAULT_CASE_SORT =
+            "createdAt";
+
+    private static final String SORT_DIRECTION_ASC =
+            "ASC";
+
+    private static final String SORT_DIRECTION_DESC =
+            "DESC";
 
     private final CaseRepository caseRepository;
     private final CaseAlertRepository caseAlertRepository;
@@ -1256,6 +1276,172 @@ public class CaseService
                 .stream()
                 .map(caseMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<CaseResponse> searchCases(
+            String status,
+            String priority,
+            UUID assignedUser,
+            String assignedTeam,
+            int page,
+            int size,
+            String sort,
+            String direction) {
+
+        validateCaseSearchRequest(
+                page,
+                size,
+                sort,
+                direction
+        );
+
+        Sort.Direction sortDirection =
+                SORT_DIRECTION_ASC.equalsIgnoreCase(
+                        direction
+                )
+                        ? Sort.Direction.ASC
+                        : Sort.Direction.DESC;
+
+        PageRequest pageRequest =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by(
+                                sortDirection,
+                                sort
+                        )
+                );
+
+        Specification<Case> specification =
+                (root, query, criteriaBuilder) -> {
+
+                    List<Predicate> predicates =
+                            new ArrayList<>();
+
+                    if (hasText(status)) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.get(
+                                                "currentStatus"
+                                        ),
+                                        status
+                                )
+                        );
+                    }
+
+                    if (hasText(priority)) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.get(
+                                                "priority"
+                                        ),
+                                        priority
+                                )
+                        );
+                    }
+
+                    if (assignedUser != null) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.get(
+                                                "assignedUser"
+                                        ),
+                                        assignedUser
+                                )
+                        );
+                    }
+
+                    if (hasText(assignedTeam)) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.get(
+                                                "assignedTeam"
+                                        ),
+                                        assignedTeam
+                                )
+                        );
+                    }
+
+                    return criteriaBuilder.and(
+                            predicates.toArray(
+                                    new Predicate[0]
+                            )
+                    );
+                };
+
+        Page<Case> casePage =
+                caseRepository.findAll(
+                        specification,
+                        pageRequest
+                );
+
+        List<CaseResponse> content =
+                casePage
+                        .getContent()
+                        .stream()
+                        .map(caseMapper::toResponse)
+                        .toList();
+
+        return new PageResponse<>(
+                content,
+                casePage.getNumber(),
+                casePage.getSize(),
+                casePage.getTotalElements(),
+                casePage.getTotalPages(),
+                casePage.hasNext(),
+                casePage.hasPrevious()
+        );
+    }
+
+    private void validateCaseSearchRequest(
+            int page,
+            int size,
+            String sort,
+            String direction) {
+
+        if (page < 0) {
+            throw new RequestValidationException(
+                    "Page must be greater than or equal to 0"
+            );
+        }
+
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new RequestValidationException(
+                    "Size must be between 1 and "
+                            + MAX_PAGE_SIZE
+            );
+        }
+
+        if (!DEFAULT_CASE_SORT.equals(
+                sort
+        )) {
+            throw new RequestValidationException(
+                    "Unsupported case sort field: "
+                            + sort
+            );
+        }
+
+        if (!SORT_DIRECTION_ASC.equalsIgnoreCase(
+                direction
+        )
+                && !SORT_DIRECTION_DESC.equalsIgnoreCase(
+                        direction
+                )) {
+
+            throw new RequestValidationException(
+                    "Unsupported sort direction: "
+                            + direction
+            );
+        }
+    }
+
+    private boolean hasText(
+            String value) {
+
+        return value != null
+                && !value.isBlank();
     }
 
     private Case getExistingCase(
