@@ -203,6 +203,10 @@ public class AlertMapper {
                 alert.getUpdatedAt()
         );
 
+        response.setRecordVersion(
+                alert.getRecordVersion()
+        );
+
         return response;
     }
 }

@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -236,7 +237,8 @@ class AlertControllerIntegrationTest {
     }
 
     @Test
-    void shouldCreateAlertThroughApi() throws Exception {
+    void shouldCreateAlertThroughApi()
+            throws Exception {
 
         String requestBody =
                 """
@@ -253,25 +255,37 @@ class AlertControllerIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/alerts")
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
-                .andExpect(status().isCreated())
+                .andExpect(
+                        status().isCreated()
+                )
                 .andExpect(
                         jsonPath("$.customerId")
-                                .value(CUSTOMER_ID.toString())
+                                .value(
+                                        CUSTOMER_ID.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$.transactionId")
-                                .value(TRANSACTION_ID.toString())
+                                .value(
+                                        TRANSACTION_ID.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$.riskAssessmentId")
-                                .value(RISK_ASSESSMENT_ID.toString())
+                                .value(
+                                        RISK_ASSESSMENT_ID.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$.decisionId")
-                                .value(DECISION_ID.toString())
+                                .value(
+                                        DECISION_ID.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$.status")
@@ -280,7 +294,8 @@ class AlertControllerIntegrationTest {
     }
 
     @Test
-    void shouldRetrieveAlertsByDecisionThroughApi() throws Exception {
+    void shouldRetrieveAlertsByDecisionThroughApi()
+            throws Exception {
 
         UUID alertId =
                 insertAlert(
@@ -288,22 +303,31 @@ class AlertControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        get("/api/v1/alerts/decision/{decisionId}",
-                                DECISION_ID)
+                        get(
+                                "/api/v1/alerts/decision/{decisionId}",
+                                DECISION_ID
+                        )
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$[0].alertId")
-                                .value(alertId.toString())
+                                .value(
+                                        alertId.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$[0].decisionId")
-                                .value(DECISION_ID.toString())
+                                .value(
+                                        DECISION_ID.toString()
+                                )
                 );
     }
 
     @Test
-    void shouldFilterAlertsByStatusThroughApi() throws Exception {
+    void shouldFilterAlertsByStatusThroughApi()
+            throws Exception {
 
         insertAlert(
                 "NEW"
@@ -311,17 +335,49 @@ class AlertControllerIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/alerts")
-                                .param("status", "NEW")
+                                .param(
+                                        "status",
+                                        "NEW"
+                                )
                 )
-                .andExpect(status().isOk())
                 .andExpect(
-                        jsonPath("$[0].status")
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.content[0].status"
+                        )
                                 .value("NEW")
+                )
+                .andExpect(
+                        jsonPath("$.page")
+                                .value(0)
+                )
+                .andExpect(
+                        jsonPath("$.size")
+                                .value(25)
+                )
+                .andExpect(
+                        jsonPath("$.totalElements")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$.totalPages")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$.hasNext")
+                                .value(false)
+                )
+                .andExpect(
+                        jsonPath("$.hasPrevious")
+                                .value(false)
                 );
     }
 
     @Test
-    void shouldUpdateAlertStatusThroughApi() throws Exception {
+    void shouldUpdateAlertStatusThroughApi()
+            throws Exception {
 
         UUID alertId =
                 insertAlert(
@@ -340,12 +396,18 @@ class AlertControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        patch("/api/v1/alerts/{alertId}/status",
-                                alertId)
-                                .contentType(MediaType.APPLICATION_JSON)
+                        patch(
+                                "/api/v1/alerts/{alertId}/status",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$.status")
                                 .value("IN_PROGRESS")
@@ -353,7 +415,8 @@ class AlertControllerIntegrationTest {
     }
 
     @Test
-    void shouldRetrieveAlertHistoryThroughApi() throws Exception {
+    void shouldRetrieveAlertHistoryThroughApi()
+            throws Exception {
 
         UUID alertId =
                 insertAlert(
@@ -372,18 +435,28 @@ class AlertControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        patch("/api/v1/alerts/{alertId}/status",
-                                alertId)
-                                .contentType(MediaType.APPLICATION_JSON)
+                        patch(
+                                "/api/v1/alerts/{alertId}/status",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
-                .andExpect(status().isOk());
+                .andExpect(
+                        status().isOk()
+                );
 
         mockMvc.perform(
-                        get("/api/v1/alerts/{alertId}/history",
-                                alertId)
+                        get(
+                                "/api/v1/alerts/{alertId}/history",
+                                alertId
+                        )
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$[0].actionType")
                                 .value("STATUS_CHANGE")
@@ -399,7 +472,8 @@ class AlertControllerIntegrationTest {
     }
 
     @Test
-    void shouldAssignAlertThroughApi() throws Exception {
+    void shouldAssignAlertThroughApi()
+            throws Exception {
 
         UUID alertId =
                 insertAlert(
@@ -420,42 +494,61 @@ class AlertControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        patch("/api/v1/alerts/{alertId}/assignment",
-                                alertId)
-                                .contentType(MediaType.APPLICATION_JSON)
+                        patch(
+                                "/api/v1/alerts/{alertId}/assignment",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$.assignedTo")
-                                .value(ASSIGNED_USER_ID.toString())
+                                .value(
+                                        ASSIGNED_USER_ID.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$.assignedTeam")
-                                .value("FRAUD_INVESTIGATION")
+                                .value(
+                                        "FRAUD_INVESTIGATION"
+                                )
                 );
 
         mockMvc.perform(
-                        get("/api/v1/alerts/{alertId}/history",
-                                alertId)
+                        get(
+                                "/api/v1/alerts/{alertId}/history",
+                                alertId
+                        )
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$[0].actionType")
                                 .value("ASSIGNMENT")
                 )
                 .andExpect(
                         jsonPath("$[0].changedBy")
-                                .value(CHANGED_BY.toString())
+                                .value(
+                                        CHANGED_BY.toString()
+                                )
                 )
                 .andExpect(
                         jsonPath("$[0].changeReason")
-                                .value("Assigned for investigation")
+                                .value(
+                                        "Assigned for investigation"
+                                )
                 );
     }
 
     @Test
-    void shouldCloseAlertThroughApi() throws Exception {
+    void shouldCloseAlertThroughApi()
+            throws Exception {
 
         UUID alertId =
                 insertAlert(
@@ -474,12 +567,18 @@ class AlertControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        post("/api/v1/alerts/{alertId}/close",
-                                alertId)
-                                .contentType(MediaType.APPLICATION_JSON)
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$.status")
                                 .value("CLOSED")
@@ -494,10 +593,14 @@ class AlertControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        get("/api/v1/alerts/{alertId}/history",
-                                alertId)
+                        get(
+                                "/api/v1/alerts/{alertId}/history",
+                                alertId
+                        )
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk()
+                )
                 .andExpect(
                         jsonPath("$[0].actionType")
                                 .value("CLOSURE")
@@ -512,8 +615,171 @@ class AlertControllerIntegrationTest {
                 )
                 .andExpect(
                         jsonPath("$[0].changedBy")
-                                .value(CHANGED_BY.toString())
+                                .value(
+                                        CHANGED_BY.toString()
+                                )
                 );
+    }
+
+    @Test
+    void shouldIncrementRecordVersionWhenUpdatingStatus()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        assertEquals(
+                1,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        String requestBody =
+                """
+                {
+                    "status": "IN_PROGRESS",
+                    "changedBy": "%s",
+                    "changeReason": "Version test status update"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/alerts/{alertId}/status",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.recordVersion")
+                                .value(2)
+                );
+
+        assertEquals(
+                2,
+                getRecordVersion(
+                        alertId
+                )
+        );
+    }
+
+    @Test
+    void shouldIncrementRecordVersionWhenAssigningAlert()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        assertEquals(
+                1,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        String requestBody =
+                """
+                {
+                    "assignedTo": "%s",
+                    "assignedTeam": "FRAUD_INVESTIGATION",
+                    "changedBy": "%s",
+                    "changeReason": "Version test assignment"
+                }
+                """.formatted(
+                        ASSIGNED_USER_ID,
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/alerts/{alertId}/assignment",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.recordVersion")
+                                .value(2)
+                );
+
+        assertEquals(
+                2,
+                getRecordVersion(
+                        alertId
+                )
+        );
+    }
+
+    @Test
+    void shouldIncrementRecordVersionWhenClosingAlert()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "IN_PROGRESS"
+                );
+
+        assertEquals(
+                1,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        String requestBody =
+                """
+                {
+                    "investigationResult": "No confirmed fraud after investigation",
+                    "closureReason": "Version test closure",
+                    "closedBy": "%s"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.recordVersion")
+                                .value(2)
+                );
+
+        assertEquals(
+                2,
+                getRecordVersion(
+                        alertId
+                )
+        );
     }
 
     private UUID insertAlert(
@@ -557,5 +823,19 @@ class AlertControllerIntegrationTest {
         );
 
         return alertId;
+    }
+
+    private Integer getRecordVersion(
+            UUID alertId) {
+
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT record_version
+                FROM alert.alert
+                WHERE alert_id = ?
+                """,
+                Integer.class,
+                alertId
+        );
     }
 }

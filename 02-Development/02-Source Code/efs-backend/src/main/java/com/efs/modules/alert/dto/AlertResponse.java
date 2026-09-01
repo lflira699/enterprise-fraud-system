@@ -32,6 +32,7 @@ public class AlertResponse {
     private String closureReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer recordVersion;
 
     public UUID getAlertId() {
         return alertId;
@@ -239,5 +240,13 @@ public class AlertResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getRecordVersion() {
+        return recordVersion;
+    }
+
+    public void setRecordVersion(Integer recordVersion) {
+        this.recordVersion = recordVersion;
     }
 }

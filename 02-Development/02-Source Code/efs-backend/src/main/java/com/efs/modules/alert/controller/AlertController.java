@@ -3,11 +3,13 @@ package com.efs.modules.alert.controller;
 import com.efs.modules.alert.dto.AlertAssignmentRequest;
 import com.efs.modules.alert.dto.AlertClosureRequest;
 import com.efs.modules.alert.dto.AlertHistoryResponse;
+import com.efs.shared.pagination.PageResponse;
 import com.efs.modules.alert.dto.AlertRequest;
 import com.efs.modules.alert.dto.AlertResponse;
 import com.efs.modules.alert.dto.AlertStatusUpdateRequest;
 import com.efs.modules.alert.service.AlertServiceInterface;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -136,37 +139,41 @@ public class AlertController {
     }
 
     @GetMapping
-    public ResponseEntity<List<AlertResponse>> searchAlerts(
+    public ResponseEntity<PageResponse<AlertResponse>> searchAlerts(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
-            @RequestParam(required = false) String alertType) {
-
-        if (status != null) {
-            return ResponseEntity.ok(
-                    alertService.getAlertsByStatus(
-                            status
-                    )
-            );
-        }
-
-        if (priority != null) {
-            return ResponseEntity.ok(
-                    alertService.getAlertsByPriority(
-                            priority
-                    )
-            );
-        }
-
-        if (alertType != null) {
-            return ResponseEntity.ok(
-                    alertService.getAlertsByType(
-                            alertType
-                    )
-            );
-        }
+            @RequestParam(required = false) String riskLevel,
+            @RequestParam(required = false) UUID assignedTo,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime createdFrom,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime createdTo,
+            @RequestParam(required = false) UUID customerId,
+            @RequestParam(required = false) String scenarioCode,
+            @RequestParam(required = false) UUID caseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(defaultValue = "generatedAt") String sort,
+            @RequestParam(defaultValue = "DESC") String direction) {
 
         return ResponseEntity.ok(
-                List.of()
+                alertService.searchAlerts(
+                        status,
+                        priority,
+                        riskLevel,
+                        assignedTo,
+                        createdFrom,
+                        createdTo,
+                        customerId,
+                        scenarioCode,
+                        caseId,
+                        page,
+                        size,
+                        sort,
+                        direction
+                )
         );
     }
 }

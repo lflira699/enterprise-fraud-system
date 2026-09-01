@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Generated;
 
@@ -95,6 +96,10 @@ public class Alert {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Version
+    @Column(name = "record_version", nullable = false)
+    private Integer recordVersion;
 
     public Alert() {
     }
@@ -305,5 +310,13 @@ public class Alert {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getRecordVersion() {
+        return recordVersion;
+    }
+
+    public void setRecordVersion(Integer recordVersion) {
+        this.recordVersion = recordVersion;
     }
 }

@@ -13,16 +13,28 @@ import com.efs.modules.alert.mapper.AlertMapper;
 import com.efs.modules.alert.repository.AlertHistoryRepository;
 import com.efs.modules.alert.repository.AlertRepository;
 import com.efs.modules.alert.validator.AlertStatusValidator;
+import com.efs.modules.casemanagement.repository.CaseAlertRepository;
+import com.efs.modules.detection.repository.DetectionScenarioRepository;
+import com.efs.modules.risk.repository.RiskAssessmentRepository;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionDecision;
 import com.efs.modules.transaction.repository.TransactionDecisionRepository;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.shared.exception.AlertConcurrentModificationException;
+import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.pagination.PageResponse;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -44,6 +56,17 @@ public class AlertService
     private static final String CLOSURE_ACTION =
             "CLOSURE";
 
+    private static final int MAX_PAGE_SIZE =
+            100;
+
+    private static final Set<String> ALLOWED_SORT_FIELDS =
+            Set.of(
+                    "generatedAt",
+                    "priorityScore",
+                    "riskScore",
+                    "dueAt"
+            );
+
     private final AlertRepository alertRepository;
 
     private final AlertHistoryRepository
@@ -54,6 +77,15 @@ public class AlertService
 
     private final TransactionRepository
             transactionRepository;
+
+    private final RiskAssessmentRepository
+            riskAssessmentRepository;
+
+    private final DetectionScenarioRepository
+            detectionScenarioRepository;
+
+    private final CaseAlertRepository
+            caseAlertRepository;
 
     private final AlertMapper alertMapper;
 
@@ -68,6 +100,9 @@ public class AlertService
             AlertHistoryRepository alertHistoryRepository,
             TransactionDecisionRepository transactionDecisionRepository,
             TransactionRepository transactionRepository,
+            RiskAssessmentRepository riskAssessmentRepository,
+            DetectionScenarioRepository detectionScenarioRepository,
+            CaseAlertRepository caseAlertRepository,
             AlertMapper alertMapper,
             AlertHistoryMapper alertHistoryMapper,
             AlertStatusValidator alertStatusValidator) {
@@ -83,6 +118,15 @@ public class AlertService
 
         this.transactionRepository =
                 transactionRepository;
+
+        this.riskAssessmentRepository =
+                riskAssessmentRepository;
+
+        this.detectionScenarioRepository =
+                detectionScenarioRepository;
+
+        this.caseAlertRepository =
+                caseAlertRepository;
 
         this.alertMapper =
                 alertMapper;
@@ -243,7 +287,7 @@ public class AlertService
         );
 
         Alert savedAlert =
-                alertRepository.save(
+                saveMutableAlert(
                         alert
                 );
 
@@ -318,7 +362,7 @@ public class AlertService
         );
 
         Alert savedAlert =
-                alertRepository.save(
+                saveMutableAlert(
                         alert
                 );
 
@@ -400,7 +444,7 @@ public class AlertService
         );
 
         Alert savedAlert =
-                alertRepository.save(
+                saveMutableAlert(
                         alert
                 );
 
@@ -539,6 +583,313 @@ public class AlertService
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AlertResponse> searchAlerts(
+            String status,
+            String priority,
+            String riskLevel,
+            UUID assignedTo,
+            LocalDateTime createdFrom,
+            LocalDateTime createdTo,
+            UUID customerId,
+            String scenarioCode,
+            UUID caseId,
+            int page,
+            int size,
+            String sort,
+            String direction) {
+
+        validatePagination(
+                page,
+                size,
+                sort,
+                direction
+        );
+
+        validateDateRange(
+                createdFrom,
+                createdTo
+        );
+
+        String normalizedStatus =
+                null;
+
+        if (status != null
+                && !status.isBlank()) {
+
+            if (!alertStatusValidator.isValidStatus(
+                    status)) {
+
+                throw new RequestValidationException(
+                        "Unsupported alert status: "
+                                + status
+                );
+            }
+
+            normalizedStatus =
+                    alertStatusValidator.normalize(
+                            status
+                    );
+        }
+
+        List<UUID> riskAssessmentIds =
+                null;
+
+        if (riskLevel != null
+                && !riskLevel.isBlank()) {
+
+            riskAssessmentIds =
+                    riskAssessmentRepository
+                            .findByRiskLevelOrderByAssessmentTimestampDesc(
+                                    riskLevel
+                            )
+                            .stream()
+                            .map(assessment ->
+                                    assessment.getRiskAssessmentId()
+                            )
+                            .toList();
+
+            if (riskAssessmentIds.isEmpty()) {
+                return emptyPageResponse(
+                        page,
+                        size
+                );
+            }
+        }
+
+        List<UUID> scenarioIds =
+                null;
+
+        if (scenarioCode != null
+                && !scenarioCode.isBlank()) {
+
+            scenarioIds =
+                    detectionScenarioRepository
+                            .findByScenarioCodeOrderByVersionDesc(
+                                    scenarioCode
+                            )
+                            .stream()
+                            .map(scenario ->
+                                    scenario.getScenarioId()
+                            )
+                            .toList();
+
+            if (scenarioIds.isEmpty()) {
+                return emptyPageResponse(
+                        page,
+                        size
+                );
+            }
+        }
+
+        List<UUID> caseAlertIds =
+                null;
+
+        if (caseId != null) {
+
+            caseAlertIds =
+                    caseAlertRepository
+                            .findByCaseIdOrderByGeneratedAtDesc(
+                                    caseId
+                            )
+                            .stream()
+                            .map(caseAlert ->
+                                    caseAlert.getSourceAlertId()
+                            )
+                            .filter(sourceAlertId ->
+                                    sourceAlertId != null
+                            )
+                            .toList();
+
+            if (caseAlertIds.isEmpty()) {
+                return emptyPageResponse(
+                        page,
+                        size
+                );
+            }
+        }
+
+        Specification<Alert> specification =
+                (root, query, criteriaBuilder) ->
+                        criteriaBuilder.conjunction();
+
+        if (normalizedStatus != null) {
+
+            String filterStatus =
+                    normalizedStatus;
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder.equal(
+                                            root.get("status"),
+                                            filterStatus
+                                    )
+                    );
+        }
+
+        if (priority != null
+                && !priority.isBlank()) {
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder.equal(
+                                            root.get("priority"),
+                                            priority
+                                    )
+                    );
+        }
+
+        if (assignedTo != null) {
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder.equal(
+                                            root.get("assignedTo"),
+                                            assignedTo
+                                    )
+                    );
+        }
+
+        if (createdFrom != null) {
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder
+                                            .greaterThanOrEqualTo(
+                                                    root.<LocalDateTime>get(
+                                                            "createdAt"
+                                                    ),
+                                                    createdFrom
+                                            )
+                    );
+        }
+
+        if (createdTo != null) {
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder
+                                            .lessThanOrEqualTo(
+                                                    root.<LocalDateTime>get(
+                                                            "createdAt"
+                                                    ),
+                                                    createdTo
+                                            )
+                    );
+        }
+
+        if (customerId != null) {
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder.equal(
+                                            root.get("customerId"),
+                                            customerId
+                                    )
+                    );
+        }
+
+        if (riskAssessmentIds != null) {
+
+            List<UUID> filterRiskAssessmentIds =
+                    riskAssessmentIds;
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    root.<UUID>get(
+                                            "riskAssessmentId"
+                                    ).in(
+                                            filterRiskAssessmentIds
+                                    )
+                    );
+        }
+
+        if (scenarioIds != null) {
+
+            List<UUID> filterScenarioIds =
+                    scenarioIds;
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    root.<UUID>get(
+                                            "scenarioId"
+                                    ).in(
+                                            filterScenarioIds
+                                    )
+                    );
+        }
+
+        if (caseAlertIds != null) {
+
+            List<UUID> filterCaseAlertIds =
+                    caseAlertIds;
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    root.<UUID>get(
+                                            "alertId"
+                                    ).in(
+                                            filterCaseAlertIds
+                                    )
+                    );
+        }
+
+        Sort.Direction sortDirection =
+                Sort.Direction.fromString(
+                        direction
+                );
+
+        PageRequest pageRequest =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by(
+                                sortDirection,
+                                sort
+                        )
+                );
+
+        Page<Alert> alertPage =
+                alertRepository.findAll(
+                        specification,
+                        pageRequest
+                );
+
+        return toPageResponse(
+                alertPage
+        );
+    }
+
+    private Alert saveMutableAlert(
+            Alert alert) {
+
+        try {
+
+            return alertRepository
+                    .saveAndFlush(
+                            alert
+                    );
+
+        } catch (OptimisticLockingFailureException exception) {
+
+            throw new AlertConcurrentModificationException(
+                    "Alert was modified by another transaction: "
+                            + alert.getAlertId(),
+                    exception
+            );
+        }
+    }
+
     private Alert getExistingAlert(
             UUID alertId) {
 
@@ -591,5 +942,103 @@ public class AlertService
                             + "the transaction decision"
             );
         }
+    }
+
+    private void validatePagination(
+            int page,
+            int size,
+            String sort,
+            String direction) {
+
+        if (page < 0) {
+
+            throw new RequestValidationException(
+                    "Page must be greater than or equal to zero"
+            );
+        }
+
+        if (size < 1
+                || size > MAX_PAGE_SIZE) {
+
+            throw new RequestValidationException(
+                    "Page size must be between 1 and "
+                            + MAX_PAGE_SIZE
+            );
+        }
+
+        if (!ALLOWED_SORT_FIELDS.contains(
+                sort)) {
+
+            throw new RequestValidationException(
+                    "Unsupported alert sort field: "
+                            + sort
+            );
+        }
+
+        try {
+
+            Sort.Direction.fromString(
+                    direction
+            );
+
+        } catch (IllegalArgumentException exception) {
+
+            throw new RequestValidationException(
+                    "Unsupported sort direction: "
+                            + direction,
+                    exception
+            );
+        }
+    }
+
+    private void validateDateRange(
+            LocalDateTime createdFrom,
+            LocalDateTime createdTo) {
+
+        if (createdFrom != null
+                && createdTo != null
+                && createdFrom.isAfter(
+                        createdTo
+                )) {
+
+            throw new RequestValidationException(
+                    "createdFrom must be before or equal to createdTo"
+            );
+        }
+    }
+
+    private PageResponse<AlertResponse> toPageResponse(
+            Page<Alert> alertPage) {
+
+        List<AlertResponse> content =
+                alertPage.getContent()
+                        .stream()
+                        .map(alertMapper::toResponse)
+                        .toList();
+
+        return new PageResponse<>(
+                content,
+                alertPage.getNumber(),
+                alertPage.getSize(),
+                alertPage.getTotalElements(),
+                alertPage.getTotalPages(),
+                alertPage.hasNext(),
+                alertPage.hasPrevious()
+        );
+    }
+
+    private PageResponse<AlertResponse> emptyPageResponse(
+            int page,
+            int size) {
+
+        return new PageResponse<>(
+                List.of(),
+                page,
+                size,
+                0,
+                0,
+                false,
+                false
+        );
     }
 }
