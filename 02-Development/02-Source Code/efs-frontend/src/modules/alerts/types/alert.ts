@@ -25,4 +25,31 @@ export type Alert = {
   closureReason: string | null
   createdAt: string | null
   updatedAt: string | null
+  recordVersion: number
+}
+
+export type AlertSortField =
+  | 'generatedAt'
+  | 'priorityScore'
+  | 'riskScore'
+  | 'dueAt'
+
+export type AlertSortDirection =
+  | 'ASC'
+  | 'DESC'
+
+export type AlertSearchParams = {
+  status?: string
+  priority?: string
+  riskLevel?: string
+  assignedTo?: string
+  createdFrom?: string
+  createdTo?: string
+  customerId?: string
+  scenarioCode?: string
+  caseId?: string
+  page?: number
+  size?: number
+  sort?: AlertSortField
+  direction?: AlertSortDirection
 }

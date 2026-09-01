@@ -33,6 +33,42 @@ const resources = {
             'Detection Scenarios activados',
         },
       },
+      alerts: {
+        filters: {
+          title: 'Filtros',
+          status: 'Estado',
+          priority: 'Prioridad',
+          riskLevel: 'Nivel de riesgo',
+          assignedTo: 'Asignado a',
+          createdFrom: 'Creado desde',
+          createdTo: 'Creado hasta',
+          customerId: 'ID de cliente',
+          scenarioCode: 'Código de escenario',
+          caseId: 'ID de caso',
+          apply: 'Aplicar filtros',
+          reset: 'Limpiar filtros',
+        },
+        list: {
+          title: 'Listado de alertas',
+          error:
+            'No fue posible cargar las alertas.',
+          noRows:
+            'No hay alertas para los filtros seleccionados.',
+        },
+        columns: {
+          reference: 'Referencia',
+          title: 'Título',
+          status: 'Estado',
+          priority: 'Prioridad',
+          priorityScore:
+            'Puntaje de prioridad',
+          severity: 'Severidad',
+          riskScore: 'Puntaje de riesgo',
+          assignedTeam: 'Equipo asignado',
+          generatedAt: 'Generada',
+          dueAt: 'Vencimiento',
+        },
+      },
     },
   },
 } as const
