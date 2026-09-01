@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router-dom'
 import AlertsPage from '../modules/alerts/pages/AlertsPage'
 import CasesPage from '../modules/cases/pages/CasesPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
+import DetectionPage from '../modules/detection/pages/DetectionPage'
 import RiskPage from '../modules/risk/pages/RiskPage'
 import AppLayout from '../shared/layouts/AppLayout'
 import AppNavigation from './AppNavigation'
@@ -59,11 +60,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.detection}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.detection}
-            />
-          }
+          element={<DetectionPage />}
         />
 
         <Route

@@ -36,6 +36,60 @@ const resources = {
         },
       },
 
+      detection: {
+        filters: {
+          title: 'Filtros',
+          scenarioCode:
+            'Código de escenario',
+          category:
+            'Categoría',
+          status:
+            'Estado',
+          criticality:
+            'Criticidad',
+          owner:
+            'Responsable',
+          apply:
+            'Aplicar filtros',
+          reset:
+            'Limpiar filtros',
+        },
+
+        list: {
+          title:
+            'Detection Scenarios',
+          error:
+            'No fue posible cargar los Detection Scenarios.',
+          noRows:
+            'No hay Detection Scenarios para los filtros seleccionados.',
+        },
+
+        columns: {
+          scenarioCode:
+            'Código',
+          scenarioName:
+            'Nombre del escenario',
+          category:
+            'Categoría',
+          criticality:
+            'Criticidad',
+          status:
+            'Estado',
+          owner:
+            'Responsable',
+          version:
+            'Versión',
+          minimumConfidence:
+            'Confianza mínima',
+          minimumEvents:
+            'Eventos mínimos',
+          minimumEvidence:
+            'Evidencia mínima',
+          updatedAt:
+            'Actualizado',
+        },
+      },
+
       alerts: {
         filters: {
           title: 'Filtros',
