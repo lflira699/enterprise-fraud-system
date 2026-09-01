@@ -3,6 +3,7 @@ package com.efs.modules.detection.controller;
 import com.efs.modules.detection.dto.DetectionScenarioRequest;
 import com.efs.modules.detection.dto.DetectionScenarioResponse;
 import com.efs.modules.detection.service.DetectionScenarioServiceInterface;
+import com.efs.shared.pagination.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,43 @@ public class DetectionScenarioController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<DetectionScenarioResponse>>
+    searchScenarios(
+            @RequestParam(required = false)
+            String scenarioCode,
+            @RequestParam(required = false)
+            String category,
+            @RequestParam(required = false)
+            String status,
+            @RequestParam(required = false)
+            String criticality,
+            @RequestParam(required = false)
+            String owner,
+            @RequestParam(defaultValue = "0")
+            int page,
+            @RequestParam(defaultValue = "25")
+            int size,
+            @RequestParam(defaultValue = "scenarioName")
+            String sort,
+            @RequestParam(defaultValue = "ASC")
+            String direction) {
+
+        return ResponseEntity.ok(
+                detectionScenarioService.searchScenarios(
+                        scenarioCode,
+                        category,
+                        status,
+                        criticality,
+                        owner,
+                        page,
+                        size,
+                        sort,
+                        direction
+                )
+        );
     }
 
     @GetMapping("/{scenarioId}")
