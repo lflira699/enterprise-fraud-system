@@ -114,6 +114,52 @@ const resources = {
             'Vencimiento',
         },
       },
+
+      risk: {
+        filters: {
+          title: 'Filtros',
+          riskLevel:
+            'Nivel de riesgo',
+          assessmentResult:
+            'Resultado de evaluación',
+          apply:
+            'Aplicar filtros',
+          reset:
+            'Limpiar filtros',
+        },
+
+        list: {
+          title:
+            'Evaluaciones de riesgo',
+          error:
+            'No fue posible cargar las evaluaciones de riesgo.',
+          noRows:
+            'No hay evaluaciones de riesgo para los filtros seleccionados.',
+        },
+
+        columns: {
+          transactionId:
+            'ID de transacción',
+          assessmentType:
+            'Tipo de evaluación',
+          assessmentStage:
+            'Etapa de evaluación',
+          overallRiskScore:
+            'Puntaje de riesgo',
+          riskLevel:
+            'Nivel de riesgo',
+          riskCategory:
+            'Categoría de riesgo',
+          assessmentResult:
+            'Resultado',
+          confidenceScore:
+            'Nivel de confianza',
+          modelName:
+            'Modelo',
+          assessmentTimestamp:
+            'Evaluada',
+        },
+      },
     },
   },
 } as const
