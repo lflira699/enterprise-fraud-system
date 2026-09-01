@@ -2,6 +2,7 @@ package com.efs.modules.risk.service;
 
 import com.efs.modules.risk.dto.RiskAssessmentRequest;
 import com.efs.modules.risk.dto.RiskAssessmentResponse;
+import com.efs.shared.pagination.PageResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -35,5 +36,14 @@ public interface RiskAssessmentServiceInterface {
 
     List<RiskAssessmentResponse> getAssessmentsByResult(
             String assessmentResult
+    );
+
+    PageResponse<RiskAssessmentResponse> searchAssessments(
+            String riskLevel,
+            String assessmentResult,
+            int page,
+            int size,
+            String sort,
+            String direction
     );
 }

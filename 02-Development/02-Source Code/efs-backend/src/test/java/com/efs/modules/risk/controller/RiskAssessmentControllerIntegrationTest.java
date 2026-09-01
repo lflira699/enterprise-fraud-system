@@ -418,9 +418,9 @@ class RiskAssessmentControllerIntegrationTest {
                                 .param("riskLevel", "HIGH")
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.content").isArray())
                 .andExpect(
-                        jsonPath("$[*].riskAssessmentId")
+                        jsonPath("$.content[*].riskAssessmentId")
                                 .value(
                                         hasItem(
                                                 expected.get(
@@ -430,9 +430,15 @@ class RiskAssessmentControllerIntegrationTest {
                                 )
                 )
                 .andExpect(
-                        jsonPath("$[*].riskLevel")
+                        jsonPath("$.content[*].riskLevel")
                                 .value(hasItem("HIGH"))
-                );
+                )
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.hasPrevious").value(false));
     }
 
     @Test
@@ -461,9 +467,9 @@ class RiskAssessmentControllerIntegrationTest {
                                 .param("assessmentResult", "REVIEW")
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.content").isArray())
                 .andExpect(
-                        jsonPath("$[*].riskAssessmentId")
+                        jsonPath("$.content[*].riskAssessmentId")
                                 .value(
                                         hasItem(
                                                 expected.get(
@@ -473,21 +479,33 @@ class RiskAssessmentControllerIntegrationTest {
                                 )
                 )
                 .andExpect(
-                        jsonPath("$[*].assessmentResult")
+                        jsonPath("$.content[*].assessmentResult")
                                 .value(hasItem("REVIEW"))
-                );
+                )
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.hasPrevious").value(false));
     }
 
     @Test
-    void shouldReturnEmptyListWhenNoSearchFilterProvided()
+    void shouldReturnEmptyPageWhenNoAssessmentsExist()
             throws Exception {
 
         mockMvc.perform(
                         get("/api/v1/risk-assessments")
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$").isEmpty());
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.hasPrevious").value(false));
     }
 
     private JsonNode createAssessment(

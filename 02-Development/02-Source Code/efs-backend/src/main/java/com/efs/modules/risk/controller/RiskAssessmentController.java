@@ -3,6 +3,7 @@ package com.efs.modules.risk.controller;
 import com.efs.modules.risk.dto.RiskAssessmentRequest;
 import com.efs.modules.risk.dto.RiskAssessmentResponse;
 import com.efs.modules.risk.service.RiskAssessmentServiceInterface;
+import com.efs.shared.pagination.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -91,26 +92,24 @@ public class RiskAssessmentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<RiskAssessmentResponse>> searchAssessments(
+    public ResponseEntity<PageResponse<RiskAssessmentResponse>>
+    searchAssessments(
             @RequestParam(required = false) String riskLevel,
-            @RequestParam(required = false) String assessmentResult) {
+            @RequestParam(required = false) String assessmentResult,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(defaultValue = "assessmentTimestamp") String sort,
+            @RequestParam(defaultValue = "DESC") String direction) {
 
-        if (riskLevel != null) {
-            return ResponseEntity.ok(
-                    riskAssessmentService.getAssessmentsByRiskLevel(
-                            riskLevel
-                    )
-            );
-        }
-
-        if (assessmentResult != null) {
-            return ResponseEntity.ok(
-                    riskAssessmentService.getAssessmentsByResult(
-                            assessmentResult
-                    )
-            );
-        }
-
-        return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(
+                riskAssessmentService.searchAssessments(
+                        riskLevel,
+                        assessmentResult,
+                        page,
+                        size,
+                        sort,
+                        direction
+                )
+        );
     }
 }
