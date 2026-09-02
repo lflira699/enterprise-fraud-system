@@ -101,6 +101,60 @@ class RuleServiceIntegrationTest {
     }
 
     @Test
+    void shouldReturnAllRulesOrderedByPriority() {
+
+        service.createRule(
+                buildRequest(
+                        "RULE-LIST-001",
+                        "List Rule One",
+                        "TRANSACTION",
+                        "HIGH",
+                        (short) 5,
+                        "ACTIVE"
+                )
+        );
+
+        service.createRule(
+                buildRequest(
+                        "RULE-LIST-002",
+                        "List Rule Two",
+                        "ATO",
+                        "CRITICAL",
+                        (short) 1,
+                        "ACTIVE"
+                )
+        );
+
+        List<RuleResponse> rules =
+                service.getRules();
+
+        assertEquals(
+                2,
+                rules.size()
+        );
+
+        assertEquals(
+                "RULE-LIST-002",
+                rules.get(0).getRuleCode()
+        );
+
+        assertEquals(
+                Short.valueOf((short) 1),
+                rules.get(0).getPriority()
+        );
+
+        assertEquals(
+                "RULE-LIST-001",
+                rules.get(1).getRuleCode()
+        );
+
+        assertEquals(
+                Short.valueOf((short) 5),
+                rules.get(1).getPriority()
+        );
+    }
+
+    @Test
     void shouldRetrieveRuleByCode() {
 
         service.createRule(

@@ -12,6 +12,8 @@ public interface RuleServiceInterface {
             RuleRequest request
     );
 
+    List<RuleResponse> getRules();
+
     RuleResponse getRuleById(
             UUID ruleId
     );

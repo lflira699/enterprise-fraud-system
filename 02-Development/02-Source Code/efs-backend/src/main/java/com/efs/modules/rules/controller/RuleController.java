@@ -35,6 +35,14 @@ public class RuleController {
                 .body(response);
     }
 
+    @GetMapping
+    public ResponseEntity<List<RuleResponse>> getRules() {
+
+        return ResponseEntity.ok(
+                ruleService.getRules()
+        );
+    }
+
     @GetMapping("/{ruleId}")
     public ResponseEntity<RuleResponse> getRuleById(
             @PathVariable UUID ruleId) {

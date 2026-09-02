@@ -50,6 +50,17 @@ public class RuleService
 
     @Override
     @Transactional(readOnly = true)
+    public List<RuleResponse> getRules() {
+
+        return ruleRepository
+                .findAllByOrderByPriorityAsc()
+                .stream()
+                .map(ruleMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public RuleResponse getRuleById(
             UUID ruleId) {
 

@@ -65,6 +65,35 @@ class RuleControllerIntegrationTest {
     }
 
     @Test
+    void shouldRetrieveAllRulesThroughApi() throws Exception {
+
+        insertRule(
+                "RULE-LIST-API-001",
+                "TRANSACTION",
+                "HIGH",
+                (short) 5,
+                "ACTIVE"
+        );
+
+        insertRule(
+                "RULE-LIST-API-002",
+                "ATO",
+                "CRITICAL",
+                (short) 1,
+                "ACTIVE"
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/rules")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ruleCode").value("RULE-LIST-API-002"))
+                .andExpect(jsonPath("$[0].priority").value(1))
+                .andExpect(jsonPath("$[1].ruleCode").value("RULE-LIST-API-001"))
+                .andExpect(jsonPath("$[1].priority").value(5));
+    }
+
+    @Test
     void shouldRetrieveRuleByIdThroughApi() throws Exception {
 
         UUID ruleId =
