@@ -89,6 +89,12 @@ public interface CaseServiceInterface {
             UUID caseId
     );
 
+    void deleteCaseEvidence(
+            UUID caseId,
+            UUID evidenceId,
+            UUID deletedBy
+    );
+
     CaseResponse updateCaseStatus(
             UUID caseId,
             CaseStatusUpdateRequest request

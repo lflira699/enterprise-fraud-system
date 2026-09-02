@@ -1,5 +1,7 @@
 package com.efs.modules.casemanagement.service;
 
+import jakarta.persistence.EntityManager;
+
 import com.efs.modules.casemanagement.dto.CaseAssignmentRequest;
 import com.efs.modules.casemanagement.dto.CaseAssignmentResponse;
 import com.efs.modules.casemanagement.dto.CaseCommentRequest;
@@ -97,6 +99,9 @@ class CaseServiceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @BeforeEach
     void setUp() {
@@ -882,6 +887,197 @@ class CaseServiceIntegrationTest {
                 () -> service.getCaseEvidenceById(
                         secondCase.getCaseId(),
                         evidence.getEvidenceId()
+                )
+        );
+    }
+
+    @Test
+    void shouldSoftDeleteCaseEvidence() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-DELETE-001"
+                        )
+                );
+
+        CaseEvidenceResponse evidence =
+                service.createCaseEvidence(
+                        created.getCaseId(),
+                        buildEvidenceRequest(
+                                "TRANSACTION_SCREENSHOT"
+                        )
+                );
+
+        service.deleteCaseEvidence(
+                created.getCaseId(),
+                evidence.getEvidenceId(),
+                ASSIGNED_TO
+        );
+
+        entityManager.flush();
+
+        Integer persistedRows =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                        """,
+                        Integer.class,
+                        evidence.getEvidenceId()
+                );
+
+        UUID deletedBy =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT deleted_by
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                        """,
+                        UUID.class,
+                        evidence.getEvidenceId()
+                );
+
+        UUID updatedBy =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT updated_by
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                        """,
+                        UUID.class,
+                        evidence.getEvidenceId()
+                );
+
+        LocalDateTime deletedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT deleted_at
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                        """,
+                        LocalDateTime.class,
+                        evidence.getEvidenceId()
+                );
+
+        LocalDateTime updatedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT updated_at
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                        """,
+                        LocalDateTime.class,
+                        evidence.getEvidenceId()
+                );
+
+        assertEquals(
+                1,
+                persistedRows
+        );
+
+        assertEquals(
+                ASSIGNED_TO,
+                deletedBy
+        );
+
+        assertEquals(
+                ASSIGNED_TO,
+                updatedBy
+        );
+
+        assertNotNull(
+                deletedAt
+        );
+
+        assertNotNull(
+                updatedAt
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getCaseEvidenceById(
+                        created.getCaseId(),
+                        evidence.getEvidenceId()
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectCaseEvidenceDeleteFromDifferentCase() {
+
+        CaseResponse firstCase =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-DELETE-002"
+                        )
+                );
+
+        CaseResponse secondCase =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-DELETE-003"
+                        )
+                );
+
+        CaseEvidenceResponse evidence =
+                service.createCaseEvidence(
+                        firstCase.getCaseId(),
+                        buildEvidenceRequest(
+                                "TRANSACTION_SCREENSHOT"
+                        )
+                );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.deleteCaseEvidence(
+                        secondCase.getCaseId(),
+                        evidence.getEvidenceId(),
+                        ASSIGNED_TO
+                )
+        );
+
+        assertNotNull(
+                service.getCaseEvidenceById(
+                        firstCase.getCaseId(),
+                        evidence.getEvidenceId()
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectAlreadyDeletedCaseEvidence() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-DELETE-004"
+                        )
+                );
+
+        CaseEvidenceResponse evidence =
+                service.createCaseEvidence(
+                        created.getCaseId(),
+                        buildEvidenceRequest(
+                                "DEVICE_EVIDENCE"
+                        )
+                );
+
+        service.deleteCaseEvidence(
+                created.getCaseId(),
+                evidence.getEvidenceId(),
+                ASSIGNED_TO
+        );
+
+        entityManager.flush();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.deleteCaseEvidence(
+                        created.getCaseId(),
+                        evidence.getEvidenceId(),
+                        ASSIGNED_TO
                 )
         );
     }

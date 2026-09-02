@@ -697,6 +697,62 @@ public class CaseService
 
     @Override
     @Transactional
+    public void deleteCaseEvidence(
+            UUID caseId,
+            UUID evidenceId,
+            UUID deletedBy) {
+
+        getExistingCase(
+                caseId
+        );
+
+        CaseEvidence evidence =
+                caseEvidenceRepository
+                        .findByEvidenceIdAndDeletedAtIsNull(
+                                evidenceId
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Case evidence not found: "
+                                                + evidenceId
+                                )
+                        );
+
+        if (!caseId.equals(
+                evidence.getCaseId())) {
+
+            throw new ResourceNotFoundException(
+                    "Case evidence not found for case: "
+                            + caseId
+            );
+        }
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        evidence.setDeletedAt(
+                now
+        );
+
+        evidence.setDeletedBy(
+                deletedBy
+        );
+
+        evidence.setUpdatedAt(
+                now
+        );
+
+        evidence.setUpdatedBy(
+                deletedBy
+        );
+
+        caseEvidenceRepository.save(
+                evidence
+        );
+    }
+
+    @Override
+    @Transactional
     public CaseResponse updateCaseStatus(
             UUID caseId,
             CaseStatusUpdateRequest request) {
