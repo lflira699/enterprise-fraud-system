@@ -887,6 +887,108 @@ class CaseServiceIntegrationTest {
     }
 
     @Test
+    void shouldRejectSoftDeletedCaseEvidenceLookup() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-005"
+                        )
+                );
+
+        CaseEvidenceResponse evidence =
+                service.createCaseEvidence(
+                        created.getCaseId(),
+                        buildEvidenceRequest(
+                                "TRANSACTION_SCREENSHOT"
+                        )
+                );
+
+        jdbcTemplate.update(
+                """
+                UPDATE case_management.case_evidence
+                SET deleted_at = CURRENT_TIMESTAMP,
+                    deleted_by = ?
+                WHERE evidence_id = ?
+                """,
+                ASSIGNED_TO,
+                evidence.getEvidenceId()
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getCaseEvidenceById(
+                        created.getCaseId(),
+                        evidence.getEvidenceId()
+                )
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedCaseEvidenceFromList() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-006"
+                        )
+                );
+
+        CaseEvidenceResponse activeEvidence =
+                service.createCaseEvidence(
+                        created.getCaseId(),
+                        buildEvidenceRequest(
+                                "TRANSACTION_SCREENSHOT"
+                        )
+                );
+
+        CaseEvidenceResponse deletedEvidence =
+                service.createCaseEvidence(
+                        created.getCaseId(),
+                        buildEvidenceRequest(
+                                "DEVICE_EVIDENCE"
+                        )
+                );
+
+        jdbcTemplate.update(
+                """
+                UPDATE case_management.case_evidence
+                SET deleted_at = CURRENT_TIMESTAMP,
+                    deleted_by = ?
+                WHERE evidence_id = ?
+                """,
+                ASSIGNED_TO,
+                deletedEvidence.getEvidenceId()
+        );
+
+        List<CaseEvidenceResponse> evidence =
+                service.getCaseEvidence(
+                        created.getCaseId()
+                );
+
+        assertEquals(
+                1,
+                evidence.size()
+        );
+
+        assertEquals(
+                activeEvidence.getEvidenceId(),
+                evidence.get(0).getEvidenceId()
+        );
+
+        assertFalse(
+                evidence.stream()
+                        .anyMatch(item ->
+                                deletedEvidence
+                                        .getEvidenceId()
+                                        .equals(
+                                                item.getEvidenceId()
+                                        )
+                        )
+        );
+    }
+
+    @Test
     void shouldUpdateCaseStatusAndCreateHistory() {
 
         CaseResponse created =

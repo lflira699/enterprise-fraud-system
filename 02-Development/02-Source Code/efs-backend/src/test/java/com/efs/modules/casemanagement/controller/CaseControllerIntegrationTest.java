@@ -859,6 +859,82 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnNotFoundForSoftDeletedCaseEvidenceThroughApi() throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-EVIDENCE-API-004"
+                );
+
+        UUID evidenceId =
+                insertCaseEvidence(
+                        caseId,
+                        "TRANSACTION_SCREENSHOT"
+                );
+
+        jdbcTemplate.update(
+                """
+                UPDATE case_management.case_evidence
+                SET deleted_at = CURRENT_TIMESTAMP,
+                    deleted_by = ?
+                WHERE evidence_id = ?
+                """,
+                ASSIGNED_TO,
+                evidenceId
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                                caseId,
+                                evidenceId)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedCaseEvidenceFromApiList() throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-EVIDENCE-API-005"
+                );
+
+        UUID activeEvidenceId =
+                insertCaseEvidence(
+                        caseId,
+                        "TRANSACTION_SCREENSHOT"
+                );
+
+        UUID deletedEvidenceId =
+                insertCaseEvidence(
+                        caseId,
+                        "DEVICE_EVIDENCE"
+                );
+
+        jdbcTemplate.update(
+                """
+                UPDATE case_management.case_evidence
+                SET deleted_at = CURRENT_TIMESTAMP,
+                    deleted_by = ?
+                WHERE evidence_id = ?
+                """,
+                ASSIGNED_TO,
+                deletedEvidenceId
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}/evidence",
+                                caseId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].evidenceId")
+                        .value(activeEvidenceId.toString()))
+                .andExpect(jsonPath("$[0].caseId")
+                        .value(caseId.toString()));
+    }
+
+    @Test
     void shouldUpdateCaseStatusThroughApi() throws Exception {
 
         UUID caseId =

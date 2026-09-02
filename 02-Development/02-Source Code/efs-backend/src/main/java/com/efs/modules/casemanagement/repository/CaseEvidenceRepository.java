@@ -12,20 +12,21 @@ import java.util.UUID;
 public interface CaseEvidenceRepository
         extends JpaRepository<CaseEvidence, UUID> {
 
-    Optional<CaseEvidence> findByEvidenceId(
+    Optional<CaseEvidence> findByEvidenceIdAndDeletedAtIsNull(
             UUID evidenceId
     );
 
-    List<CaseEvidence> findByCaseIdOrderByUploadedAtDesc(
+    List<CaseEvidence> findByCaseIdAndDeletedAtIsNullOrderByUploadedAtDesc(
             UUID caseId
     );
 
-    List<CaseEvidence> findByCaseIdAndEvidenceTypeOrderByUploadedAtDesc(
+    List<CaseEvidence>
+    findByCaseIdAndEvidenceTypeAndDeletedAtIsNullOrderByUploadedAtDesc(
             UUID caseId,
             String evidenceType
     );
 
-    List<CaseEvidence> findByTransactionIdOrderByUploadedAtDesc(
+    List<CaseEvidence> findByTransactionIdAndDeletedAtIsNullOrderByUploadedAtDesc(
             UUID transactionId
     );
 }

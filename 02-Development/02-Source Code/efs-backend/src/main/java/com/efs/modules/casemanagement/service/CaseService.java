@@ -615,8 +615,23 @@ public class CaseService
                 caseId
         );
 
+        LocalDateTime now =
+                LocalDateTime.now();
+
         evidence.setUploadedAt(
-                LocalDateTime.now()
+                now
+        );
+
+        evidence.setCreatedAt(
+                now
+        );
+
+        evidence.setCreatedBy(
+                evidence.getUploadedBy()
+        );
+
+        evidence.setUpdatedAt(
+                now
         );
 
         return caseEvidenceMapper.toResponse(
@@ -638,7 +653,7 @@ public class CaseService
 
         CaseEvidence evidence =
                 caseEvidenceRepository
-                        .findByEvidenceId(
+                        .findByEvidenceIdAndDeletedAtIsNull(
                                 evidenceId
                         )
                         .orElseThrow(() ->
@@ -672,7 +687,7 @@ public class CaseService
         );
 
         return caseEvidenceRepository
-                .findByCaseIdOrderByUploadedAtDesc(
+                .findByCaseIdAndDeletedAtIsNullOrderByUploadedAtDesc(
                         caseId
                 )
                 .stream()
