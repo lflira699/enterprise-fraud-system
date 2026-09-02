@@ -28,6 +28,7 @@ import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.shared.exception.DuplicateRecordException;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1313,18 +1314,90 @@ class CaseServiceIntegrationTest {
         assertNotNull(resolution.getResolutionId());
         assertEquals(created.getCaseId(), resolution.getCaseId());
         assertEquals("CONFIRMED_FRAUD", resolution.getResolutionType());
+
         assertEquals(
                 "Investigation completed with documented resolution",
                 resolution.getResolutionSummary()
         );
+
         assertEquals(
                 new BigDecimal("1500.00"),
                 resolution.getEconomicImpact()
         );
-        assertEquals("GTQ", resolution.getCurrencyCode());
-        assertEquals(ASSIGNED_TO, resolution.getResolvedBy());
-        assertEquals(ASSIGNED_FROM, resolution.getApprovedBy());
-        assertNotNull(resolution.getResolvedAt());
+
+        assertEquals(
+                "GTQ",
+                resolution.getCurrencyCode()
+        );
+
+        assertEquals(
+                ASSIGNED_TO,
+                resolution.getResolvedBy()
+        );
+
+        assertEquals(
+                ASSIGNED_FROM,
+                resolution.getApprovedBy()
+        );
+
+        assertNotNull(
+                resolution.getResolvedAt()
+        );
+
+        entityManager.flush();
+
+        String persistedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT current_status
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        String.class,
+                        created.getCaseId()
+                );
+
+        LocalDateTime closedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closed_at
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        LocalDateTime.class,
+                        created.getCaseId()
+                );
+
+        Integer closureHistoryCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_status_history
+                        WHERE case_id = ?
+                          AND previous_status = ?
+                          AND current_status = ?
+                          AND changed_by = ?
+                        """,
+                        Integer.class,
+                        created.getCaseId(),
+                        "OPEN",
+                        "CLOSED",
+                        ASSIGNED_TO
+                );
+
+        assertEquals(
+                "CLOSED",
+                persistedStatus
+        );
+
+        assertNotNull(
+                closedAt
+        );
+
+        assertEquals(
+                1,
+                closureHistoryCount
+        );
 
         CaseResolutionResponse retrieved =
                 service.getCaseResolutionById(
@@ -1339,7 +1412,7 @@ class CaseServiceIntegrationTest {
     }
 
     @Test
-    void shouldReturnCaseResolutions() {
+    void shouldRejectSecondCaseResolutionAfterClosure() {
 
         CaseResponse created =
                 service.createCase(
@@ -1355,19 +1428,107 @@ class CaseServiceIntegrationTest {
                 )
         );
 
-        service.createCaseResolution(
-                created.getCaseId(),
-                buildResolutionRequest(
-                        "FALSE_POSITIVE"
-                )
-        );
+        entityManager.flush();
 
-        List<CaseResolutionResponse> resolutions =
-                service.getCaseResolutions(
+        LocalDateTime closedAtBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closed_at
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        LocalDateTime.class,
                         created.getCaseId()
                 );
 
-        assertEquals(2, resolutions.size());
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.createCaseResolution(
+                                created.getCaseId(),
+                                buildResolutionRequest(
+                                        "FALSE_POSITIVE"
+                                )
+                        )
+                );
+
+        assertEquals(
+                "Case already closed: "
+                        + created.getCaseId(),
+                exception.getMessage()
+        );
+
+        Integer resolutionCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_resolution
+                        WHERE case_id = ?
+                        """,
+                        Integer.class,
+                        created.getCaseId()
+                );
+
+        LocalDateTime closedAtAfter =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closed_at
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        LocalDateTime.class,
+                        created.getCaseId()
+                );
+
+        assertEquals(
+                1,
+                resolutionCount
+        );
+
+        assertEquals(
+                closedAtBefore,
+                closedAtAfter
+        );
+    }
+
+    @Test
+    void shouldRejectDirectCaseClosureWithoutResolution() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-RESOLUTION-005"
+                        )
+                );
+
+        CaseStatusUpdateRequest request =
+                new CaseStatusUpdateRequest();
+
+        request.setCurrentStatus(
+                "CLOSED"
+        );
+
+        request.setChangeReason(
+                "Direct closure attempt"
+        );
+
+        request.setChangedBy(
+                ASSIGNED_TO
+        );
+
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.updateCaseStatus(
+                                created.getCaseId(),
+                                request
+                        )
+                );
+
+        assertEquals(
+                "Case closure requires a case resolution",
+                exception.getMessage()
+        );
     }
 
     @Test

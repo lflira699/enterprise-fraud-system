@@ -63,6 +63,7 @@ import com.efs.modules.casemanagement.repository.CaseTaskRepository;
 import com.efs.shared.exception.DuplicateRecordException;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.exception.ValidationException;
 import com.efs.shared.pagination.PageResponse;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
@@ -768,6 +769,14 @@ public class CaseService
                         caseId
                 );
 
+        if ("CLOSED".equals(
+                request.getCurrentStatus())) {
+
+            throw new ValidationException(
+                    "Case closure requires a case resolution"
+            );
+        }
+
         String previousStatus =
                 caseEntity.getCurrentStatus();
 
@@ -847,9 +856,26 @@ public class CaseService
             UUID caseId,
             CaseResolutionRequest request) {
 
-        getExistingCase(
-                caseId
-        );
+        Case caseEntity =
+                getExistingCase(
+                        caseId
+                );
+
+        if ("CLOSED".equals(
+                caseEntity.getCurrentStatus())
+                || caseEntity.getClosedAt() != null) {
+
+            throw new ValidationException(
+                    "Case already closed: "
+                            + caseId
+            );
+        }
+
+        String previousStatus =
+                caseEntity.getCurrentStatus();
+
+        LocalDateTime now =
+                LocalDateTime.now();
 
         CaseResolution resolution =
                 caseResolutionMapper.toEntity(
@@ -861,13 +887,59 @@ public class CaseService
         );
 
         resolution.setResolvedAt(
-                LocalDateTime.now()
+                now
+        );
+
+        CaseResolution savedResolution =
+                caseResolutionRepository.save(
+                        resolution
+                );
+
+        caseEntity.setCurrentStatus(
+                "CLOSED"
+        );
+
+        caseEntity.setClosedAt(
+                now
+        );
+
+        caseEntity.setUpdatedAt(
+                now
+        );
+
+        caseRepository.save(
+                caseEntity
+        );
+
+        CaseStatusHistory history =
+                new CaseStatusHistory();
+
+        history.setCaseId(
+                caseId
+        );
+
+        history.setPreviousStatus(
+                previousStatus
+        );
+
+        history.setCurrentStatus(
+                "CLOSED"
+        );
+
+        history.setChangedBy(
+                request.getResolvedBy()
+        );
+
+        history.setChangedAt(
+                now
+        );
+
+        caseStatusHistoryRepository.save(
+                history
         );
 
         return caseResolutionMapper.toResponse(
-                caseResolutionRepository.save(
-                        resolution
-                )
+                savedResolution
         );
     }
 

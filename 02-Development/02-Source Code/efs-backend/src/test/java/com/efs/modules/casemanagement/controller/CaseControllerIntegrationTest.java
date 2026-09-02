@@ -1204,6 +1204,184 @@ class CaseControllerIntegrationTest {
                 .andExpect(jsonPath("$.resolvedBy").value(ASSIGNED_TO.toString()))
                 .andExpect(jsonPath("$.approvedBy").value(ASSIGNED_FROM.toString()))
                 .andExpect(jsonPath("$.resolvedAt").exists());
+
+        entityManager.flush();
+
+        String persistedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT current_status
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        String.class,
+                        caseId
+                );
+
+        Integer closedAtCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case
+                        WHERE case_id = ?
+                          AND closed_at IS NOT NULL
+                        """,
+                        Integer.class,
+                        caseId
+                );
+
+        Integer closureHistoryCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_status_history
+                        WHERE case_id = ?
+                          AND previous_status = ?
+                          AND current_status = ?
+                          AND changed_by = ?
+                        """,
+                        Integer.class,
+                        caseId,
+                        "OPEN",
+                        "CLOSED",
+                        ASSIGNED_TO
+                );
+
+        assertEquals(
+                "CLOSED",
+                persistedStatus
+        );
+
+        assertEquals(
+                1,
+                closedAtCount
+        );
+
+        assertEquals(
+                1,
+                closureHistoryCount
+        );
+    }
+
+    @Test
+    void shouldRejectSecondCaseResolutionAfterClosureThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-RESOLUTION-API-004"
+                );
+
+        String firstRequest =
+                """
+                {
+                    "resolutionType": "CONFIRMED_FRAUD",
+                    "resolutionSummary": "Investigation completed with documented resolution",
+                    "economicImpact": 1500.00,
+                    "currencyCode": "GTQ",
+                    "resolvedBy": "%s",
+                    "approvedBy": "%s"
+                }
+                """.formatted(
+                        ASSIGNED_TO,
+                        ASSIGNED_FROM
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/resolutions",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(firstRequest)
+                )
+                .andExpect(status().isCreated());
+
+        String secondRequest =
+                """
+                {
+                    "resolutionType": "FALSE_POSITIVE",
+                    "resolutionSummary": "Second closure attempt",
+                    "economicImpact": 0.00,
+                    "currencyCode": "GTQ",
+                    "resolvedBy": "%s",
+                    "approvedBy": "%s"
+                }
+                """.formatted(
+                        ASSIGNED_TO,
+                        ASSIGNED_FROM
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/resolutions",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(secondRequest)
+                )
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("BUSINESS_VALIDATION_ERROR"));
+
+        Integer resolutionCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_resolution
+                        WHERE case_id = ?
+                        """,
+                        Integer.class,
+                        caseId
+                );
+
+        assertEquals(
+                1,
+                resolutionCount
+        );
+    }
+
+    @Test
+    void shouldRejectDirectCaseClosureWithoutResolutionThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-RESOLUTION-API-005"
+                );
+
+        String requestBody =
+                """
+                {
+                    "currentStatus": "CLOSED",
+                    "changeReason": "Direct closure attempt",
+                    "changedBy": "%s"
+                }
+                """.formatted(
+                        ASSIGNED_TO
+                );
+
+        mockMvc.perform(
+                        patch("/api/v1/cases/{caseId}/status",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("BUSINESS_VALIDATION_ERROR"));
+
+        String persistedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT current_status
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        String.class,
+                        caseId
+                );
+
+        assertEquals(
+                "OPEN",
+                persistedStatus
+        );
     }
 
     @Test
