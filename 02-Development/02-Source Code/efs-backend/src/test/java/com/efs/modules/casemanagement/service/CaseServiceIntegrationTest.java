@@ -26,6 +26,7 @@ import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.shared.exception.DuplicateRecordException;
+import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1046,6 +1047,40 @@ class CaseServiceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldRejectCaseEvidenceDeleteWithoutActor() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-EVIDENCE-DELETE-005"
+                        )
+                );
+
+        CaseEvidenceResponse evidence =
+                service.createCaseEvidence(
+                        created.getCaseId(),
+                        buildEvidenceRequest(
+                                "TRANSACTION_SCREENSHOT"
+                        )
+                );
+
+        assertThrows(
+                RequestValidationException.class,
+                () -> service.deleteCaseEvidence(
+                        created.getCaseId(),
+                        evidence.getEvidenceId(),
+                        null
+                )
+        );
+
+        assertNotNull(
+                service.getCaseEvidenceById(
+                        created.getCaseId(),
+                        evidence.getEvidenceId()
+                )
+        );
+    }
     @Test
     void shouldRejectAlreadyDeletedCaseEvidence() {
 

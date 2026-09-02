@@ -702,6 +702,12 @@ public class CaseService
             UUID evidenceId,
             UUID deletedBy) {
 
+        if (deletedBy == null) {
+            throw new RequestValidationException(
+                    "Evidence deletion actor is required"
+            );
+        }
+
         getExistingCase(
                 caseId
         );
