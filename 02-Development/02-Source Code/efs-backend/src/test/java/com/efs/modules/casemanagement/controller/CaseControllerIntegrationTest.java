@@ -807,6 +807,68 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnNotFoundWhenCreatingEvidenceForUnknownCaseThroughApi()
+            throws Exception {
+
+        UUID unknownCaseId =
+                UUID.randomUUID();
+
+        String requestBody =
+                """
+                {
+                    "transactionId": "%s",
+                    "evidenceType": "TRANSACTION_SCREENSHOT",
+                    "sourceSystem": "INTERNAL_CASE_TOOL",
+                    "storageUri": "case-evidence://transaction/screenshot-unknown",
+                    "checksumSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    "uploadedBy": "%s"
+                }
+                """.formatted(
+                        TRANSACTION_ID,
+                        ASSIGNED_TO
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/evidence",
+                                unknownCaseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectInvalidCaseEvidenceThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-EVIDENCE-API-007"
+                );
+
+        String requestBody =
+                """
+                {
+                    "transactionId": "%s",
+                    "evidenceType": "",
+                    "sourceSystem": "",
+                    "uploadedBy": "%s"
+                }
+                """.formatted(
+                        TRANSACTION_ID,
+                        ASSIGNED_TO
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/evidence",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldRetrieveCaseEvidenceThroughApi() throws Exception {
 
         UUID caseId =
