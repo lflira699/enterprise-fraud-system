@@ -933,6 +933,36 @@ class CaseControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].caseId")
                         .value(caseId.toString()));
     }
+    @Test
+    void shouldReturnNotFoundWhenRetrievingEvidenceForUnknownCaseThroughApi()
+            throws Exception {
+
+        UUID unknownCaseId =
+                UUID.randomUUID();
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}/evidence",
+                                unknownCaseId)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnEmptyEvidenceListForCaseWithoutEvidenceThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-EVIDENCE-API-006"
+                );
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}/evidence",
+                                caseId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
 
     @Test
     void shouldUpdateCaseStatusThroughApi() throws Exception {
