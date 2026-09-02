@@ -582,6 +582,100 @@ class CaseServiceIntegrationTest {
     }
 
     @Test
+    void shouldRejectAssignmentForClosedCaseWithoutChangingCurrentAssignment() {
+
+        CaseResponse created =
+                service.createCase(
+                        buildRequest(
+                                "CASE-ASSIGNMENT-003"
+                        )
+                );
+
+        CaseAssignmentRequest initialAssignment =
+                new CaseAssignmentRequest();
+
+        initialAssignment.setAssignedFrom(ASSIGNED_FROM);
+        initialAssignment.setAssignedTo(ASSIGNED_TO);
+        initialAssignment.setAssignedTeam("FRAUD_INVESTIGATION");
+        initialAssignment.setAssignmentReason("Initial assignment");
+
+        service.assignCase(
+                created.getCaseId(),
+                initialAssignment
+        );
+
+        service.createCaseResolution(
+                created.getCaseId(),
+                buildResolutionRequest(
+                        "CONFIRMED_FRAUD"
+                )
+        );
+
+        entityManager.flush();
+
+        CaseAssignmentRequest reassignment =
+                new CaseAssignmentRequest();
+
+        reassignment.setAssignedFrom(ASSIGNED_TO);
+        reassignment.setAssignedTo(ASSIGNED_FROM);
+        reassignment.setAssignedTeam("FRAUD_REVIEW");
+        reassignment.setAssignmentReason("Reassignment after closure");
+
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.assignCase(
+                                created.getCaseId(),
+                                reassignment
+                        )
+                );
+
+        assertEquals(
+                "Case is not available for assignment",
+                exception.getMessage()
+        );
+
+        CaseResponse persistedCase =
+                service.getCaseById(
+                        created.getCaseId()
+                );
+
+        assertEquals(
+                "CLOSED",
+                persistedCase.getCurrentStatus()
+        );
+
+        assertEquals(
+                ASSIGNED_TO,
+                persistedCase.getAssignedUser()
+        );
+
+        assertEquals(
+                "FRAUD_INVESTIGATION",
+                persistedCase.getAssignedTeam()
+        );
+
+        List<CaseAssignmentResponse> assignments =
+                service.getCaseAssignments(
+                        created.getCaseId()
+                );
+
+        assertEquals(
+                1,
+                assignments.size()
+        );
+
+        assertEquals(
+                ASSIGNED_TO,
+                assignments.get(0).getAssignedTo()
+        );
+
+        assertEquals(
+                "FRAUD_INVESTIGATION",
+                assignments.get(0).getAssignedTeam()
+        );
+    }
+    @Test
     void shouldCreateAndRetrieveCaseTask() {
 
         CaseResponse created =

@@ -368,6 +368,14 @@ public class CaseService
                 getExistingCase(
                         caseId
                 );
+        if ("CLOSED".equals(
+                caseEntity.getCurrentStatus())
+                || caseEntity.getClosedAt() != null) {
+
+            throw new ValidationException(
+                    "Case is not available for assignment"
+            );
+        }
 
         LocalDateTime now =
                 LocalDateTime.now();

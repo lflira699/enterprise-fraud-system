@@ -587,6 +587,122 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectAssignmentForClosedCaseThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-ASSIGNMENT-API-003"
+                );
+
+        String initialAssignment =
+                """
+                {
+                  "assignedFrom": "%s",
+                  "assignedTo": "%s",
+                  "assignedTeam": "FRAUD_INVESTIGATION",
+                  "assignmentReason": "Initial assignment"
+                }
+                """.formatted(
+                        ASSIGNED_FROM,
+                        ASSIGNED_TO
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/assignments",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(initialAssignment)
+                )
+                .andExpect(status().isCreated());
+
+        String resolutionRequest =
+                """
+                {
+                  "resolutionType": "CONFIRMED_FRAUD",
+                  "resolutionSummary": "Investigation completed with documented resolution",
+                  "economicImpact": 1500.00,
+                  "currencyCode": "GTQ",
+                  "resolvedBy": "%s",
+                  "approvedBy": "%s"
+                }
+                """.formatted(
+                        ASSIGNED_TO,
+                        ASSIGNED_FROM
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/resolutions",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resolutionRequest)
+                )
+                .andExpect(status().isCreated());
+
+        String reassignment =
+                """
+                {
+                  "assignedFrom": "%s",
+                  "assignedTo": "%s",
+                  "assignedTeam": "FRAUD_REVIEW",
+                  "assignmentReason": "Reassignment after closure"
+                }
+                """.formatted(
+                        ASSIGNED_TO,
+                        ASSIGNED_FROM
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/{caseId}/assignments",
+                                caseId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(reassignment)
+                )
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("BUSINESS_VALIDATION_ERROR"));
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}",
+                                caseId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus")
+                        .value("CLOSED"))
+                .andExpect(jsonPath("$.assignedUser")
+                        .value(ASSIGNED_TO.toString()))
+                .andExpect(jsonPath("$.assignedTeam")
+                        .value("FRAUD_INVESTIGATION"));
+
+        Integer assignmentCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_assignment
+                        WHERE case_id = ?
+                        """,
+                        Integer.class,
+                        caseId
+                );
+
+        assertEquals(
+                1,
+                assignmentCount
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}/assignments",
+                                caseId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assignedTo")
+                        .value(ASSIGNED_TO.toString()))
+                .andExpect(jsonPath("$[0].assignedTeam")
+                        .value("FRAUD_INVESTIGATION"))
+                .andExpect(jsonPath("$[0].assignmentReason")
+                        .value("Initial assignment"));
+    }
+    @Test
     void shouldCreateCaseTaskThroughApi() throws Exception {
 
         UUID caseId =
