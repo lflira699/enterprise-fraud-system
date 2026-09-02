@@ -342,6 +342,74 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
+    void shouldRetrieveCaseByIdWithoutModifyingCaseThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-REVIEW-API-001"
+                );
+
+        LocalDateTime updatedAtBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT updated_at
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        LocalDateTime.class,
+                        caseId
+                );
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}",
+                                caseId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseId")
+                        .value(caseId.toString()))
+                .andExpect(jsonPath("$.caseNumber")
+                        .value("CASE-REVIEW-API-001"))
+                .andExpect(jsonPath("$.organizationId")
+                        .value(ORGANIZATION_ID.toString()))
+                .andExpect(jsonPath("$.transactionId")
+                        .value(TRANSACTION_ID.toString()))
+                .andExpect(jsonPath("$.customerId")
+                        .value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.currentStatus")
+                        .value("OPEN"));
+
+        LocalDateTime updatedAtAfter =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT updated_at
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        LocalDateTime.class,
+                        caseId
+                );
+
+        assertEquals(
+                updatedAtBefore,
+                updatedAtAfter
+        );
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenRetrievingUnknownCaseThroughApi()
+            throws Exception {
+
+        UUID unknownCaseId =
+                UUID.randomUUID();
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}",
+                                unknownCaseId)
+                )
+                .andExpect(status().isNotFound());
+    }
+    @Test
     void shouldRetrieveCaseByNumberThroughApi() throws Exception {
 
         UUID caseId =
