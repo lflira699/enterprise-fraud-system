@@ -36,6 +36,38 @@ const resources = {
         },
       },
 
+      rules: {
+        list: {
+          title:
+            'Catálogo de reglas',
+          error:
+            'No fue posible cargar las reglas.',
+          noRows:
+            'No hay reglas disponibles.',
+        },
+
+        columns: {
+          ruleCode:
+            'Código',
+          ruleName:
+            'Nombre de la regla',
+          category:
+            'Categoría',
+          severity:
+            'Severidad',
+          priority:
+            'Prioridad',
+          ownerTeam:
+            'Equipo responsable',
+          currentVersion:
+            'Versión',
+          status:
+            'Estado',
+          updatedAt:
+            'Actualizada',
+        },
+      },
+
       detection: {
         filters: {
           title: 'Filtros',
