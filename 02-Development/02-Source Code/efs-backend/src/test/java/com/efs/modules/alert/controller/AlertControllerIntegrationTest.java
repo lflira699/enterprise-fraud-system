@@ -325,6 +325,218 @@ class AlertControllerIntegrationTest {
     }
 
     @Test
+    void shouldReviewAlertByIdThroughApiWithoutModification()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        Integer versionBeforeReview =
+                getRecordVersion(
+                        alertId
+                );
+
+        Integer historyBeforeReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}",
+                                alertId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.alertId")
+                                .value(
+                                        alertId.toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.customerId")
+                                .value(
+                                        CUSTOMER_ID.toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.transactionId")
+                                .value(
+                                        TRANSACTION_ID.toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.decisionId")
+                                .value(
+                                        DECISION_ID.toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.status")
+                                .value("NEW")
+                );
+
+        Integer historyAfterReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        assertEquals(
+                versionBeforeReview,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        assertEquals(
+                historyBeforeReview,
+                historyAfterReview
+        );
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenReviewingUnknownAlertThroughApi()
+            throws Exception {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}",
+                                unknownAlertId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void shouldAllowReviewOfClosedAlertThroughApi()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "IN_PROGRESS"
+                );
+
+        String closureRequestBody =
+                """
+                {
+                    "investigationResult": "Investigation completed",
+                    "closureReason": "False positive",
+                    "closedBy": "%s"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(closureRequestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                );
+
+        Integer versionBeforeReview =
+                getRecordVersion(
+                        alertId
+                );
+
+        Integer historyBeforeReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}",
+                                alertId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.alertId")
+                                .value(
+                                        alertId.toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.status")
+                                .value("CLOSED")
+                )
+                .andExpect(
+                        jsonPath("$.closureReason")
+                                .value("False positive")
+                )
+                .andExpect(
+                        jsonPath("$.closedAt")
+                                .exists()
+                );
+
+        Integer historyAfterReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        assertEquals(
+                versionBeforeReview,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        assertEquals(
+                historyBeforeReview,
+                historyAfterReview
+        );
+
+        assertEquals(
+                1,
+                historyAfterReview
+        );
+    }
+
+    @Test
     void shouldRetrieveAlertsByDecisionThroughApi()
             throws Exception {
 

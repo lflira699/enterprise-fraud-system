@@ -298,6 +298,168 @@ class AlertServiceIntegrationTest {
     }
 
     @Test
+    void shouldReviewAlertByIdWithoutModification() {
+
+        AlertResponse created =
+                service.createAlert(
+                        buildRequest()
+                );
+
+        Integer versionBeforeReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT record_version
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        created.getAlertId()
+                );
+
+        Integer historyBeforeReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        created.getAlertId()
+                );
+
+        AlertResponse reviewed =
+                service.getAlertById(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                created.getAlertId(),
+                reviewed.getAlertId()
+        );
+
+        assertEquals(
+                CUSTOMER_ID,
+                reviewed.getCustomerId()
+        );
+
+        assertEquals(
+                TRANSACTION_ID,
+                reviewed.getTransactionId()
+        );
+
+        assertEquals(
+                DECISION_ID,
+                reviewed.getDecisionId()
+        );
+
+        assertEquals(
+                "NEW",
+                reviewed.getStatus()
+        );
+
+        Integer versionAfterReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT record_version
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        created.getAlertId()
+                );
+
+        Integer historyAfterReview =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                versionBeforeReview,
+                versionAfterReview
+        );
+
+        assertEquals(
+                historyBeforeReview,
+                historyAfterReview
+        );
+    }
+
+    @Test
+    void shouldRejectReviewForUnknownAlert() {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getAlertById(
+                        unknownAlertId
+                )
+        );
+    }
+
+    @Test
+    void shouldAllowReviewOfClosedAlert() {
+
+        AlertResponse created =
+                service.createAlert(
+                        buildRequest()
+                );
+
+        AlertClosureRequest closureRequest =
+                new AlertClosureRequest();
+
+        closureRequest.setInvestigationResult(
+                "Investigation completed"
+        );
+
+        closureRequest.setClosureReason(
+                "False positive"
+        );
+
+        closureRequest.setClosedBy(
+                CHANGED_BY
+        );
+
+        AlertResponse closed =
+                service.closeAlert(
+                        created.getAlertId(),
+                        closureRequest
+                );
+
+        AlertResponse reviewed =
+                service.getAlertById(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                closed.getAlertId(),
+                reviewed.getAlertId()
+        );
+
+        assertEquals(
+                "CLOSED",
+                reviewed.getStatus()
+        );
+
+        assertEquals(
+                closed.getClosedAt(),
+                reviewed.getClosedAt()
+        );
+
+        assertEquals(
+                "False positive",
+                reviewed.getClosureReason()
+        );
+    }
+
+    @Test
     void shouldReturnAlertsByDecision() {
 
         service.createAlert(buildRequest());
