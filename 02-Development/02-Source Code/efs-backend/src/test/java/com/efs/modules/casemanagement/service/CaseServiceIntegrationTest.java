@@ -465,6 +465,142 @@ class CaseServiceIntegrationTest {
     }
 
     @Test
+    void shouldRejectCaseCreationFromUnknownAlert() {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        CaseFromAlertRequest request =
+                new CaseFromAlertRequest();
+
+        request.setAlertId(
+                unknownAlertId
+        );
+        request.setCaseNumber(
+                "CASE-ALERT-UNKNOWN-001"
+        );
+        request.setOrganizationId(
+                ORGANIZATION_ID
+        );
+        request.setCaseType(
+                "FRAUD_INVESTIGATION"
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.createCaseFromAlert(
+                        request
+                )
+        );
+
+        Integer caseCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case
+                        WHERE case_number = ?
+                        """,
+                        Integer.class,
+                        "CASE-ALERT-UNKNOWN-001"
+                );
+
+        Integer linkCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_alert
+                        WHERE source_alert_id = ?
+                        """,
+                        Integer.class,
+                        unknownAlertId
+                );
+
+        assertEquals(
+                0,
+                caseCount
+        );
+        assertEquals(
+                0,
+                linkCount
+        );
+    }
+
+    @Test
+    void shouldRejectCaseCreationFromClosedAlert() {
+
+        jdbcTemplate.update(
+                """
+                UPDATE alert.alert
+                SET status = ?,
+                    updated_at = ?
+                WHERE alert_id = ?
+                """,
+                "CLOSED",
+                LocalDateTime.now(),
+                ALERT_ID
+        );
+
+        CaseFromAlertRequest request =
+                new CaseFromAlertRequest();
+
+        request.setAlertId(
+                ALERT_ID
+        );
+        request.setCaseNumber(
+                "CASE-ALERT-CLOSED-001"
+        );
+        request.setOrganizationId(
+                ORGANIZATION_ID
+        );
+        request.setCaseType(
+                "FRAUD_INVESTIGATION"
+        );
+
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.createCaseFromAlert(
+                                request
+                        )
+                );
+
+        assertEquals(
+                "Alert is not available for case creation",
+                exception.getMessage()
+        );
+
+        Integer caseCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case
+                        WHERE case_number = ?
+                        """,
+                        Integer.class,
+                        "CASE-ALERT-CLOSED-001"
+                );
+
+        Integer linkCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_alert
+                        WHERE source_alert_id = ?
+                        """,
+                        Integer.class,
+                        ALERT_ID
+                );
+
+        assertEquals(
+                0,
+                caseCount
+        );
+        assertEquals(
+                0,
+                linkCount
+        );
+    }
+    @Test
     void shouldRejectDuplicateCaseCreationFromSameAlert() {
 
         CaseFromAlertRequest firstRequest =

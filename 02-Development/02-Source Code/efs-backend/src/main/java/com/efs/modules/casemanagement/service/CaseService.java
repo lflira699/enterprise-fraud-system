@@ -240,6 +240,13 @@ public class CaseService
             );
         }
 
+        if ("CLOSED".equals(
+                alert.getStatus())) {
+
+            throw new ValidationException(
+                    "Alert is not available for case creation"
+            );
+        }
         Case caseEntity =
                 new Case();
 

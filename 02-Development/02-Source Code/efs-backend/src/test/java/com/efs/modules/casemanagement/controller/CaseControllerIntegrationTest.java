@@ -525,6 +525,134 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectCaseCreationFromUnknownAlertThroughApi()
+            throws Exception {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        String requestBody =
+                """
+                {
+                  "alertId": "%s",
+                  "caseNumber": "CASE-ALERT-API-UNKNOWN-001",
+                  "organizationId": "%s",
+                  "caseType": "FRAUD_INVESTIGATION"
+                }
+                """.formatted(
+                        unknownAlertId,
+                        ORGANIZATION_ID
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/from-alert")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+
+        Integer caseCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case
+                        WHERE case_number = ?
+                        """,
+                        Integer.class,
+                        "CASE-ALERT-API-UNKNOWN-001"
+                );
+
+        Integer linkCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_alert
+                        WHERE source_alert_id = ?
+                        """,
+                        Integer.class,
+                        unknownAlertId
+                );
+
+        assertEquals(
+                0,
+                caseCount
+        );
+        assertEquals(
+                0,
+                linkCount
+        );
+    }
+
+    @Test
+    void shouldRejectCaseCreationFromClosedAlertThroughApi()
+            throws Exception {
+
+        jdbcTemplate.update(
+                """
+                UPDATE alert.alert
+                SET status = ?,
+                    updated_at = ?
+                WHERE alert_id = ?
+                """,
+                "CLOSED",
+                LocalDateTime.now(),
+                ALERT_ID
+        );
+
+        String requestBody =
+                """
+                {
+                  "alertId": "%s",
+                  "caseNumber": "CASE-ALERT-API-CLOSED-001",
+                  "organizationId": "%s",
+                  "caseType": "FRAUD_INVESTIGATION"
+                }
+                """.formatted(
+                        ALERT_ID,
+                        ORGANIZATION_ID
+                );
+
+        mockMvc.perform(
+                        post("/api/v1/cases/from-alert")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("BUSINESS_VALIDATION_ERROR"));
+
+        Integer caseCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case
+                        WHERE case_number = ?
+                        """,
+                        Integer.class,
+                        "CASE-ALERT-API-CLOSED-001"
+                );
+
+        Integer linkCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_alert
+                        WHERE source_alert_id = ?
+                        """,
+                        Integer.class,
+                        ALERT_ID
+                );
+
+        assertEquals(
+                0,
+                caseCount
+        );
+        assertEquals(
+                0,
+                linkCount
+        );
+    }
+    @Test
     void shouldRejectDuplicateCaseCreationFromSameAlertThroughApi()
             throws Exception {
 
