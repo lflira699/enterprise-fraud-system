@@ -23,6 +23,15 @@ public class RabbitMQConfig {
     public static final String SCENARIO_ACTIVATED_ROUTING_KEY =
             "scenario.activated.v1";
 
+    public static final String DECISION_GENERATED_QUEUE =
+            "alert-engine.decision-generated";
+
+    public static final String DECISION_GENERATED_DLQ =
+            "alert-engine.decision-generated.dlq";
+
+    public static final String DECISION_GENERATED_ROUTING_KEY =
+            "decision.generated.v1";
+
     @Bean
     public DirectExchange domainEventsExchange() {
         return new DirectExchange(
@@ -63,5 +72,38 @@ public class RabbitMQConfig {
                 .bind(scenarioActivatedQueue)
                 .to(domainEventsExchange)
                 .with(SCENARIO_ACTIVATED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue decisionGeneratedDlq() {
+        return QueueBuilder
+                .durable(DECISION_GENERATED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue decisionGeneratedQueue() {
+        return QueueBuilder
+                .durable(DECISION_GENERATED_QUEUE)
+                .withArgument(
+                        "x-dead-letter-exchange",
+                        ""
+                )
+                .withArgument(
+                        "x-dead-letter-routing-key",
+                        DECISION_GENERATED_DLQ
+                )
+                .build();
+    }
+
+    @Bean
+    public Binding decisionGeneratedBinding(
+            Queue decisionGeneratedQueue,
+            DirectExchange domainEventsExchange) {
+
+        return BindingBuilder
+                .bind(decisionGeneratedQueue)
+                .to(domainEventsExchange)
+                .with(DECISION_GENERATED_ROUTING_KEY);
     }
 }
