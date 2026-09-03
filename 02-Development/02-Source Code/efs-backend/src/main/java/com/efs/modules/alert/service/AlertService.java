@@ -23,6 +23,7 @@ import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.AlertConcurrentModificationException;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.exception.ValidationException;
 import com.efs.shared.pagination.PageResponse;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
@@ -417,9 +418,13 @@ public class AlertService
                         alertId
                 );
 
-        ensureAlertIsOpen(
-                alert
-        );
+        if (CLOSED_STATUS.equals(
+                alert.getStatus())) {
+
+            throw new ValidationException(
+                    "Alert is already closed"
+            );
+        }
 
         String previousStatus =
                 alert.getStatus();

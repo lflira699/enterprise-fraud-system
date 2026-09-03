@@ -622,6 +622,294 @@ class AlertControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnNotFoundWhenClosingUnknownAlertThroughApi()
+            throws Exception {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        String requestBody =
+                """
+                {
+                    "investigationResult": "Investigation completed",
+                    "closureReason": "Closure attempt for unknown alert",
+                    "closedBy": "%s"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                unknownAlertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void shouldRejectIncompleteAlertClosureThroughApi()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "IN_PROGRESS"
+                );
+
+        String requestBody =
+                """
+                {
+                    "investigationResult": "",
+                    "closureReason": "",
+                    "closedBy": null
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isBadRequest()
+                )
+                .andExpect(
+                        jsonPath("$.errorCode")
+                                .value("VALIDATION_ERROR")
+                );
+
+        String persistedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT status
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        String.class,
+                        alertId
+                );
+
+        assertEquals(
+                "IN_PROGRESS",
+                persistedStatus
+        );
+
+        Integer historyCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        assertEquals(
+                0,
+                historyCount
+        );
+    }
+
+    @Test
+    void shouldRejectClosingAlreadyClosedAlertThroughApi()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "IN_PROGRESS"
+                );
+
+        String firstRequestBody =
+                """
+                {
+                    "investigationResult": "Investigation completed",
+                    "closureReason": "False positive",
+                    "closedBy": "%s"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(firstRequestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                );
+
+        LocalDateTime originalClosedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closed_at
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        LocalDateTime.class,
+                        alertId
+                );
+
+        String originalClosureReason =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closure_reason
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        String.class,
+                        alertId
+                );
+
+        Integer originalRecordVersion =
+                getRecordVersion(
+                        alertId
+                );
+
+        Integer historyCountBeforeRetry =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        String secondRequestBody =
+                """
+                {
+                    "investigationResult": "Second closure attempt",
+                    "closureReason": "Must not replace original closure",
+                    "closedBy": "%s"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(secondRequestBody)
+                )
+                .andExpect(
+                        status().isUnprocessableEntity()
+                )
+                .andExpect(
+                        jsonPath("$.errorCode")
+                                .value(
+                                        "BUSINESS_VALIDATION_ERROR"
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "Alert is already closed"
+                                )
+                );
+
+        String persistedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT status
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        String.class,
+                        alertId
+                );
+
+        LocalDateTime persistedClosedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closed_at
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        LocalDateTime.class,
+                        alertId
+                );
+
+        String persistedClosureReason =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT closure_reason
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        String.class,
+                        alertId
+                );
+
+        Integer historyCountAfterRetry =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        assertEquals(
+                "CLOSED",
+                persistedStatus
+        );
+
+        assertEquals(
+                originalClosedAt,
+                persistedClosedAt
+        );
+
+        assertEquals(
+                originalClosureReason,
+                persistedClosureReason
+        );
+
+        assertEquals(
+                originalRecordVersion,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        assertEquals(
+                historyCountBeforeRetry,
+                historyCountAfterRetry
+        );
+
+        assertEquals(
+                1,
+                historyCountAfterRetry
+        );
+    }
+
+    @Test
     void shouldIncrementRecordVersionWhenUpdatingStatus()
             throws Exception {
 

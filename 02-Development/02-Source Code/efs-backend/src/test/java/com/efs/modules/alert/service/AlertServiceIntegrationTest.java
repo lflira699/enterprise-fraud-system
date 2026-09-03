@@ -6,6 +6,8 @@ import com.efs.modules.alert.dto.AlertHistoryResponse;
 import com.efs.modules.alert.dto.AlertRequest;
 import com.efs.modules.alert.dto.AlertResponse;
 import com.efs.modules.alert.dto.AlertStatusUpdateRequest;
+import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -471,6 +473,135 @@ class AlertServiceIntegrationTest {
         assertEquals(
                 CHANGED_BY,
                 history.get(0).getChangedBy()
+        );
+    }
+
+    @Test
+    void shouldRejectClosingUnknownAlert() {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        AlertClosureRequest request =
+                new AlertClosureRequest();
+
+        request.setInvestigationResult(
+                "Investigation completed"
+        );
+
+        request.setClosureReason(
+                "Closure attempt for unknown alert"
+        );
+
+        request.setClosedBy(
+                CHANGED_BY
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.closeAlert(
+                        unknownAlertId,
+                        request
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectClosingAlreadyClosedAlert() {
+
+        AlertResponse created =
+                service.createAlert(
+                        buildRequest()
+                );
+
+        AlertClosureRequest firstRequest =
+                new AlertClosureRequest();
+
+        firstRequest.setInvestigationResult(
+                "Investigation completed"
+        );
+
+        firstRequest.setClosureReason(
+                "False positive"
+        );
+
+        firstRequest.setClosedBy(
+                CHANGED_BY
+        );
+
+        AlertResponse firstClosure =
+                service.closeAlert(
+                        created.getAlertId(),
+                        firstRequest
+                );
+
+        List<AlertHistoryResponse> historyBeforeRetry =
+                service.getAlertHistory(
+                        created.getAlertId()
+                );
+
+        AlertClosureRequest secondRequest =
+                new AlertClosureRequest();
+
+        secondRequest.setInvestigationResult(
+                "Second closure attempt"
+        );
+
+        secondRequest.setClosureReason(
+                "Must not replace original closure"
+        );
+
+        secondRequest.setClosedBy(
+                CHANGED_BY
+        );
+
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.closeAlert(
+                                created.getAlertId(),
+                                secondRequest
+                        )
+                );
+
+        assertEquals(
+                "Alert is already closed",
+                exception.getMessage()
+        );
+
+        AlertResponse persistedAlert =
+                service.getAlertById(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                "CLOSED",
+                persistedAlert.getStatus()
+        );
+
+        assertEquals(
+                firstClosure.getClosedAt(),
+                persistedAlert.getClosedAt()
+        );
+
+        assertEquals(
+                "False positive",
+                persistedAlert.getClosureReason()
+        );
+
+        List<AlertHistoryResponse> historyAfterRetry =
+                service.getAlertHistory(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                historyBeforeRetry.size(),
+                historyAfterRetry.size()
+        );
+
+        assertEquals(
+                1,
+                historyAfterRetry.size()
         );
     }
 
