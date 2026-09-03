@@ -3,6 +3,7 @@ package com.efs.modules.rules.service;
 import com.efs.modules.rules.entity.RuleAction;
 import com.efs.modules.rules.entity.RuleExecution;
 import com.efs.modules.rules.repository.RuleActionRepository;
+import com.efs.modules.rules.repository.RuleExecutionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.when;
 class RuleAlertActionResolverTest {
 
     private RuleActionRepository ruleActionRepository;
+    private RuleExecutionRepository ruleExecutionRepository;
     private RuleAlertActionResolver resolver;
 
     @BeforeEach
@@ -30,9 +32,15 @@ class RuleAlertActionResolverTest {
                         RuleActionRepository.class
                 );
 
+        ruleExecutionRepository =
+                mock(
+                        RuleExecutionRepository.class
+                );
+
         resolver =
                 new RuleAlertActionResolver(
-                        ruleActionRepository
+                        ruleActionRepository,
+                        ruleExecutionRepository
                 );
     }
 
@@ -98,11 +106,156 @@ class RuleAlertActionResolverTest {
                 secondCreateAlert,
                 result.get(1)
         );
+    }
+
+    @Test
+    void shouldResolveCreateAlertActionsForMatchedTransactionExecutions() {
+
+        UUID transactionId =
+                UUID.randomUUID();
+
+        UUID firstRuleVersionId =
+                UUID.randomUUID();
+
+        UUID secondRuleVersionId =
+                UUID.randomUUID();
+
+        RuleExecution firstExecution =
+                createExecution(
+                        true,
+                        firstRuleVersionId
+                );
+
+        RuleExecution secondExecution =
+                createExecution(
+                        true,
+                        secondRuleVersionId
+                );
+
+        RuleAction firstAction =
+                createAction(
+                        "CREATE_ALERT",
+                        (short) 1
+                );
+
+        RuleAction secondAction =
+                createAction(
+                        "CREATE_ALERT",
+                        (short) 1
+                );
+
+        when(
+                ruleExecutionRepository
+                        .findByTransactionIdAndMatchedTrueOrderByExecutedAtDesc(
+                                transactionId
+                        )
+        ).thenReturn(
+                List.of(
+                        firstExecution,
+                        secondExecution
+                )
+        );
+
+        when(
+                ruleActionRepository
+                        .findByRuleVersionIdOrderByExecutionOrderAsc(
+                                firstRuleVersionId
+                        )
+        ).thenReturn(
+                List.of(
+                        firstAction
+                )
+        );
+
+        when(
+                ruleActionRepository
+                        .findByRuleVersionIdOrderByExecutionOrderAsc(
+                                secondRuleVersionId
+                        )
+        ).thenReturn(
+                List.of(
+                        secondAction
+                )
+        );
+
+        List<RuleAction> result =
+                resolver
+                        .resolveCreateAlertActionsByTransactionId(
+                                transactionId
+                        );
+
+        assertEquals(
+                2,
+                result.size()
+        );
+
+        assertEquals(
+                firstAction,
+                result.get(0)
+        );
+
+        assertEquals(
+                secondAction,
+                result.get(1)
+        );
+    }
+
+    @Test
+    void shouldReturnEmptyWhenTransactionHasNoMatchedExecutions() {
+
+        UUID transactionId =
+                UUID.randomUUID();
+
+        when(
+                ruleExecutionRepository
+                        .findByTransactionIdAndMatchedTrueOrderByExecutedAtDesc(
+                                transactionId
+                        )
+        ).thenReturn(
+                List.of()
+        );
+
+        List<RuleAction> result =
+                resolver
+                        .resolveCreateAlertActionsByTransactionId(
+                                transactionId
+                        );
+
+        assertTrue(
+                result.isEmpty()
+        );
 
         verify(
-                ruleActionRepository
+                ruleActionRepository,
+                never()
         ).findByRuleVersionIdOrderByExecutionOrderAsc(
-                ruleVersionId
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
+    void shouldRejectMissingTransactionId() {
+
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                resolver
+                                        .resolveCreateAlertActionsByTransactionId(
+                                                null
+                                        )
+                );
+
+        assertEquals(
+                "Transaction id is required",
+                exception.getMessage()
+        );
+
+        verify(
+                ruleExecutionRepository,
+                never()
+        ).findByTransactionIdAndMatchedTrueOrderByExecutedAtDesc(
+                org.mockito.ArgumentMatchers.any()
         );
     }
 
@@ -128,8 +281,7 @@ class RuleAlertActionResolverTest {
                 ruleActionRepository,
                 never()
         ).findByRuleVersionIdOrderByExecutionOrderAsc(
-                org.mockito.ArgumentMatchers
-                        .any()
+                org.mockito.ArgumentMatchers.any()
         );
     }
 
@@ -149,14 +301,6 @@ class RuleAlertActionResolverTest {
 
         assertTrue(
                 result.isEmpty()
-        );
-
-        verify(
-                ruleActionRepository,
-                never()
-        ).findByRuleVersionIdOrderByExecutionOrderAsc(
-                org.mockito.ArgumentMatchers
-                        .any()
         );
     }
 

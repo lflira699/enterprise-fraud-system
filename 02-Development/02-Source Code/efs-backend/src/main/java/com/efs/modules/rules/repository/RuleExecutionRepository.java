@@ -30,6 +30,10 @@ public interface RuleExecutionRepository
             UUID transactionId
     );
 
+    List<RuleExecution> findByTransactionIdAndMatchedTrueOrderByExecutedAtDesc(
+            UUID transactionId
+    );
+
     List<RuleExecution> findByExecutionStatusOrderByExecutedAtDesc(
             String executionStatus
     );
