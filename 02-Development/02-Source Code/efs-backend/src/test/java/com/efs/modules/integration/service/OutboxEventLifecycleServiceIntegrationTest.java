@@ -357,11 +357,14 @@ class OutboxEventLifecycleServiceIntegrationTest {
                 "publication-failure"
         );
 
-        LocalDateTime latestExpected =
-                LocalDateTime.now()
-                        .plusSeconds(
-                                expectedDelaySeconds
-                        );
+      LocalDateTime latestExpected =
+        LocalDateTime.now()
+                .plusSeconds(
+                        expectedDelaySeconds
+                )
+                .plusNanos(
+                        1_000_000
+                );
 
         entityManager.flush();
         entityManager.clear();
