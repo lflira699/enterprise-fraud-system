@@ -66,6 +66,11 @@ class AlertControllerIntegrationTest {
                     "79797979-7979-7979-7979-797979797979"
             );
 
+    private static final UUID REASSIGNED_USER_ID =
+            UUID.fromString(
+                    "7a7a7a7a-7a7a-7a7a-7a7a-7a7a7a7a7a7a"
+            );
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -115,6 +120,32 @@ class AlertControllerIntegrationTest {
                 "efs.alert.controller.user",
                 "EFS Alert Controller User",
                 "efs.alert.controller@example.com",
+                "LOCAL",
+                false,
+                "ACTIVE",
+                0
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status,
+                    failed_login_attempts
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                REASSIGNED_USER_ID,
+                ORGANIZATION_ID,
+                "efs.alert.controller.reassigned",
+                "EFS Alert Controller Reassigned User",
+                "efs.alert.controller.reassigned@example.com",
                 "LOCAL",
                 false,
                 "ACTIVE",
@@ -544,6 +575,262 @@ class AlertControllerIntegrationTest {
                                         "Assigned for investigation"
                                 )
                 );
+    }
+
+    @Test
+    void shouldReassignAlertThroughApi()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        String firstRequestBody =
+                """
+                {
+                    "assignedTo": "%s",
+                    "assignedTeam": "FRAUD_INVESTIGATION",
+                    "changedBy": "%s",
+                    "changeReason": "Initial assignment"
+                }
+                """.formatted(
+                        ASSIGNED_USER_ID,
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/alerts/{alertId}/assignment",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(firstRequestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                );
+
+        String secondRequestBody =
+                """
+                {
+                    "assignedTo": "%s",
+                    "assignedTeam": "FRAUD_INVESTIGATION",
+                    "changedBy": "%s",
+                    "changeReason": "Reassigned for investigation"
+                }
+                """.formatted(
+                        REASSIGNED_USER_ID,
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/alerts/{alertId}/assignment",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(secondRequestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.assignedTo")
+                                .value(
+                                        REASSIGNED_USER_ID.toString()
+                                )
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}/history",
+                                alertId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.length()")
+                                .value(2)
+                )
+                .andExpect(
+                        jsonPath("$[0].actionType")
+                                .value("ASSIGNMENT")
+                )
+                .andExpect(
+                        jsonPath("$[1].actionType")
+                                .value("ASSIGNMENT")
+                );
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenAssigningUnknownAlertThroughApi()
+            throws Exception {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        String requestBody =
+                """
+                {
+                    "assignedTo": "%s",
+                    "assignedTeam": "FRAUD_INVESTIGATION",
+                    "changedBy": "%s",
+                    "changeReason": "Assignment attempt for unknown alert"
+                }
+                """.formatted(
+                        ASSIGNED_USER_ID,
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/alerts/{alertId}/assignment",
+                                unknownAlertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void shouldRejectAssignmentForClosedAlertThroughApi()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "IN_PROGRESS"
+                );
+
+        String closureRequestBody =
+                """
+                {
+                    "investigationResult": "Investigation completed",
+                    "closureReason": "Closed before assignment attempt",
+                    "closedBy": "%s"
+                }
+                """.formatted(
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/alerts/{alertId}/close",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(closureRequestBody)
+                )
+                .andExpect(
+                        status().isOk()
+                );
+
+        Integer versionBeforeAssignment =
+                getRecordVersion(
+                        alertId
+                );
+
+        Integer historyBeforeAssignment =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        String assignmentRequestBody =
+                """
+                {
+                    "assignedTo": "%s",
+                    "assignedTeam": "FRAUD_INVESTIGATION",
+                    "changedBy": "%s",
+                    "changeReason": "Must not assign closed alert"
+                }
+                """.formatted(
+                        ASSIGNED_USER_ID,
+                        CHANGED_BY
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/alerts/{alertId}/assignment",
+                                alertId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(assignmentRequestBody)
+                )
+                .andExpect(
+                        status().isUnprocessableEntity()
+                )
+                .andExpect(
+                        jsonPath("$.errorCode")
+                                .value(
+                                        "BUSINESS_VALIDATION_ERROR"
+                                )
+                )
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "Alert is not available for assignment"
+                                )
+                );
+
+        UUID persistedAssignedTo =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT assigned_to
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        UUID.class,
+                        alertId
+                );
+
+        Integer historyAfterAssignment =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM alert.alert_history
+                        WHERE alert_id = ?
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        assertEquals(
+                null,
+                persistedAssignedTo
+        );
+
+        assertEquals(
+                versionBeforeAssignment,
+                getRecordVersion(
+                        alertId
+                )
+        );
+
+        assertEquals(
+                historyBeforeAssignment,
+                historyAfterAssignment
+        );
     }
 
     @Test

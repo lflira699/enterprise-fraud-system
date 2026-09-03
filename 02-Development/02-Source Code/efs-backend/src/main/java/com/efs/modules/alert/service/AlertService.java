@@ -343,9 +343,13 @@ public class AlertService
                         alertId
                 );
 
-        ensureAlertIsOpen(
-                alert
-        );
+        if (CLOSED_STATUS.equals(
+                alert.getStatus())) {
+
+            throw new ValidationException(
+                    "Alert is not available for assignment"
+            );
+        }
 
         LocalDateTime now =
                 LocalDateTime.now();

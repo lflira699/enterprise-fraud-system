@@ -78,6 +78,11 @@ class AlertServiceIntegrationTest {
                     "abababab-abab-abab-abab-abababababab"
             );
 
+    private static final UUID REASSIGNED_USER_ID =
+            UUID.fromString(
+                    "bcbcbcbc-bcbc-bcbc-bcbc-bcbcbcbcbcbc"
+            );
+
     @Autowired
     private AlertServiceInterface service;
 
@@ -127,6 +132,32 @@ class AlertServiceIntegrationTest {
                 "efs.alert.test.user",
                 "EFS Alert Test User",
                 "efs.alert.test@example.com",
+                "LOCAL",
+                false,
+                "ACTIVE",
+                0
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status,
+                    failed_login_attempts
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                REASSIGNED_USER_ID,
+                ORGANIZATION_ID,
+                "efs.alert.reassigned.user",
+                "EFS Alert Reassigned User",
+                "efs.alert.reassigned@example.com",
                 "LOCAL",
                 false,
                 "ACTIVE",
@@ -405,6 +436,197 @@ class AlertServiceIntegrationTest {
     }
 
     @Test
+    void shouldAllowAlertReassignmentAndCreateHistory() {
+
+        AlertResponse created =
+                service.createAlert(
+                        buildRequest()
+                );
+
+        AlertAssignmentRequest firstRequest =
+                new AlertAssignmentRequest();
+
+        firstRequest.setAssignedTo(
+                ASSIGNED_USER_ID
+        );
+        firstRequest.setAssignedTeam(
+                "FRAUD_INVESTIGATION"
+        );
+        firstRequest.setChangedBy(
+                CHANGED_BY
+        );
+        firstRequest.setChangeReason(
+                "Initial assignment"
+        );
+
+        service.assignAlert(
+                created.getAlertId(),
+                firstRequest
+        );
+
+        AlertAssignmentRequest secondRequest =
+                new AlertAssignmentRequest();
+
+        secondRequest.setAssignedTo(
+                REASSIGNED_USER_ID
+        );
+        secondRequest.setAssignedTeam(
+                "FRAUD_INVESTIGATION"
+        );
+        secondRequest.setChangedBy(
+                CHANGED_BY
+        );
+        secondRequest.setChangeReason(
+                "Reassigned for investigation"
+        );
+
+        AlertResponse reassigned =
+                service.assignAlert(
+                        created.getAlertId(),
+                        secondRequest
+                );
+
+        assertEquals(
+                REASSIGNED_USER_ID,
+                reassigned.getAssignedTo()
+        );
+
+        List<AlertHistoryResponse> history =
+                service.getAlertHistory(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                2,
+                history.size()
+        );
+
+        assertEquals(
+                "ASSIGNMENT",
+                history.get(0).getActionType()
+        );
+
+        assertEquals(
+                "ASSIGNMENT",
+                history.get(1).getActionType()
+        );
+    }
+
+    @Test
+    void shouldRejectAssignmentForUnknownAlert() {
+
+        UUID unknownAlertId =
+                UUID.randomUUID();
+
+        AlertAssignmentRequest request =
+                new AlertAssignmentRequest();
+
+        request.setAssignedTo(
+                ASSIGNED_USER_ID
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.assignAlert(
+                        unknownAlertId,
+                        request
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectAssignmentForClosedAlert() {
+
+        AlertResponse created =
+                service.createAlert(
+                        buildRequest()
+                );
+
+        AlertClosureRequest closureRequest =
+                new AlertClosureRequest();
+
+        closureRequest.setInvestigationResult(
+                "Investigation completed"
+        );
+
+        closureRequest.setClosureReason(
+                "Closed after investigation"
+        );
+
+        closureRequest.setClosedBy(
+                CHANGED_BY
+        );
+
+        service.closeAlert(
+                created.getAlertId(),
+                closureRequest
+        );
+
+        AlertAssignmentRequest assignmentRequest =
+                new AlertAssignmentRequest();
+
+        assignmentRequest.setAssignedTo(
+                ASSIGNED_USER_ID
+        );
+
+        assignmentRequest.setAssignedTeam(
+                "FRAUD_INVESTIGATION"
+        );
+
+        assignmentRequest.setChangedBy(
+                CHANGED_BY
+        );
+
+        assignmentRequest.setChangeReason(
+                "Must not assign closed alert"
+        );
+
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.assignAlert(
+                                created.getAlertId(),
+                                assignmentRequest
+                        )
+                );
+
+        assertEquals(
+                "Alert is not available for assignment",
+                exception.getMessage()
+        );
+
+        AlertResponse persistedAlert =
+                service.getAlertById(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                "CLOSED",
+                persistedAlert.getStatus()
+        );
+
+        assertEquals(
+                null,
+                persistedAlert.getAssignedTo()
+        );
+
+        List<AlertHistoryResponse> history =
+                service.getAlertHistory(
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                1,
+                history.size()
+        );
+
+        assertEquals(
+                "CLOSURE",
+                history.get(0).getActionType()
+        );
+    }
+
+    @Test
     void shouldCloseAlertAndCreateHistory() {
 
         AlertResponse created =
@@ -661,7 +883,7 @@ class AlertServiceIntegrationTest {
         );
 
         assertThrows(
-                IllegalStateException.class,
+                ValidationException.class,
                 () -> service.assignAlert(
                         created.getAlertId(),
                         assignmentRequest
