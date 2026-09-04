@@ -59,6 +59,12 @@ public class TransactionService
         Transaction transaction =
                 transactionMapper.toEntity(request);
 
+        if (transaction.getCorrelationId() == null) {
+            transaction.setCorrelationId(
+                    UUID.randomUUID()
+            );
+        }
+
         LocalDateTime now = LocalDateTime.now();
 
         if (transaction.getTransactionDatetime() == null) {
@@ -186,10 +192,21 @@ public class TransactionService
                     );
                 });
 
+        UUID existingCorrelationId =
+                transaction.getCorrelationId();
+
         transactionMapper.updateEntity(
                 request,
                 transaction
         );
+
+        if (transaction.getCorrelationId() == null) {
+            transaction.setCorrelationId(
+                    existingCorrelationId != null
+                            ? existingCorrelationId
+                            : UUID.randomUUID()
+            );
+        }
 
         if (transaction.getTransactionDatetime() == null) {
             transaction.setTransactionDatetime(

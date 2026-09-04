@@ -802,6 +802,10 @@ class TransactionServiceIntegrationTest {
         TransactionResponse created =
                 createTransaction();
 
+        assertNotNull(
+                created.getCorrelationId()
+        );
+
         TransactionRequest request =
                 buildRequest(
                         created.getTransactionReference()
@@ -833,6 +837,11 @@ class TransactionServiceIntegrationTest {
         assertEquals(
                 created.getTransactionReference(),
                 updated.getTransactionReference()
+        );
+
+        assertEquals(
+                created.getCorrelationId(),
+                updated.getCorrelationId()
         );
 
         assertNotNull(

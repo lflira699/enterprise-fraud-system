@@ -2,6 +2,7 @@ package com.efs.modules.decision.service;
 
 import com.efs.modules.decision.dto.DecisionEvaluationRequest;
 import com.efs.modules.transaction.dto.TransactionDecisionResponse;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,11 +47,19 @@ class DecisionExecutionServiceIntegrationTest {
                     "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
             );
 
+    private static final UUID CORRELATION_ID =
+            UUID.fromString(
+                    "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            );
+
     @Autowired
     private DecisionExecutionServiceInterface service;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @BeforeEach
     void setUp() {
@@ -92,10 +101,11 @@ class DecisionExecutionServiceIntegrationTest {
                     transaction_status,
                     final_decision,
                     fraud_score,
+                    correlation_id,
                     created_by,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 TRANSACTION_ID,
                 "EFS-DECISION-EXECUTION-TEST-TRANSACTION",
@@ -107,6 +117,7 @@ class DecisionExecutionServiceIntegrationTest {
                 "RECEIVED",
                 "PENDING",
                 BigDecimal.ZERO,
+                CORRELATION_ID,
                 CREATED_BY,
                 1
         );
@@ -162,6 +173,8 @@ class DecisionExecutionServiceIntegrationTest {
                 service.evaluateAndPersistDecision(
                         request
                 );
+
+        entityManager.flush();
 
         assertNotNull(
                 response.getDecisionId()
@@ -221,6 +234,131 @@ class DecisionExecutionServiceIntegrationTest {
         assertEquals(
                 1,
                 persistedCount
+        );
+
+        Integer outboxCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM integration.outbox_event
+                        WHERE aggregate_type = ?
+                          AND aggregate_id = ?
+                          AND event_type = ?
+                          AND correlation_id = ?
+                          AND status = ?
+                          AND attempt_count = ?
+                        """,
+                        Integer.class,
+                        "TransactionDecision",
+                        response.getDecisionId(),
+                        "DecisionGenerated",
+                        CORRELATION_ID,
+                        "PENDING",
+                        0
+                );
+
+        assertEquals(
+                1,
+                outboxCount
+        );
+
+        String outboxDecisionId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT payload -> 'payload' ->> 'decisionId'
+                        FROM integration.outbox_event
+                        WHERE aggregate_type = ?
+                          AND aggregate_id = ?
+                          AND event_type = ?
+                        """,
+                        String.class,
+                        "TransactionDecision",
+                        response.getDecisionId(),
+                        "DecisionGenerated"
+                );
+
+        assertEquals(
+                response.getDecisionId().toString(),
+                outboxDecisionId
+        );
+
+        String outboxMessageId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT payload ->> 'messageId'
+                        FROM integration.outbox_event
+                        WHERE aggregate_type = ?
+                          AND aggregate_id = ?
+                          AND event_type = ?
+                        """,
+                        String.class,
+                        "TransactionDecision",
+                        response.getDecisionId(),
+                        "DecisionGenerated"
+                );
+
+        assertNotNull(
+                outboxMessageId
+        );
+
+        String outboxSchemaVersion =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT payload ->> 'schemaVersion'
+                        FROM integration.outbox_event
+                        WHERE aggregate_type = ?
+                          AND aggregate_id = ?
+                          AND event_type = ?
+                        """,
+                        String.class,
+                        "TransactionDecision",
+                        response.getDecisionId(),
+                        "DecisionGenerated"
+                );
+
+        assertEquals(
+                "1.0",
+                outboxSchemaVersion
+        );
+
+        String outboxProducer =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT payload ->> 'producer'
+                        FROM integration.outbox_event
+                        WHERE aggregate_type = ?
+                          AND aggregate_id = ?
+                          AND event_type = ?
+                        """,
+                        String.class,
+                        "TransactionDecision",
+                        response.getDecisionId(),
+                        "DecisionGenerated"
+                );
+
+        assertEquals(
+                "Decision Engine",
+                outboxProducer
+        );
+
+        String outboxCorrelationId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT payload ->> 'correlationId'
+                        FROM integration.outbox_event
+                        WHERE aggregate_type = ?
+                          AND aggregate_id = ?
+                          AND event_type = ?
+                        """,
+                        String.class,
+                        "TransactionDecision",
+                        response.getDecisionId(),
+                        "DecisionGenerated"
+                );
+
+        assertEquals(
+                CORRELATION_ID.toString(),
+                outboxCorrelationId
         );
     }
 }

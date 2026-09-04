@@ -48,6 +48,11 @@ class DecisionControllerIntegrationTest {
                     "56565656-5656-5656-5656-565656565656"
             );
 
+    private static final UUID CORRELATION_ID =
+            UUID.fromString(
+                    "67676767-6767-6767-6767-676767676767"
+            );
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -94,10 +99,11 @@ class DecisionControllerIntegrationTest {
                     transaction_status,
                     final_decision,
                     fraud_score,
+                    correlation_id,
                     created_by,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 TRANSACTION_ID,
                 "EFS-DECISION-CONTROLLER-TEST-TRANSACTION",
@@ -109,6 +115,7 @@ class DecisionControllerIntegrationTest {
                 "RECEIVED",
                 "PENDING",
                 BigDecimal.ZERO,
+                CORRELATION_ID,
                 CREATED_BY,
                 1
         );
