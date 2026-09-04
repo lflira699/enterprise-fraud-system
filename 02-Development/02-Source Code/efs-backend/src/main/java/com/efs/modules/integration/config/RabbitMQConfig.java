@@ -5,6 +5,11 @@ import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
+import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -31,6 +36,10 @@ public class RabbitMQConfig {
 
     public static final String DECISION_GENERATED_ROUTING_KEY =
             "decision.generated.v1";
+
+    public static final String
+            DECISION_GENERATED_LISTENER_CONTAINER_FACTORY =
+            "decisionGeneratedRabbitListenerContainerFactory";
 
     @Bean
     public DirectExchange domainEventsExchange() {
@@ -105,5 +114,40 @@ public class RabbitMQConfig {
                 .bind(decisionGeneratedQueue)
                 .to(domainEventsExchange)
                 .with(DECISION_GENERATED_ROUTING_KEY);
+    }
+
+    @Bean(
+            name =
+                    DECISION_GENERATED_LISTENER_CONTAINER_FACTORY
+    )
+    public SimpleRabbitListenerContainerFactory
+            decisionGeneratedRabbitListenerContainerFactory(
+                    SimpleRabbitListenerContainerFactoryConfigurer configurer,
+                    ConnectionFactory connectionFactory) {
+
+        SimpleRabbitListenerContainerFactory factory =
+                new SimpleRabbitListenerContainerFactory();
+
+        configurer.configure(
+                factory,
+                connectionFactory
+        );
+
+        factory.setAdviceChain(
+                RetryInterceptorBuilder
+                        .stateless()
+                        .maxAttempts(
+                                4
+                        )
+                        .backOffPolicy(
+                                new DecisionGeneratedRetryBackOffPolicy()
+                        )
+                        .recoverer(
+                                new RejectAndDontRequeueRecoverer()
+                        )
+                        .build()
+        );
+
+        return factory;
     }
 }
