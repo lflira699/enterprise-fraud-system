@@ -4,6 +4,7 @@ import com.efs.modules.playbook.dto.PlaybookVersionRequest;
 import com.efs.modules.playbook.dto.PlaybookVersionResponse;
 import com.efs.modules.playbook.entity.PlaybookVersion;
 import com.efs.modules.playbook.mapper.PlaybookVersionMapper;
+import com.efs.modules.playbook.repository.PlaybookExecutionRepository;
 import com.efs.modules.playbook.repository.PlaybookRepository;
 import com.efs.modules.playbook.repository.PlaybookVersionRepository;
 import org.springframework.stereotype.Service;
@@ -20,15 +21,18 @@ public class PlaybookVersionService
 
     private final PlaybookVersionRepository playbookVersionRepository;
     private final PlaybookRepository playbookRepository;
+    private final PlaybookExecutionRepository playbookExecutionRepository;
     private final PlaybookVersionMapper playbookVersionMapper;
 
     public PlaybookVersionService(
             PlaybookVersionRepository playbookVersionRepository,
             PlaybookRepository playbookRepository,
+            PlaybookExecutionRepository playbookExecutionRepository,
             PlaybookVersionMapper playbookVersionMapper
     ) {
         this.playbookVersionRepository = playbookVersionRepository;
         this.playbookRepository = playbookRepository;
+        this.playbookExecutionRepository = playbookExecutionRepository;
         this.playbookVersionMapper = playbookVersionMapper;
     }
 
@@ -120,6 +124,10 @@ public class PlaybookVersionService
     ) {
         PlaybookVersion entity = getEntity(playbookVersionId);
 
+        validatePlaybookVersionNotExecuted(
+                playbookVersionId
+        );
+
         validatePlaybookExists(request.getPlaybookId());
         validateEffectivePeriod(request);
 
@@ -164,6 +172,21 @@ public class PlaybookVersionService
         if (!playbookRepository.existsById(playbookId)) {
             throw new IllegalArgumentException(
                     "Playbook not found: " + playbookId
+            );
+        }
+    }
+
+    private void validatePlaybookVersionNotExecuted(
+            UUID playbookVersionId
+    ) {
+        if (!playbookExecutionRepository
+                .findByPlaybookVersionIdOrderByStartedAtDesc(
+                        playbookVersionId
+                )
+                .isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Playbook version cannot be modified after execution: "
+                            + playbookVersionId
             );
         }
     }

@@ -4,6 +4,7 @@ import com.efs.modules.playbook.dto.PlaybookStepRequest;
 import com.efs.modules.playbook.dto.PlaybookStepResponse;
 import com.efs.modules.playbook.entity.PlaybookStep;
 import com.efs.modules.playbook.mapper.PlaybookStepMapper;
+import com.efs.modules.playbook.repository.PlaybookExecutionRepository;
 import com.efs.modules.playbook.repository.PlaybookStepRepository;
 import com.efs.modules.playbook.repository.PlaybookVersionRepository;
 import org.springframework.stereotype.Service;
@@ -20,15 +21,18 @@ public class PlaybookStepService
 
     private final PlaybookStepRepository playbookStepRepository;
     private final PlaybookVersionRepository playbookVersionRepository;
+    private final PlaybookExecutionRepository playbookExecutionRepository;
     private final PlaybookStepMapper playbookStepMapper;
 
     public PlaybookStepService(
             PlaybookStepRepository playbookStepRepository,
             PlaybookVersionRepository playbookVersionRepository,
+            PlaybookExecutionRepository playbookExecutionRepository,
             PlaybookStepMapper playbookStepMapper
     ) {
         this.playbookStepRepository = playbookStepRepository;
         this.playbookVersionRepository = playbookVersionRepository;
+        this.playbookExecutionRepository = playbookExecutionRepository;
         this.playbookStepMapper = playbookStepMapper;
     }
 
@@ -39,6 +43,11 @@ public class PlaybookStepService
         validatePlaybookVersionExists(
                 request.getPlaybookVersionId()
         );
+
+        validatePlaybookVersionNotExecuted(
+                request.getPlaybookVersionId()
+        );
+
         validateStepOrder(request.getStepOrder());
         validateExpectedDuration(
                 request.getExpectedDurationMinutes()
@@ -89,9 +98,25 @@ public class PlaybookStepService
     ) {
         PlaybookStep entity = getEntity(playbookStepId);
 
+        UUID currentPlaybookVersionId =
+                entity.getPlaybookVersionId();
+
+        validatePlaybookVersionNotExecuted(
+                currentPlaybookVersionId
+        );
+
         validatePlaybookVersionExists(
                 request.getPlaybookVersionId()
         );
+
+        if (!currentPlaybookVersionId.equals(
+                request.getPlaybookVersionId()
+        )) {
+            validatePlaybookVersionNotExecuted(
+                    request.getPlaybookVersionId()
+            );
+        }
+
         validateStepOrder(request.getStepOrder());
         validateExpectedDuration(
                 request.getExpectedDurationMinutes()
@@ -124,6 +149,21 @@ public class PlaybookStepService
         )) {
             throw new IllegalArgumentException(
                     "Playbook version not found: "
+                            + playbookVersionId
+            );
+        }
+    }
+
+    private void validatePlaybookVersionNotExecuted(
+            UUID playbookVersionId
+    ) {
+        if (!playbookExecutionRepository
+                .findByPlaybookVersionIdOrderByStartedAtDesc(
+                        playbookVersionId
+                )
+                .isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Playbook version cannot be modified after execution: "
                             + playbookVersionId
             );
         }
