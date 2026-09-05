@@ -117,6 +117,11 @@ public class PlaybookExecutionService
         PlaybookExecution entity =
                 getEntity(playbookExecutionId);
 
+        validatePlaybookExecutionVersionUnchanged(
+                entity,
+                request.getPlaybookVersionId()
+        );
+
         validatePlaybookVersionExists(
                 request.getPlaybookVersionId()
         );
@@ -146,6 +151,19 @@ public class PlaybookExecutionService
                                         + playbookExecutionId
                         )
                 );
+    }
+
+    private void validatePlaybookExecutionVersionUnchanged(
+            PlaybookExecution entity,
+            UUID requestedPlaybookVersionId
+    ) {
+        if (!entity.getPlaybookVersionId()
+                .equals(requestedPlaybookVersionId)) {
+            throw new IllegalArgumentException(
+                    "Playbook execution version cannot be changed: "
+                            + entity.getPlaybookExecutionId()
+            );
+        }
     }
 
     private void validatePlaybookVersionExists(
