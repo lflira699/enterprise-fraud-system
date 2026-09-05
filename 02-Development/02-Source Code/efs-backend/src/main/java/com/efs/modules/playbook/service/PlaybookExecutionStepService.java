@@ -63,6 +63,11 @@ public class PlaybookExecutionStepService
                 request.getPlaybookStepId()
         );
 
+        validatePlaybookStepBelongsToExecutionVersion(
+                request.getPlaybookExecutionId(),
+                request.getPlaybookStepId()
+        );
+
         playbookExecutionStepRepository
                 .findByPlaybookExecutionIdAndPlaybookStepId(
                         request.getPlaybookExecutionId(),
@@ -134,6 +139,11 @@ public class PlaybookExecutionStepService
                 request.getPlaybookStepId()
         );
 
+        validatePlaybookStepBelongsToExecutionVersion(
+                request.getPlaybookExecutionId(),
+                request.getPlaybookStepId()
+        );
+
         validateExecutionPeriod(request);
 
         playbookExecutionStepRepository
@@ -174,6 +184,40 @@ public class PlaybookExecutionStepService
                                         + playbookExecutionStepId
                         )
                 );
+    }
+
+    private void validatePlaybookStepBelongsToExecutionVersion(
+            UUID playbookExecutionId,
+            UUID playbookStepId
+    ) {
+        var execution =
+                playbookExecutionRepository
+                        .findById(playbookExecutionId)
+                        .orElseThrow(
+                                () -> new IllegalArgumentException(
+                                        "Playbook execution not found: "
+                                                + playbookExecutionId
+                                )
+                        );
+
+        var step =
+                playbookStepRepository
+                        .findById(playbookStepId)
+                        .orElseThrow(
+                                () -> new IllegalArgumentException(
+                                        "Playbook step not found: "
+                                                + playbookStepId
+                                )
+                        );
+
+        if (!execution.getPlaybookVersionId()
+                .equals(step.getPlaybookVersionId())) {
+
+            throw new IllegalArgumentException(
+                    "Playbook step does not belong to "
+                            + "playbook execution version"
+            );
+        }
     }
 
     private void validatePlaybookExecutionExists(
