@@ -6,6 +6,7 @@ import com.efs.modules.playbook.entity.PlaybookExecution;
 import com.efs.modules.playbook.mapper.PlaybookExecutionMapper;
 import com.efs.modules.playbook.repository.PlaybookExecutionRepository;
 import com.efs.modules.playbook.repository.PlaybookVersionRepository;
+import com.efs.shared.exception.ValidationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -122,6 +123,11 @@ public class PlaybookExecutionService
                 request.getPlaybookVersionId()
         );
 
+        validateAlertOriginUnchanged(
+                entity,
+                request.getAlertId()
+        );
+
         validatePlaybookVersionExists(
                 request.getPlaybookVersionId()
         );
@@ -161,6 +167,20 @@ public class PlaybookExecutionService
                 .equals(requestedPlaybookVersionId)) {
             throw new IllegalArgumentException(
                     "Playbook execution version cannot be changed: "
+                            + entity.getPlaybookExecutionId()
+            );
+        }
+    }
+
+    private void validateAlertOriginUnchanged(
+            PlaybookExecution entity,
+            UUID requestedAlertId
+    ) {
+        if (entity.getAlertId() != null
+                && !entity.getAlertId()
+                        .equals(requestedAlertId)) {
+            throw new ValidationException(
+                    "Playbook execution alert origin cannot be changed: "
                             + entity.getPlaybookExecutionId()
             );
         }

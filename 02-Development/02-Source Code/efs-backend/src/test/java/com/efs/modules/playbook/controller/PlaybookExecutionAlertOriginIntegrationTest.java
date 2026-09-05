@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +67,11 @@ class PlaybookExecutionAlertOriginIntegrationTest {
     private static final UUID ALERT_ID =
             UUID.fromString(
                     "a7070707-a707-a707-a707-a70707070707"
+            );
+
+    private static final UUID DIFFERENT_ALERT_ID =
+            UUID.fromString(
+                    "a8080808-a808-a808-a808-a80808080808"
             );
 
     @Autowired
@@ -284,6 +290,170 @@ class PlaybookExecutionAlertOriginIntegrationTest {
                                 "$[0].status"
                         ).value(
                                 "TEST"
+                        )
+                );
+    }
+
+    @Test
+    void shouldRejectRemovingAlertOriginFromExistingPlaybookExecution()
+            throws Exception {
+
+        PlaybookVersionResponse version =
+                createPlaybookVersion();
+
+        String createRequest =
+                """
+                {
+                    "playbookVersionId": "%s",
+                    "alertId": "%s",
+                    "status": "TEST"
+                }
+                """.formatted(
+                        version.getPlaybookVersionId(),
+                        ALERT_ID
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/playbook-executions"
+                        )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        createRequest
+                                )
+                )
+                .andExpect(
+                        status().isCreated()
+                );
+
+        entityManager.flush();
+
+        UUID playbookExecutionId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT playbook_execution_id
+                        FROM playbook.playbook_execution
+                        WHERE alert_id = ?
+                        """,
+                        UUID.class,
+                        ALERT_ID
+                );
+
+        String updateRequest =
+                """
+                {
+                    "playbookVersionId": "%s",
+                    "status": "COMPLETED"
+                }
+                """.formatted(
+                        version.getPlaybookVersionId()
+                );
+
+        mockMvc.perform(
+                        put(
+                                "/api/v1/playbook-executions/{playbookExecutionId}",
+                                playbookExecutionId
+                        )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        updateRequest
+                                )
+                )
+                .andExpect(
+                        status().isUnprocessableEntity()
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.errorCode"
+                        ).value(
+                                "BUSINESS_VALIDATION_ERROR"
+                        )
+                );
+    }
+
+    @Test
+    void shouldRejectChangingAlertOriginFromExistingPlaybookExecution()
+            throws Exception {
+
+        PlaybookVersionResponse version =
+                createPlaybookVersion();
+
+        String createRequest =
+                """
+                {
+                    "playbookVersionId": "%s",
+                    "alertId": "%s",
+                    "status": "TEST"
+                }
+                """.formatted(
+                        version.getPlaybookVersionId(),
+                        ALERT_ID
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/playbook-executions"
+                        )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        createRequest
+                                )
+                )
+                .andExpect(
+                        status().isCreated()
+                );
+
+        entityManager.flush();
+
+        UUID playbookExecutionId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT playbook_execution_id
+                        FROM playbook.playbook_execution
+                        WHERE alert_id = ?
+                        """,
+                        UUID.class,
+                        ALERT_ID
+                );
+
+        String updateRequest =
+                """
+                {
+                    "playbookVersionId": "%s",
+                    "alertId": "%s",
+                    "status": "COMPLETED"
+                }
+                """.formatted(
+                        version.getPlaybookVersionId(),
+                        DIFFERENT_ALERT_ID
+                );
+
+        mockMvc.perform(
+                        put(
+                                "/api/v1/playbook-executions/{playbookExecutionId}",
+                                playbookExecutionId
+                        )
+                                .contentType(
+                                        "application/json"
+                                )
+                                .content(
+                                        updateRequest
+                                )
+                )
+                .andExpect(
+                        status().isUnprocessableEntity()
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.errorCode"
+                        ).value(
+                                "BUSINESS_VALIDATION_ERROR"
                         )
                 );
     }
