@@ -49,8 +49,15 @@ public class PlaybookStepService
         );
 
         validateStepOrder(request.getStepOrder());
+
         validateExpectedDuration(
                 request.getExpectedDurationMinutes()
+        );
+
+        validateStepOrderUnique(
+                request.getPlaybookVersionId(),
+                request.getStepOrder(),
+                null
         );
 
         PlaybookStep entity =
@@ -118,8 +125,15 @@ public class PlaybookStepService
         }
 
         validateStepOrder(request.getStepOrder());
+
         validateExpectedDuration(
                 request.getExpectedDurationMinutes()
+        );
+
+        validateStepOrderUnique(
+                request.getPlaybookVersionId(),
+                request.getStepOrder(),
+                playbookStepId
         );
 
         playbookStepMapper.updateEntity(entity, request);
@@ -186,5 +200,30 @@ public class PlaybookStepService
                     "expectedDurationMinutes cannot be negative"
             );
         }
+    }
+
+    private void validateStepOrderUnique(
+            UUID playbookVersionId,
+            Integer stepOrder,
+            UUID currentPlaybookStepId
+    ) {
+        playbookStepRepository
+                .findByPlaybookVersionIdAndStepOrder(
+                        playbookVersionId,
+                        stepOrder
+                )
+                .filter(existing ->
+                        currentPlaybookStepId == null
+                                || !existing.getPlaybookStepId()
+                                .equals(currentPlaybookStepId)
+                )
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException(
+                            "Playbook step order already exists for playbook version "
+                                    + playbookVersionId
+                                    + ": "
+                                    + stepOrder
+                    );
+                });
     }
 }

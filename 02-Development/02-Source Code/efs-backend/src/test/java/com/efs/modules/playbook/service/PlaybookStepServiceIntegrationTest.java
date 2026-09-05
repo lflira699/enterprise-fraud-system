@@ -130,9 +130,141 @@ class PlaybookStepServiceIntegrationTest {
     }
 
     @Test
-    void shouldReturnStepsOrderedAscending() {
+    void shouldRejectDuplicateStepOrder() {
         PlaybookVersionResponse version =
                 createPlaybookVersion("PB-STEP-004");
+
+        PlaybookStepRequest first =
+                new PlaybookStepRequest();
+
+        first.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        first.setStepOrder(1);
+        first.setStepName("First Step");
+
+        playbookStepService.create(first);
+
+        PlaybookStepRequest duplicate =
+                new PlaybookStepRequest();
+
+        duplicate.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        duplicate.setStepOrder(1);
+        duplicate.setStepName("Duplicate Step");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookStepService.create(duplicate)
+        );
+    }
+
+    @Test
+    void shouldRejectDuplicateStepOrderDuringUpdate() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-STEP-005");
+
+        PlaybookStepRequest firstRequest =
+                new PlaybookStepRequest();
+
+        firstRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        firstRequest.setStepOrder(1);
+        firstRequest.setStepName("First Step");
+
+        playbookStepService.create(firstRequest);
+
+        PlaybookStepRequest secondRequest =
+                new PlaybookStepRequest();
+
+        secondRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        secondRequest.setStepOrder(2);
+        secondRequest.setStepName("Second Step");
+
+        PlaybookStepResponse second =
+                playbookStepService.create(secondRequest);
+
+        PlaybookStepRequest updateRequest =
+                new PlaybookStepRequest();
+
+        updateRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        updateRequest.setStepOrder(1);
+        updateRequest.setStepName("Conflicting Step");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookStepService.update(
+                        second.getPlaybookStepId(),
+                        updateRequest
+                )
+        );
+    }
+
+    @Test
+    void shouldAllowSameStepOrderDuringUpdate() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-STEP-006");
+
+        PlaybookStepRequest createRequest =
+                new PlaybookStepRequest();
+
+        createRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        createRequest.setStepOrder(1);
+        createRequest.setStepName("Original Step");
+        createRequest.setExpectedDurationMinutes(10);
+
+        PlaybookStepResponse created =
+                playbookStepService.create(createRequest);
+
+        PlaybookStepRequest updateRequest =
+                new PlaybookStepRequest();
+
+        updateRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        updateRequest.setStepOrder(1);
+        updateRequest.setStepName("Updated Step");
+        updateRequest.setExpectedDurationMinutes(15);
+
+        PlaybookStepResponse updated =
+                playbookStepService.update(
+                        created.getPlaybookStepId(),
+                        updateRequest
+                );
+
+        assertEquals(
+                created.getPlaybookStepId(),
+                updated.getPlaybookStepId()
+        );
+
+        assertEquals(
+                1,
+                updated.getStepOrder()
+        );
+
+        assertEquals(
+                "Updated Step",
+                updated.getStepName()
+        );
+
+        assertEquals(
+                15,
+                updated.getExpectedDurationMinutes()
+        );
+    }
+
+    @Test
+    void shouldReturnStepsOrderedAscending() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-STEP-007");
 
         PlaybookStepRequest second =
                 new PlaybookStepRequest();
