@@ -144,6 +144,11 @@ public class PlaybookExecutionStepService
                 request.getPlaybookStepId()
         );
 
+        validatePlaybookExecutionStepIdentityUnchanged(
+                entity,
+                request
+        );
+
         validateExecutionPeriod(request);
 
         playbookExecutionStepRepository
@@ -184,6 +189,27 @@ public class PlaybookExecutionStepService
                                         + playbookExecutionStepId
                         )
                 );
+    }
+
+    private void validatePlaybookExecutionStepIdentityUnchanged(
+            PlaybookExecutionStep entity,
+            PlaybookExecutionStepRequest request
+    ) {
+        if (!entity.getPlaybookExecutionId()
+                .equals(request.getPlaybookExecutionId())) {
+            throw new IllegalArgumentException(
+                    "Playbook execution step execution cannot be changed: "
+                            + entity.getPlaybookExecutionStepId()
+            );
+        }
+
+        if (!entity.getPlaybookStepId()
+                .equals(request.getPlaybookStepId())) {
+            throw new IllegalArgumentException(
+                    "Playbook execution step definition cannot be changed: "
+                            + entity.getPlaybookExecutionStepId()
+            );
+        }
     }
 
     private void validatePlaybookStepBelongsToExecutionVersion(
