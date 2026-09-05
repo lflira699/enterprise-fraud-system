@@ -36,7 +36,8 @@ class PlaybookVersionServiceIntegrationTest {
 
     @Test
     void shouldCreatePlaybookVersion() {
-        PlaybookResponse playbook = createPlaybook("PB-VERSION-001");
+        PlaybookResponse playbook =
+                createPlaybook("PB-VERSION-001");
 
         PlaybookVersionRequest request =
                 new PlaybookVersionRequest();
@@ -55,18 +56,22 @@ class PlaybookVersionServiceIntegrationTest {
                 playbookVersionService.create(request);
 
         assertNotNull(response.getPlaybookVersionId());
+
         assertEquals(
                 playbook.getPlaybookId(),
                 response.getPlaybookId()
         );
+
         assertEquals(
                 1,
                 response.getVersionNumber()
         );
+
         assertEquals(
                 "TEST",
                 response.getStatus()
         );
+
         assertNotNull(response.getCreatedAt());
         assertNotNull(response.getUpdatedAt());
     }
@@ -102,9 +107,11 @@ class PlaybookVersionServiceIntegrationTest {
         request.setPlaybookId(playbook.getPlaybookId());
         request.setVersionNumber(1);
         request.setStatus("TEST");
+
         request.setEffectiveFrom(
                 LocalDateTime.of(2026, 8, 24, 10, 0)
         );
+
         request.setEffectiveTo(
                 LocalDateTime.of(2026, 8, 23, 10, 0)
         );
@@ -116,21 +123,84 @@ class PlaybookVersionServiceIntegrationTest {
     }
 
     @Test
-    void shouldReturnVersionsOrderedDescending() {
+    void shouldRejectVersionNumberBelowOne() {
         PlaybookResponse playbook =
                 createPlaybook("PB-VERSION-004");
+
+        PlaybookVersionRequest request =
+                new PlaybookVersionRequest();
+
+        request.setPlaybookId(playbook.getPlaybookId());
+        request.setVersionNumber(0);
+        request.setStatus("TEST");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookVersionService.create(request)
+        );
+    }
+
+    @Test
+    void shouldRejectVersionNumberBelowOneDuringUpdate() {
+        PlaybookResponse playbook =
+                createPlaybook("PB-VERSION-005");
+
+        PlaybookVersionRequest createRequest =
+                new PlaybookVersionRequest();
+
+        createRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        createRequest.setVersionNumber(1);
+        createRequest.setStatus("TEST");
+
+        PlaybookVersionResponse created =
+                playbookVersionService.create(
+                        createRequest
+                );
+
+        PlaybookVersionRequest updateRequest =
+                new PlaybookVersionRequest();
+
+        updateRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        updateRequest.setVersionNumber(0);
+        updateRequest.setStatus("TEST");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookVersionService.update(
+                        created.getPlaybookVersionId(),
+                        updateRequest
+                )
+        );
+    }
+
+    @Test
+    void shouldReturnVersionsOrderedDescending() {
+        PlaybookResponse playbook =
+                createPlaybook("PB-VERSION-006");
 
         PlaybookVersionRequest versionOne =
                 new PlaybookVersionRequest();
 
-        versionOne.setPlaybookId(playbook.getPlaybookId());
+        versionOne.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
         versionOne.setVersionNumber(1);
         versionOne.setStatus("TEST");
 
         PlaybookVersionRequest versionTwo =
                 new PlaybookVersionRequest();
 
-        versionTwo.setPlaybookId(playbook.getPlaybookId());
+        versionTwo.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
         versionTwo.setVersionNumber(2);
         versionTwo.setStatus("TEST");
 
@@ -143,18 +213,24 @@ class PlaybookVersionServiceIntegrationTest {
                 );
 
         assertEquals(2, results.size());
+
         assertEquals(
                 2,
                 results.get(0).getVersionNumber()
         );
+
         assertEquals(
                 1,
                 results.get(1).getVersionNumber()
         );
     }
 
-    private PlaybookResponse createPlaybook(String code) {
-        PlaybookRequest request = new PlaybookRequest();
+    private PlaybookResponse createPlaybook(
+            String code
+    ) {
+        PlaybookRequest request =
+                new PlaybookRequest();
+
         request.setPlaybookCode(code);
         request.setPlaybookName(code);
         request.setStatus("TEST");

@@ -42,6 +42,10 @@ public class PlaybookVersionService
     ) {
         validatePlaybookExists(request.getPlaybookId());
 
+        validateVersionNumber(
+                request.getVersionNumber()
+        );
+
         playbookVersionRepository
                 .findByPlaybookIdAndVersionNumber(
                         request.getPlaybookId(),
@@ -129,6 +133,11 @@ public class PlaybookVersionService
         );
 
         validatePlaybookExists(request.getPlaybookId());
+
+        validateVersionNumber(
+                request.getVersionNumber()
+        );
+
         validateEffectivePeriod(request);
 
         playbookVersionRepository
@@ -187,6 +196,17 @@ public class PlaybookVersionService
             throw new IllegalArgumentException(
                     "Playbook version cannot be modified after execution: "
                             + playbookVersionId
+            );
+        }
+    }
+
+    private void validateVersionNumber(
+            Integer versionNumber
+    ) {
+        if (versionNumber != null
+                && versionNumber < 1) {
+            throw new IllegalArgumentException(
+                    "versionNumber must be greater than or equal to 1"
             );
         }
     }
