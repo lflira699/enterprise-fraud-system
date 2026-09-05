@@ -29,7 +29,11 @@ public class PlaybookExecutionMapper {
         entity.setAlertId(request.getAlertId());
         entity.setScenarioId(request.getScenarioId());
         entity.setStatus(request.getStatus());
-        entity.setStartedAt(request.getStartedAt());
+
+        if (request.getStartedAt() != null) {
+            entity.setStartedAt(request.getStartedAt());
+        }
+
         entity.setCompletedAt(request.getCompletedAt());
     }
 

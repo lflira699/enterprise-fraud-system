@@ -183,6 +183,68 @@ class PlaybookExecutionServiceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldPreserveStartedAtWhenOmittedDuringUpdate() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-EXECUTION-005");
+
+        LocalDateTime originalStartedAt =
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        5,
+                        12,
+                        0
+                );
+
+        PlaybookExecutionRequest createRequest =
+                new PlaybookExecutionRequest();
+
+        createRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+
+        createRequest.setStatus(
+                "TEST"
+        );
+
+        createRequest.setStartedAt(
+                originalStartedAt
+        );
+
+        PlaybookExecutionResponse created =
+                playbookExecutionService.create(
+                        createRequest
+                );
+
+        PlaybookExecutionRequest updateRequest =
+                new PlaybookExecutionRequest();
+
+        updateRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+
+        updateRequest.setStatus(
+                "COMPLETED"
+        );
+
+        PlaybookExecutionResponse updated =
+                playbookExecutionService.update(
+                        created.getPlaybookExecutionId(),
+                        updateRequest
+                );
+
+        assertEquals(
+                "COMPLETED",
+                updated.getStatus()
+        );
+
+        assertEquals(
+                originalStartedAt,
+                updated.getStartedAt()
+        );
+    }
+
     private PlaybookVersionResponse createPlaybookVersion(
             String code
     ) {
