@@ -132,7 +132,10 @@ public class PlaybookExecutionService
                 request.getPlaybookVersionId()
         );
 
-        validateExecutionPeriod(request);
+        validateExecutionPeriod(
+                entity,
+                request
+        );
 
         playbookExecutionMapper.updateEntity(
                 entity,
@@ -206,6 +209,25 @@ public class PlaybookExecutionService
                 && request.getCompletedAt() != null
                 && request.getCompletedAt()
                         .isBefore(request.getStartedAt())) {
+            throw new IllegalArgumentException(
+                    "completedAt cannot be before startedAt"
+            );
+        }
+    }
+
+    private void validateExecutionPeriod(
+            PlaybookExecution entity,
+            PlaybookExecutionRequest request
+    ) {
+        LocalDateTime effectiveStartedAt =
+                request.getStartedAt() != null
+                        ? request.getStartedAt()
+                        : entity.getStartedAt();
+
+        if (effectiveStartedAt != null
+                && request.getCompletedAt() != null
+                && request.getCompletedAt()
+                        .isBefore(effectiveStartedAt)) {
             throw new IllegalArgumentException(
                     "completedAt cannot be before startedAt"
             );

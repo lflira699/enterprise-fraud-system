@@ -245,6 +245,70 @@ class PlaybookExecutionServiceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldRejectCompletedAtBeforePersistedStartedAtWhenStartedAtOmittedDuringUpdate() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-EXECUTION-006");
+
+        LocalDateTime originalStartedAt =
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        5,
+                        12,
+                        0
+                );
+
+        PlaybookExecutionRequest createRequest =
+                new PlaybookExecutionRequest();
+
+        createRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+
+        createRequest.setStatus(
+                "TEST"
+        );
+
+        createRequest.setStartedAt(
+                originalStartedAt
+        );
+
+        PlaybookExecutionResponse created =
+                playbookExecutionService.create(
+                        createRequest
+                );
+
+        PlaybookExecutionRequest updateRequest =
+                new PlaybookExecutionRequest();
+
+        updateRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+
+        updateRequest.setStatus(
+                "COMPLETED"
+        );
+
+        updateRequest.setCompletedAt(
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        5,
+                        11,
+                        0
+                )
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookExecutionService.update(
+                        created.getPlaybookExecutionId(),
+                        updateRequest
+                )
+        );
+    }
+
     private PlaybookVersionResponse createPlaybookVersion(
             String code
     ) {
