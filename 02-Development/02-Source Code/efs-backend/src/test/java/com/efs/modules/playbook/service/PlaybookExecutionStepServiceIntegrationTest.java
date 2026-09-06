@@ -171,9 +171,62 @@ class PlaybookExecutionStepServiceIntegrationTest {
     }
 
     @Test
-    void shouldReturnExecutionSteps() {
+    void shouldRejectInvalidExecutionPeriodDuringUpdate() {
         TestContext context =
                 createContext("PB-EXEC-STEP-004");
+
+        PlaybookExecutionStepRequest createRequest =
+                new PlaybookExecutionStepRequest();
+
+        createRequest.setPlaybookExecutionId(
+                context.execution().getPlaybookExecutionId()
+        );
+
+        createRequest.setPlaybookStepId(
+                context.step().getPlaybookStepId()
+        );
+
+        createRequest.setStatus("TEST");
+
+        PlaybookExecutionStepResponse created =
+                playbookExecutionStepService.create(
+                        createRequest
+                );
+
+        PlaybookExecutionStepRequest updateRequest =
+                new PlaybookExecutionStepRequest();
+
+        updateRequest.setPlaybookExecutionId(
+                context.execution().getPlaybookExecutionId()
+        );
+
+        updateRequest.setPlaybookStepId(
+                context.step().getPlaybookStepId()
+        );
+
+        updateRequest.setStatus("TEST");
+
+        updateRequest.setStartedAt(
+                LocalDateTime.of(2026, 8, 23, 11, 0)
+        );
+
+        updateRequest.setCompletedAt(
+                LocalDateTime.of(2026, 8, 23, 10, 0)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookExecutionStepService.update(
+                        created.getPlaybookExecutionStepId(),
+                        updateRequest
+                )
+        );
+    }
+
+    @Test
+    void shouldReturnExecutionSteps() {
+        TestContext context =
+                createContext("PB-EXEC-STEP-005");
 
         PlaybookExecutionStepRequest request =
                 new PlaybookExecutionStepRequest();
