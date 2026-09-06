@@ -130,9 +130,81 @@ class PlaybookStepServiceIntegrationTest {
     }
 
     @Test
-    void shouldRejectDuplicateStepOrder() {
+    void shouldRejectInvalidStepOrderDuringUpdate() {
         PlaybookVersionResponse version =
                 createPlaybookVersion("PB-STEP-004");
+
+        PlaybookStepRequest createRequest =
+                new PlaybookStepRequest();
+
+        createRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        createRequest.setStepOrder(1);
+        createRequest.setStepName("Original Step");
+
+        PlaybookStepResponse created =
+                playbookStepService.create(createRequest);
+
+        PlaybookStepRequest updateRequest =
+                new PlaybookStepRequest();
+
+        updateRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        updateRequest.setStepOrder(0);
+        updateRequest.setStepName("Invalid Updated Step");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookStepService.update(
+                        created.getPlaybookStepId(),
+                        updateRequest
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectNegativeExpectedDurationDuringUpdate() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-STEP-005");
+
+        PlaybookStepRequest createRequest =
+                new PlaybookStepRequest();
+
+        createRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        createRequest.setStepOrder(1);
+        createRequest.setStepName("Original Step");
+        createRequest.setExpectedDurationMinutes(10);
+
+        PlaybookStepResponse created =
+                playbookStepService.create(createRequest);
+
+        PlaybookStepRequest updateRequest =
+                new PlaybookStepRequest();
+
+        updateRequest.setPlaybookVersionId(
+                version.getPlaybookVersionId()
+        );
+        updateRequest.setStepOrder(1);
+        updateRequest.setStepName("Invalid Duration Step");
+        updateRequest.setExpectedDurationMinutes(-1);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookStepService.update(
+                        created.getPlaybookStepId(),
+                        updateRequest
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectDuplicateStepOrder() {
+        PlaybookVersionResponse version =
+                createPlaybookVersion("PB-STEP-006");
 
         PlaybookStepRequest first =
                 new PlaybookStepRequest();
@@ -163,7 +235,7 @@ class PlaybookStepServiceIntegrationTest {
     @Test
     void shouldRejectDuplicateStepOrderDuringUpdate() {
         PlaybookVersionResponse version =
-                createPlaybookVersion("PB-STEP-005");
+                createPlaybookVersion("PB-STEP-007");
 
         PlaybookStepRequest firstRequest =
                 new PlaybookStepRequest();
@@ -209,7 +281,7 @@ class PlaybookStepServiceIntegrationTest {
     @Test
     void shouldAllowSameStepOrderDuringUpdate() {
         PlaybookVersionResponse version =
-                createPlaybookVersion("PB-STEP-006");
+                createPlaybookVersion("PB-STEP-008");
 
         PlaybookStepRequest createRequest =
                 new PlaybookStepRequest();
@@ -264,7 +336,7 @@ class PlaybookStepServiceIntegrationTest {
     @Test
     void shouldReturnStepsOrderedAscending() {
         PlaybookVersionResponse version =
-                createPlaybookVersion("PB-STEP-007");
+                createPlaybookVersion("PB-STEP-009");
 
         PlaybookStepRequest second =
                 new PlaybookStepRequest();
