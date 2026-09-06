@@ -180,9 +180,122 @@ class PlaybookVersionServiceIntegrationTest {
     }
 
     @Test
-    void shouldReturnVersionsOrderedDescending() {
+    void shouldRejectDuplicateVersionNumberDuringUpdate() {
         PlaybookResponse playbook =
                 createPlaybook("PB-VERSION-006");
+
+        PlaybookVersionRequest versionOneRequest =
+                new PlaybookVersionRequest();
+
+        versionOneRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        versionOneRequest.setVersionNumber(1);
+        versionOneRequest.setStatus("TEST");
+
+        playbookVersionService.create(
+                versionOneRequest
+        );
+
+        PlaybookVersionRequest versionTwoRequest =
+                new PlaybookVersionRequest();
+
+        versionTwoRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        versionTwoRequest.setVersionNumber(2);
+        versionTwoRequest.setStatus("TEST");
+
+        PlaybookVersionResponse versionTwo =
+                playbookVersionService.create(
+                        versionTwoRequest
+                );
+
+        PlaybookVersionRequest updateRequest =
+                new PlaybookVersionRequest();
+
+        updateRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        updateRequest.setVersionNumber(1);
+        updateRequest.setStatus("TEST");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> playbookVersionService.update(
+                        versionTwo.getPlaybookVersionId(),
+                        updateRequest
+                )
+        );
+    }
+
+    @Test
+    void shouldAllowSameVersionNumberDuringUpdate() {
+        PlaybookResponse playbook =
+                createPlaybook("PB-VERSION-007");
+
+        PlaybookVersionRequest createRequest =
+                new PlaybookVersionRequest();
+
+        createRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        createRequest.setVersionNumber(1);
+        createRequest.setStatus("TEST");
+
+        PlaybookVersionResponse created =
+                playbookVersionService.create(
+                        createRequest
+                );
+
+        PlaybookVersionRequest updateRequest =
+                new PlaybookVersionRequest();
+
+        updateRequest.setPlaybookId(
+                playbook.getPlaybookId()
+        );
+
+        updateRequest.setVersionNumber(1);
+        updateRequest.setStatus("UPDATED_TEST");
+
+        updateRequest.setEffectiveFrom(
+                LocalDateTime.of(2026, 8, 23, 10, 0)
+        );
+
+        updateRequest.setEffectiveTo(
+                LocalDateTime.of(2026, 8, 24, 10, 0)
+        );
+
+        PlaybookVersionResponse updated =
+                playbookVersionService.update(
+                        created.getPlaybookVersionId(),
+                        updateRequest
+                );
+
+        assertEquals(
+                created.getPlaybookVersionId(),
+                updated.getPlaybookVersionId()
+        );
+
+        assertEquals(
+                1,
+                updated.getVersionNumber()
+        );
+
+        assertEquals(
+                "UPDATED_TEST",
+                updated.getStatus()
+        );
+    }
+
+    @Test
+    void shouldReturnVersionsOrderedDescending() {
+        PlaybookResponse playbook =
+                createPlaybook("PB-VERSION-008");
 
         PlaybookVersionRequest versionOne =
                 new PlaybookVersionRequest();
