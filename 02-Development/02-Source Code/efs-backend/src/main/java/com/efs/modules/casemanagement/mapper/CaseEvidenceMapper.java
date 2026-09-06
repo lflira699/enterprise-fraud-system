@@ -83,6 +83,34 @@ public class CaseEvidenceMapper {
                 evidence.getUploadedAt()
         );
 
+        response.setEvidenceCategory(
+                evidence.getEvidenceCategory()
+        );
+
+        response.setEvidenceName(
+                evidence.getEvidenceName()
+        );
+
+        response.setEvidenceDescription(
+                evidence.getEvidenceDescription()
+        );
+
+        response.setValidationStatus(
+                evidence.getValidationStatus()
+        );
+
+        response.setConfidentialityLevel(
+                evidence.getConfidentialityLevel()
+        );
+
+        response.setUpdatedAt(
+                evidence.getUpdatedAt()
+        );
+
+        response.setUpdatedBy(
+                evidence.getUpdatedBy()
+        );
+
         return response;
     }
 }

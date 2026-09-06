@@ -8,6 +8,7 @@ import com.efs.modules.casemanagement.dto.CaseEscalationRequest;
 import com.efs.modules.casemanagement.dto.CaseEscalationResponse;
 import com.efs.modules.casemanagement.dto.CaseEvidenceRequest;
 import com.efs.modules.casemanagement.dto.CaseEvidenceResponse;
+import com.efs.modules.casemanagement.dto.CaseEvidenceUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseFromAlertRequest;
 import com.efs.modules.casemanagement.dto.CaseHistoryRequest;
 import com.efs.modules.casemanagement.dto.CaseHistoryResponse;
@@ -87,6 +88,12 @@ public interface CaseServiceInterface {
 
     List<CaseEvidenceResponse> getCaseEvidence(
             UUID caseId
+    );
+
+    CaseEvidenceResponse updateCaseEvidence(
+            UUID caseId,
+            UUID evidenceId,
+            CaseEvidenceUpdateRequest request
     );
 
     void deleteCaseEvidence(

@@ -14,6 +14,13 @@ public class CaseEvidenceResponse {
     private String checksumSha256;
     private UUID uploadedBy;
     private LocalDateTime uploadedAt;
+    private String evidenceCategory;
+    private String evidenceName;
+    private String evidenceDescription;
+    private String validationStatus;
+    private String confidentialityLevel;
+    private LocalDateTime updatedAt;
+    private UUID updatedBy;
 
     public UUID getEvidenceId() {
         return evidenceId;
@@ -85,5 +92,61 @@ public class CaseEvidenceResponse {
 
     public void setUploadedAt(LocalDateTime uploadedAt) {
         this.uploadedAt = uploadedAt;
+    }
+
+    public String getEvidenceCategory() {
+        return evidenceCategory;
+    }
+
+    public void setEvidenceCategory(String evidenceCategory) {
+        this.evidenceCategory = evidenceCategory;
+    }
+
+    public String getEvidenceName() {
+        return evidenceName;
+    }
+
+    public void setEvidenceName(String evidenceName) {
+        this.evidenceName = evidenceName;
+    }
+
+    public String getEvidenceDescription() {
+        return evidenceDescription;
+    }
+
+    public void setEvidenceDescription(String evidenceDescription) {
+        this.evidenceDescription = evidenceDescription;
+    }
+
+    public String getValidationStatus() {
+        return validationStatus;
+    }
+
+    public void setValidationStatus(String validationStatus) {
+        this.validationStatus = validationStatus;
+    }
+
+    public String getConfidentialityLevel() {
+        return confidentialityLevel;
+    }
+
+    public void setConfidentialityLevel(String confidentialityLevel) {
+        this.confidentialityLevel = confidentialityLevel;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public UUID getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public void setUpdatedBy(UUID updatedBy) {
+        this.updatedBy = updatedBy;
     }
 }

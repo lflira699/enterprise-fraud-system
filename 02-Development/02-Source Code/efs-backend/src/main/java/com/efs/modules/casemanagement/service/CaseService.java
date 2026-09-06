@@ -2,6 +2,11 @@ package com.efs.modules.casemanagement.service;
 
 import com.efs.modules.alert.entity.Alert;
 import com.efs.modules.alert.repository.AlertRepository;
+import com.efs.modules.audit.dto.AuditEntityChangeRequest;
+import com.efs.modules.audit.dto.AuditEventRequest;
+import com.efs.modules.audit.dto.AuditEventResponse;
+import com.efs.modules.audit.service.AuditEntityChangeServiceInterface;
+import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.casemanagement.dto.CaseAssignmentRequest;
 import com.efs.modules.casemanagement.dto.CaseAssignmentResponse;
 import com.efs.modules.casemanagement.dto.CaseCommentRequest;
@@ -10,6 +15,7 @@ import com.efs.modules.casemanagement.dto.CaseEscalationRequest;
 import com.efs.modules.casemanagement.dto.CaseEscalationResponse;
 import com.efs.modules.casemanagement.dto.CaseEvidenceRequest;
 import com.efs.modules.casemanagement.dto.CaseEvidenceResponse;
+import com.efs.modules.casemanagement.dto.CaseEvidenceUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseFromAlertRequest;
 import com.efs.modules.casemanagement.dto.CaseHistoryRequest;
 import com.efs.modules.casemanagement.dto.CaseHistoryResponse;
@@ -75,7 +81,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -119,6 +127,8 @@ public class CaseService
     private final CaseNotificationRepository caseNotificationRepository;
     private final CaseHistoryRepository caseHistoryRepository;
     private final AlertRepository alertRepository;
+    private final AuditEventServiceInterface auditEventService;
+    private final AuditEntityChangeServiceInterface auditEntityChangeService;
 
     private final CaseMapper caseMapper;
     private final CaseAssignmentMapper caseAssignmentMapper;
@@ -156,7 +166,9 @@ public class CaseService
             CaseEscalationMapper caseEscalationMapper,
             CaseSlaMapper caseSlaMapper,
             CaseNotificationMapper caseNotificationMapper,
-            CaseHistoryMapper caseHistoryMapper) {
+            CaseHistoryMapper caseHistoryMapper,
+            AuditEventServiceInterface auditEventService,
+            AuditEntityChangeServiceInterface auditEntityChangeService) {
 
         this.caseRepository = caseRepository;
         this.caseAlertRepository = caseAlertRepository;
@@ -183,6 +195,12 @@ public class CaseService
         this.caseSlaMapper = caseSlaMapper;
         this.caseNotificationMapper = caseNotificationMapper;
         this.caseHistoryMapper = caseHistoryMapper;
+
+        this.auditEventService =
+                auditEventService;
+
+        this.auditEntityChangeService =
+                auditEntityChangeService;
     }
 
     @Override
@@ -709,6 +727,330 @@ public class CaseService
                 .stream()
                 .map(caseEvidenceMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public CaseEvidenceResponse updateCaseEvidence(
+            UUID caseId,
+            UUID evidenceId,
+            CaseEvidenceUpdateRequest request) {
+
+        if (request.getUpdatedBy() == null) {
+            throw new RequestValidationException(
+                    "Evidence update actor is required"
+            );
+        }
+
+        Case caseEntity =
+                getExistingCase(
+                        caseId
+                );
+
+        CaseEvidence evidence =
+                caseEvidenceRepository
+                        .findByEvidenceIdAndDeletedAtIsNull(
+                                evidenceId
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Case evidence not found: "
+                                                + evidenceId
+                                )
+                        );
+
+        if (!caseId.equals(
+                evidence.getCaseId())) {
+
+            throw new ResourceNotFoundException(
+                    "Case evidence not found for case: "
+                            + caseId
+            );
+        }
+
+        Map<String, Object> previousValue =
+                new LinkedHashMap<>();
+
+        Map<String, Object> currentValue =
+                new LinkedHashMap<>();
+
+        previousValue.put(
+                "evidenceId",
+                evidenceId.toString()
+        );
+
+        currentValue.put(
+                "evidenceId",
+                evidenceId.toString()
+        );
+
+        boolean hasUpdate =
+                false;
+
+        if (request.getEvidenceType() != null) {
+
+            if (request.getEvidenceType().isBlank()) {
+                throw new RequestValidationException(
+                        "Evidence type cannot be blank"
+                );
+            }
+
+            previousValue.put(
+                    "evidenceType",
+                    evidence.getEvidenceType()
+            );
+
+            evidence.setEvidenceType(
+                    request.getEvidenceType()
+            );
+
+            currentValue.put(
+                    "evidenceType",
+                    evidence.getEvidenceType()
+            );
+
+            hasUpdate = true;
+        }
+
+        if (request.getEvidenceCategory() != null) {
+
+            previousValue.put(
+                    "evidenceCategory",
+                    evidence.getEvidenceCategory()
+            );
+
+            evidence.setEvidenceCategory(
+                    request.getEvidenceCategory()
+            );
+
+            currentValue.put(
+                    "evidenceCategory",
+                    evidence.getEvidenceCategory()
+            );
+
+            hasUpdate = true;
+        }
+
+        if (request.getEvidenceName() != null) {
+
+            previousValue.put(
+                    "evidenceName",
+                    evidence.getEvidenceName()
+            );
+
+            evidence.setEvidenceName(
+                    request.getEvidenceName()
+            );
+
+            currentValue.put(
+                    "evidenceName",
+                    evidence.getEvidenceName()
+            );
+
+            hasUpdate = true;
+        }
+
+        if (request.getEvidenceDescription() != null) {
+
+            previousValue.put(
+                    "evidenceDescription",
+                    evidence.getEvidenceDescription()
+            );
+
+            evidence.setEvidenceDescription(
+                    request.getEvidenceDescription()
+            );
+
+            currentValue.put(
+                    "evidenceDescription",
+                    evidence.getEvidenceDescription()
+            );
+
+            hasUpdate = true;
+        }
+
+        if (request.getValidationStatus() != null) {
+
+            previousValue.put(
+                    "validationStatus",
+                    evidence.getValidationStatus()
+            );
+
+            evidence.setValidationStatus(
+                    request.getValidationStatus()
+            );
+
+            currentValue.put(
+                    "validationStatus",
+                    evidence.getValidationStatus()
+            );
+
+            hasUpdate = true;
+        }
+
+        if (request.getConfidentialityLevel() != null) {
+
+            previousValue.put(
+                    "confidentialityLevel",
+                    evidence.getConfidentialityLevel()
+            );
+
+            evidence.setConfidentialityLevel(
+                    request.getConfidentialityLevel()
+            );
+
+            currentValue.put(
+                    "confidentialityLevel",
+                    evidence.getConfidentialityLevel()
+            );
+
+            hasUpdate = true;
+        }
+
+        if (!hasUpdate) {
+            throw new RequestValidationException(
+                    "At least one evidence field is required for update"
+            );
+        }
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        evidence.setUpdatedAt(
+                now
+        );
+
+        evidence.setUpdatedBy(
+                request.getUpdatedBy()
+        );
+
+        CaseEvidence savedEvidence =
+                caseEvidenceRepository.save(
+                        evidence
+                );
+
+        CaseHistory history =
+                new CaseHistory();
+
+        history.setCaseId(
+                caseId
+        );
+
+        history.setEventType(
+                "EVIDENCE_UPDATED"
+        );
+
+        history.setEventDescription(
+                "Case evidence updated"
+        );
+
+        history.setPreviousValue(
+                previousValue.toString()
+        );
+
+        history.setNewValue(
+                currentValue.toString()
+        );
+
+        history.setChangedBy(
+                request.getUpdatedBy()
+        );
+
+        history.setChangedAt(
+                now
+        );
+
+        caseHistoryRepository.save(
+                history
+        );
+
+        AuditEventRequest auditEventRequest =
+                new AuditEventRequest();
+
+        auditEventRequest.setOrganizationId(
+                caseEntity.getOrganizationId()
+        );
+
+        auditEventRequest.setTenantId(
+                caseEntity.getTenantId()
+        );
+
+        auditEventRequest.setUserId(
+                request.getUpdatedBy()
+        );
+
+        auditEventRequest.setEventType(
+                "EVIDENCE_UPDATED"
+        );
+
+        auditEventRequest.setEntityType(
+                "CASE"
+        );
+
+        auditEventRequest.setEntityId(
+                caseId
+        );
+
+        auditEventRequest.setAction(
+                "UPDATE"
+        );
+
+        auditEventRequest.setSourceComponent(
+                "CASE"
+        );
+
+        auditEventRequest.setEventResult(
+                "SUCCESS"
+        );
+
+        auditEventRequest.setEventDetails(
+                Map.of(
+                        "caseId",
+                        caseId.toString(),
+                        "evidenceId",
+                        evidenceId.toString()
+                )
+        );
+
+        AuditEventResponse auditEvent =
+                auditEventService.createAuditEvent(
+                        auditEventRequest
+                );
+
+        AuditEntityChangeRequest entityChangeRequest =
+                new AuditEntityChangeRequest();
+
+        entityChangeRequest.setAuditEventId(
+                auditEvent.getAuditEventId()
+        );
+
+        entityChangeRequest.setEntityType(
+                "CASE"
+        );
+
+        entityChangeRequest.setEntityId(
+                caseId
+        );
+
+        entityChangeRequest.setOperation(
+                "UPDATE"
+        );
+
+        entityChangeRequest.setPreviousValue(
+                previousValue
+        );
+
+        entityChangeRequest.setCurrentValue(
+                currentValue
+        );
+
+        auditEntityChangeService.createAuditEntityChange(
+                entityChangeRequest
+        );
+
+        return caseEvidenceMapper.toResponse(
+                savedEvidence
+        );
     }
 
     @Override

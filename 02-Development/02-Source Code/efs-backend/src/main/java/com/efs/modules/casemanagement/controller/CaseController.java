@@ -8,6 +8,7 @@ import com.efs.modules.casemanagement.dto.CaseEscalationRequest;
 import com.efs.modules.casemanagement.dto.CaseEscalationResponse;
 import com.efs.modules.casemanagement.dto.CaseEvidenceRequest;
 import com.efs.modules.casemanagement.dto.CaseEvidenceResponse;
+import com.efs.modules.casemanagement.dto.CaseEvidenceUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseFromAlertRequest;
 import com.efs.modules.casemanagement.dto.CaseHistoryRequest;
 import com.efs.modules.casemanagement.dto.CaseHistoryResponse;
@@ -225,6 +226,21 @@ public class CaseController {
                 caseService.getCaseEvidenceById(
                         caseId,
                         evidenceId
+                )
+        );
+    }
+
+    @PatchMapping("/{caseId}/evidence/{evidenceId}")
+    public ResponseEntity<CaseEvidenceResponse> updateCaseEvidence(
+            @PathVariable UUID caseId,
+            @PathVariable UUID evidenceId,
+            @Valid @RequestBody CaseEvidenceUpdateRequest request) {
+
+        return ResponseEntity.ok(
+                caseService.updateCaseEvidence(
+                        caseId,
+                        evidenceId,
+                        request
                 )
         );
     }
