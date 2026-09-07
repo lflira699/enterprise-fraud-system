@@ -26,6 +26,24 @@ public class RuleVersion {
     @Column(name = "version_number", nullable = false)
     private Integer versionNumber;
 
+    @Column(name = "rule_name", nullable = false, length = 200)
+    private String ruleName;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "category", nullable = false, length = 50)
+    private String category;
+
+    @Column(name = "severity", nullable = false, length = 20)
+    private String severity;
+
+    @Column(name = "priority", nullable = false)
+    private Short priority;
+
+    @Column(name = "owner_team", length = 100)
+    private String ownerTeam;
+
     @Column(name = "effective_from")
     private LocalDateTime effectiveFrom;
 
@@ -72,6 +90,54 @@ public class RuleVersion {
 
     public void setVersionNumber(Integer versionNumber) {
         this.versionNumber = versionNumber;
+    }
+
+    public String getRuleName() {
+        return ruleName;
+    }
+
+    public void setRuleName(String ruleName) {
+        this.ruleName = ruleName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public Short getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Short priority) {
+        this.priority = priority;
+    }
+
+    public String getOwnerTeam() {
+        return ownerTeam;
+    }
+
+    public void setOwnerTeam(String ownerTeam) {
+        this.ownerTeam = ownerTeam;
     }
 
     public LocalDateTime getEffectiveFrom() {

@@ -125,6 +125,36 @@ class RuleVersionServiceIntegrationTest {
         );
 
         assertEquals(
+                "Rule Version Snapshot",
+                created.getRuleName()
+        );
+
+        assertEquals(
+                "Versioned rule snapshot",
+                created.getDescription()
+        );
+
+        assertEquals(
+                "TRANSACTION",
+                created.getCategory()
+        );
+
+        assertEquals(
+                "HIGH",
+                created.getSeverity()
+        );
+
+        assertEquals(
+                Short.valueOf((short) 1),
+                created.getPriority()
+        );
+
+        assertEquals(
+                "FRAUD_RULES",
+                created.getOwnerTeam()
+        );
+
+        assertEquals(
                 "DRAFT",
                 created.getPublicationStatus()
         );
@@ -151,6 +181,36 @@ class RuleVersionServiceIntegrationTest {
         assertEquals(
                 created.getRuleVersionId(),
                 retrieved.getRuleVersionId()
+        );
+
+        assertEquals(
+                "Rule Version Snapshot",
+                retrieved.getRuleName()
+        );
+
+        assertEquals(
+                "Versioned rule snapshot",
+                retrieved.getDescription()
+        );
+
+        assertEquals(
+                "TRANSACTION",
+                retrieved.getCategory()
+        );
+
+        assertEquals(
+                "HIGH",
+                retrieved.getSeverity()
+        );
+
+        assertEquals(
+                Short.valueOf((short) 1),
+                retrieved.getPriority()
+        );
+
+        assertEquals(
+                "FRAUD_RULES",
+                retrieved.getOwnerTeam()
         );
     }
 
@@ -184,6 +244,26 @@ class RuleVersionServiceIntegrationTest {
         assertEquals(
                 Integer.valueOf(1),
                 retrieved.getVersionNumber()
+        );
+
+        assertEquals(
+                "Rule Version Snapshot",
+                retrieved.getRuleName()
+        );
+
+        assertEquals(
+                "TRANSACTION",
+                retrieved.getCategory()
+        );
+
+        assertEquals(
+                "HIGH",
+                retrieved.getSeverity()
+        );
+
+        assertEquals(
+                Short.valueOf((short) 1),
+                retrieved.getPriority()
         );
     }
 
@@ -229,6 +309,16 @@ class RuleVersionServiceIntegrationTest {
         assertEquals(
                 Integer.valueOf(1),
                 versions.get(1).getVersionNumber()
+        );
+
+        assertEquals(
+                "Rule Version Snapshot",
+                versions.get(0).getRuleName()
+        );
+
+        assertEquals(
+                "Rule Version Snapshot",
+                versions.get(1).getRuleName()
         );
     }
 
@@ -279,6 +369,16 @@ class RuleVersionServiceIntegrationTest {
         assertEquals(
                 "PUBLISHED",
                 versions.get(1).getPublicationStatus()
+        );
+
+        assertEquals(
+                "Rule Version Snapshot",
+                versions.get(0).getRuleName()
+        );
+
+        assertEquals(
+                "Rule Version Snapshot",
+                versions.get(1).getRuleName()
         );
     }
 
@@ -398,6 +498,30 @@ class RuleVersionServiceIntegrationTest {
 
         request.setVersionNumber(
                 versionNumber
+        );
+
+        request.setRuleName(
+                "Rule Version Snapshot"
+        );
+
+        request.setDescription(
+                "Versioned rule snapshot"
+        );
+
+        request.setCategory(
+                "TRANSACTION"
+        );
+
+        request.setSeverity(
+                "HIGH"
+        );
+
+        request.setPriority(
+                (short) 1
+        );
+
+        request.setOwnerTeam(
+                "FRAUD_RULES"
         );
 
         request.setEffectiveFrom(

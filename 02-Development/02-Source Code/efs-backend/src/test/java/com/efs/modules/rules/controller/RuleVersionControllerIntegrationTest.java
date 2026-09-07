@@ -101,6 +101,12 @@ class RuleVersionControllerIntegrationTest {
                 """
                 {
                     "versionNumber": 1,
+                    "ruleName": "Rule Version API Snapshot",
+                    "description": "Versioned rule snapshot",
+                    "category": "TRANSACTION",
+                    "severity": "HIGH",
+                    "priority": 1,
+                    "ownerTeam": "FRAUD_RULES",
                     "effectiveFrom": "%s",
                     "effectiveTo": null,
                     "publicationStatus": "DRAFT",
@@ -114,8 +120,10 @@ class RuleVersionControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        post("/api/v1/rules/{ruleId}/versions",
-                                ruleId)
+                        post(
+                                "/api/v1/rules/{ruleId}/versions",
+                                ruleId
+                        )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody)
                 )
@@ -125,6 +133,22 @@ class RuleVersionControllerIntegrationTest {
                         ruleId.toString()
                 ))
                 .andExpect(jsonPath("$.versionNumber").value(1))
+                .andExpect(jsonPath("$.ruleName").value(
+                        "Rule Version API Snapshot"
+                ))
+                .andExpect(jsonPath("$.description").value(
+                        "Versioned rule snapshot"
+                ))
+                .andExpect(jsonPath("$.category").value(
+                        "TRANSACTION"
+                ))
+                .andExpect(jsonPath("$.severity").value(
+                        "HIGH"
+                ))
+                .andExpect(jsonPath("$.priority").value(1))
+                .andExpect(jsonPath("$.ownerTeam").value(
+                        "FRAUD_RULES"
+                ))
                 .andExpect(jsonPath("$.publicationStatus").value(
                         "DRAFT"
                 ))
@@ -167,6 +191,22 @@ class RuleVersionControllerIntegrationTest {
                         ruleId.toString()
                 ))
                 .andExpect(jsonPath("$.versionNumber").value(1))
+                .andExpect(jsonPath("$.ruleName").value(
+                        "Rule Version API Snapshot"
+                ))
+                .andExpect(jsonPath("$.description").value(
+                        "Versioned rule snapshot"
+                ))
+                .andExpect(jsonPath("$.category").value(
+                        "TRANSACTION"
+                ))
+                .andExpect(jsonPath("$.severity").value(
+                        "HIGH"
+                ))
+                .andExpect(jsonPath("$.priority").value(1))
+                .andExpect(jsonPath("$.ownerTeam").value(
+                        "FRAUD_RULES"
+                ))
                 .andExpect(jsonPath("$.publicationStatus").value(
                         "DRAFT"
                 ))
@@ -204,10 +244,16 @@ class RuleVersionControllerIntegrationTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].versionNumber").value(2))
+                .andExpect(jsonPath("$[0].ruleName").value(
+                        "Rule Version API Snapshot"
+                ))
                 .andExpect(jsonPath("$[0].publicationStatus").value(
                         "PUBLISHED"
                 ))
                 .andExpect(jsonPath("$[1].versionNumber").value(1))
+                .andExpect(jsonPath("$[1].ruleName").value(
+                        "Rule Version API Snapshot"
+                ))
                 .andExpect(jsonPath("$[1].publicationStatus").value(
                         "DRAFT"
                 ));
@@ -244,6 +290,16 @@ class RuleVersionControllerIntegrationTest {
                         ruleId.toString()
                 ))
                 .andExpect(jsonPath("$.versionNumber").value(3))
+                .andExpect(jsonPath("$.ruleName").value(
+                        "Rule Version API Snapshot"
+                ))
+                .andExpect(jsonPath("$.category").value(
+                        "TRANSACTION"
+                ))
+                .andExpect(jsonPath("$.severity").value(
+                        "HIGH"
+                ))
+                .andExpect(jsonPath("$.priority").value(1))
                 .andExpect(jsonPath("$.publicationStatus").value(
                         "PUBLISHED"
                 ));
@@ -282,8 +338,14 @@ class RuleVersionControllerIntegrationTest {
                         )
                 )
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ruleName").value(
+                        "Rule Version API Snapshot"
+                ))
                 .andExpect(jsonPath("$[0].publicationStatus").value(
                         "PUBLISHED"
+                ))
+                .andExpect(jsonPath("$[1].ruleName").value(
+                        "Rule Version API Snapshot"
                 ))
                 .andExpect(jsonPath("$[1].publicationStatus").value(
                         "PUBLISHED"
@@ -312,7 +374,11 @@ class RuleVersionControllerIntegrationTest {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 ruleId,
                 ruleCode,
@@ -343,6 +409,12 @@ class RuleVersionControllerIntegrationTest {
                     rule_version_id,
                     rule_id,
                     version_number,
+                    rule_name,
+                    description,
+                    category,
+                    severity,
+                    priority,
+                    owner_team,
                     effective_from,
                     effective_to,
                     publication_status,
@@ -351,11 +423,20 @@ class RuleVersionControllerIntegrationTest {
                     approved_by,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 ruleVersionId,
                 ruleId,
                 versionNumber,
+                "Rule Version API Snapshot",
+                "Versioned rule snapshot",
+                "TRANSACTION",
+                "HIGH",
+                (short) 1,
+                "FRAUD_RULES",
                 LocalDateTime.now(),
                 null,
                 publicationStatus,

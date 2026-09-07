@@ -291,7 +291,11 @@ class RuleParameterControllerIntegrationTest {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 ruleId,
                 ruleCode,
@@ -314,6 +318,12 @@ class RuleParameterControllerIntegrationTest {
                     rule_version_id,
                     rule_id,
                     version_number,
+                    rule_name,
+                    description,
+                    category,
+                    severity,
+                    priority,
+                    owner_team,
                     effective_from,
                     effective_to,
                     publication_status,
@@ -322,11 +332,22 @@ class RuleParameterControllerIntegrationTest {
                     approved_by,
                     created_at
                 )
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP,
+                    ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 ruleVersionId,
                 ruleId,
                 1,
+                "Rule Parameter API Test",
+                "Rule used by V53 API integration tests",
+                "TRANSACTION",
+                "HIGH",
+                (short) 1,
+                "FRAUD_RULES",
                 null,
                 "DRAFT",
                 "Initial rule version",

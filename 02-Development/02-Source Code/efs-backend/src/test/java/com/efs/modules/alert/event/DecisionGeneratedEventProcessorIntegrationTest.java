@@ -507,6 +507,12 @@ class DecisionGeneratedEventProcessorIntegrationTest {
                     rule_version_id,
                     rule_id,
                     version_number,
+                    rule_name,
+                    description,
+                    category,
+                    severity,
+                    priority,
+                    owner_team,
                     effective_from,
                     effective_to,
                     publication_status,
@@ -516,7 +522,7 @@ class DecisionGeneratedEventProcessorIntegrationTest {
                     created_at
                 )
                 VALUES (
-                    ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     CURRENT_TIMESTAMP,
                     ?, ?, ?, ?, ?,
                     CURRENT_TIMESTAMP
@@ -525,6 +531,12 @@ class DecisionGeneratedEventProcessorIntegrationTest {
                 RULE_VERSION_ID,
                 RULE_ID,
                 1,
+                "Decision Generated Integration Test Rule",
+                "Rule used by DecisionGenerated processor integration test",
+                "TRANSACTION",
+                "HIGH",
+                (short) 1,
+                "FRAUD_RULES",
                 null,
                 "DRAFT",
                 "DecisionGenerated integration test version",

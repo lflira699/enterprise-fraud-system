@@ -376,6 +376,12 @@ class RuleMetricControllerIntegrationTest {
                     rule_version_id,
                     rule_id,
                     version_number,
+                    rule_name,
+                    description,
+                    category,
+                    severity,
+                    priority,
+                    owner_team,
                     effective_from,
                     effective_to,
                     publication_status,
@@ -385,7 +391,7 @@ class RuleMetricControllerIntegrationTest {
                     created_at
                 )
                 VALUES (
-                    ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     CURRENT_TIMESTAMP,
                     NULL,
                     ?,
@@ -398,6 +404,12 @@ class RuleMetricControllerIntegrationTest {
                 RULE_VERSION_ID,
                 RULE_ID,
                 1,
+                "Rule Metric API Test",
+                "Rule used by V57 REST integration tests",
+                "TRANSACTION",
+                "HIGH",
+                (short) 1,
+                "FRAUD_RULES",
                 "PUBLISHED",
                 "Rule metric API integration version",
                 USER_ID

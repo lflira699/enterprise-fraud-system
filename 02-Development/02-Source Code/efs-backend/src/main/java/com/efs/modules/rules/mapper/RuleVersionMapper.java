@@ -18,6 +18,30 @@ public class RuleVersionMapper {
                 request.getVersionNumber()
         );
 
+        ruleVersion.setRuleName(
+                request.getRuleName()
+        );
+
+        ruleVersion.setDescription(
+                request.getDescription()
+        );
+
+        ruleVersion.setCategory(
+                request.getCategory()
+        );
+
+        ruleVersion.setSeverity(
+                request.getSeverity()
+        );
+
+        ruleVersion.setPriority(
+                request.getPriority()
+        );
+
+        ruleVersion.setOwnerTeam(
+                request.getOwnerTeam()
+        );
+
         ruleVersion.setEffectiveFrom(
                 request.getEffectiveFrom()
         );
@@ -61,6 +85,30 @@ public class RuleVersionMapper {
 
         response.setVersionNumber(
                 ruleVersion.getVersionNumber()
+        );
+
+        response.setRuleName(
+                ruleVersion.getRuleName()
+        );
+
+        response.setDescription(
+                ruleVersion.getDescription()
+        );
+
+        response.setCategory(
+                ruleVersion.getCategory()
+        );
+
+        response.setSeverity(
+                ruleVersion.getSeverity()
+        );
+
+        response.setPriority(
+                ruleVersion.getPriority()
+        );
+
+        response.setOwnerTeam(
+                ruleVersion.getOwnerTeam()
         );
 
         response.setEffectiveFrom(

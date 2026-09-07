@@ -286,7 +286,11 @@ class RuleActionControllerIntegrationTest {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 ruleId,
                 ruleCode,
@@ -309,6 +313,12 @@ class RuleActionControllerIntegrationTest {
                     rule_version_id,
                     rule_id,
                     version_number,
+                    rule_name,
+                    description,
+                    category,
+                    severity,
+                    priority,
+                    owner_team,
                     effective_from,
                     effective_to,
                     publication_status,
@@ -317,11 +327,22 @@ class RuleActionControllerIntegrationTest {
                     approved_by,
                     created_at
                 )
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP,
+                    ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 ruleVersionId,
                 ruleId,
                 1,
+                "Rule Action API Test",
+                "Rule used by V52 API integration tests",
+                "TRANSACTION",
+                "HIGH",
+                (short) 1,
+                "FRAUD_RULES",
                 null,
                 "DRAFT",
                 "Initial rule version",
@@ -353,7 +374,10 @@ class RuleActionControllerIntegrationTest {
                     is_async,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, CURRENT_TIMESTAMP)
+                VALUES (
+                    ?, ?, ?, ?, CAST(? AS jsonb), ?,
+                    CURRENT_TIMESTAMP
+                )
                 """,
                 actionId,
                 ruleVersionId,

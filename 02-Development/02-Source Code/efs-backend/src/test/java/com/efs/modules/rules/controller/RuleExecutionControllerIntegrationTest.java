@@ -484,6 +484,12 @@ class RuleExecutionControllerIntegrationTest {
                     rule_version_id,
                     rule_id,
                     version_number,
+                    rule_name,
+                    description,
+                    category,
+                    severity,
+                    priority,
+                    owner_team,
                     effective_from,
                     effective_to,
                     publication_status,
@@ -493,7 +499,7 @@ class RuleExecutionControllerIntegrationTest {
                     created_at
                 )
                 VALUES (
-                    ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     CURRENT_TIMESTAMP,
                     NULL,
                     ?,
@@ -506,6 +512,12 @@ class RuleExecutionControllerIntegrationTest {
                 RULE_VERSION_ID,
                 RULE_ID,
                 1,
+                "Rule Execution API Test",
+                "Rule used by V56 REST integration tests",
+                "TRANSACTION",
+                "HIGH",
+                (short) 1,
+                "FRAUD_RULES",
                 "PUBLISHED",
                 "Rule execution API integration version",
                 USER_ID
