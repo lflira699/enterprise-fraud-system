@@ -52,10 +52,36 @@ class RuleHistoryServiceIntegrationTest {
     @BeforeEach
     void setUp() {
 
-        insertOrganization();
-        insertUser();
-    }
+        Number organizationCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM administration.organization
+                        WHERE organization_id = ?
+                        """,
+                        Number.class,
+                        ORGANIZATION_ID
+                );
 
+        if (organizationCount.longValue() == 0L) {
+            insertOrganization();
+        }
+
+        Number userCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM administration.user_account
+                        WHERE user_id = ?
+                        """,
+                        Number.class,
+                        USER_ID
+                );
+
+        if (userCount.longValue() == 0L) {
+            insertUser();
+        }
+    }
     @Test
     void shouldCreateAndRetrieveRuleHistoryById() {
 
