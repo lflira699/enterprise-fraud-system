@@ -1,5 +1,6 @@
 package com.efs.modules.rules.controller;
 
+import com.efs.modules.rules.dto.RuleActivationRequest;
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
 import com.efs.modules.rules.dto.RuleUpdateRequest;
@@ -97,6 +98,19 @@ public class RuleController {
 
         return ResponseEntity.ok(
                 ruleService.updateRule(
+                        ruleId,
+                        request
+                )
+        );
+    }
+
+    @PostMapping("/{ruleId}/activate")
+    public ResponseEntity<RuleResponse> activateRule(
+            @PathVariable UUID ruleId,
+            @Valid @RequestBody RuleActivationRequest request) {
+
+        return ResponseEntity.ok(
+                ruleService.activateRule(
                         ruleId,
                         request
                 )

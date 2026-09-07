@@ -1,5 +1,6 @@
 package com.efs.modules.rules.service;
 
+import com.efs.modules.rules.dto.RuleActivationRequest;
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
 import com.efs.modules.rules.dto.RuleUpdateRequest;
@@ -39,5 +40,10 @@ public interface RuleServiceInterface {
     RuleVersionResponse updateRule(
             UUID ruleId,
             RuleUpdateRequest request
+    );
+
+    RuleResponse activateRule(
+            UUID ruleId,
+            RuleActivationRequest request
     );
 }

@@ -5,6 +5,7 @@ import com.efs.modules.audit.dto.AuditEventRequest;
 import com.efs.modules.audit.dto.AuditEventResponse;
 import com.efs.modules.audit.service.AuditEntityChangeServiceInterface;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
+import com.efs.modules.rules.dto.RuleActivationRequest;
 import com.efs.modules.rules.dto.RuleHistoryRequest;
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
@@ -16,6 +17,7 @@ import com.efs.modules.rules.mapper.RuleMapper;
 import com.efs.modules.rules.repository.RuleRepository;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.exception.ValidationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -563,5 +565,200 @@ public class RuleService
         );
 
         return createdVersion;
+    }
+
+    @Override
+    @Transactional
+    public RuleResponse activateRule(
+            UUID ruleId,
+            RuleActivationRequest request) {
+
+        if (request.getChangedBy() == null) {
+            throw new RequestValidationException(
+                    "Rule activation actor is required"
+            );
+        }
+
+        Rule rule =
+                ruleRepository
+                        .findByRuleId(ruleId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Rule not found: " + ruleId
+                                )
+                        );
+
+        if ("ACTIVE".equals(rule.getStatus())) {
+            return ruleMapper.toResponse(rule);
+        }
+
+        if (!"INACTIVE".equals(rule.getStatus())) {
+            throw new ValidationException(
+                    "Rule must be INACTIVE before activation"
+            );
+        }
+
+        Map<String, Object> previousValue =
+                new LinkedHashMap<>();
+
+        previousValue.put(
+                "status",
+                rule.getStatus()
+        );
+
+        Map<String, Object> currentValue =
+                new LinkedHashMap<>();
+
+        currentValue.put(
+                "status",
+                "ACTIVE"
+        );
+
+        rule.setStatus(
+                "ACTIVE"
+        );
+
+        rule.setUpdatedAt(
+                LocalDateTime.now()
+        );
+
+        Rule savedRule =
+                ruleRepository.save(rule);
+
+        RuleHistoryRequest historyRequest =
+                new RuleHistoryRequest();
+
+        historyRequest.setEntityType(
+                "RULE"
+        );
+
+        historyRequest.setEntityId(
+                ruleId
+        );
+
+        historyRequest.setOperationType(
+                "ACTIVATION"
+        );
+
+        historyRequest.setPreviousValue(
+                previousValue
+        );
+
+        historyRequest.setCurrentValue(
+                currentValue
+        );
+
+        historyRequest.setChangeReason(
+                request.getChangeReason()
+        );
+
+        historyRequest.setChangedBy(
+                request.getChangedBy()
+        );
+
+        historyRequest.setCorrelationId(
+                request.getCorrelationId()
+        );
+
+        ruleHistoryService.createRuleHistory(
+                historyRequest
+        );
+
+        AuditEventRequest auditEventRequest =
+                new AuditEventRequest();
+
+        auditEventRequest.setUserId(
+                request.getChangedBy()
+        );
+
+        auditEventRequest.setEventType(
+                "RULE_ACTIVATED"
+        );
+
+        auditEventRequest.setEntityType(
+                "RULE"
+        );
+
+        auditEventRequest.setEntityId(
+                ruleId
+        );
+
+        auditEventRequest.setAction(
+                "ACTIVATE"
+        );
+
+        auditEventRequest.setSourceComponent(
+                "RULE_ENGINE"
+        );
+
+        auditEventRequest.setCorrelationId(
+                request.getCorrelationId()
+        );
+
+        auditEventRequest.setEventResult(
+                "SUCCESS"
+        );
+
+        Map<String, Object> eventDetails =
+                new LinkedHashMap<>();
+
+        eventDetails.put(
+                "ruleId",
+                ruleId.toString()
+        );
+
+        eventDetails.put(
+                "previousStatus",
+                "INACTIVE"
+        );
+
+        eventDetails.put(
+                "newStatus",
+                "ACTIVE"
+        );
+
+        auditEventRequest.setEventDetails(
+                eventDetails
+        );
+
+        AuditEventResponse auditEvent =
+                auditEventService.createAuditEvent(
+                        auditEventRequest
+                );
+
+        AuditEntityChangeRequest entityChangeRequest =
+                new AuditEntityChangeRequest();
+
+        entityChangeRequest.setAuditEventId(
+                auditEvent.getAuditEventId()
+        );
+
+        entityChangeRequest.setEntityType(
+                "RULE"
+        );
+
+        entityChangeRequest.setEntityId(
+                ruleId
+        );
+
+        entityChangeRequest.setOperation(
+                "UPDATE"
+        );
+
+        entityChangeRequest.setPreviousValue(
+                previousValue
+        );
+
+        entityChangeRequest.setCurrentValue(
+                currentValue
+        );
+
+        auditEntityChangeService.createAuditEntityChange(
+                entityChangeRequest
+        );
+
+        return ruleMapper.toResponse(
+                savedRule
+        );
     }
 }
