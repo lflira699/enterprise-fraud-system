@@ -2,6 +2,8 @@ package com.efs.modules.rules.controller;
 
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
+import com.efs.modules.rules.dto.RuleUpdateRequest;
+import com.efs.modules.rules.dto.RuleVersionResponse;
 import com.efs.modules.rules.service.RuleServiceInterface;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -85,6 +87,19 @@ public class RuleController {
 
         return ResponseEntity.ok(
                 ruleService.getRulesBySeverity(severity)
+        );
+    }
+
+    @PatchMapping("/{ruleId}")
+    public ResponseEntity<RuleVersionResponse> updateRule(
+            @PathVariable UUID ruleId,
+            @Valid @RequestBody RuleUpdateRequest request) {
+
+        return ResponseEntity.ok(
+                ruleService.updateRule(
+                        ruleId,
+                        request
+                )
         );
     }
 }

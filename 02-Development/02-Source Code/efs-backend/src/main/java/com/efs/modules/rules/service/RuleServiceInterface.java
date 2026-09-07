@@ -2,6 +2,8 @@ package com.efs.modules.rules.service;
 
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
+import com.efs.modules.rules.dto.RuleUpdateRequest;
+import com.efs.modules.rules.dto.RuleVersionResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -32,5 +34,10 @@ public interface RuleServiceInterface {
 
     List<RuleResponse> getRulesBySeverity(
             String severity
+    );
+
+    RuleVersionResponse updateRule(
+            UUID ruleId,
+            RuleUpdateRequest request
     );
 }
