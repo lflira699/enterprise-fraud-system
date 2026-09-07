@@ -6,6 +6,7 @@ import com.efs.modules.audit.dto.AuditEventResponse;
 import com.efs.modules.audit.service.AuditEntityChangeServiceInterface;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.rules.dto.RuleActivationRequest;
+import com.efs.modules.rules.dto.RuleDeactivationRequest;
 import com.efs.modules.rules.dto.RuleHistoryRequest;
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
@@ -715,6 +716,201 @@ public class RuleService
         eventDetails.put(
                 "newStatus",
                 "ACTIVE"
+        );
+
+        auditEventRequest.setEventDetails(
+                eventDetails
+        );
+
+        AuditEventResponse auditEvent =
+                auditEventService.createAuditEvent(
+                        auditEventRequest
+                );
+
+        AuditEntityChangeRequest entityChangeRequest =
+                new AuditEntityChangeRequest();
+
+        entityChangeRequest.setAuditEventId(
+                auditEvent.getAuditEventId()
+        );
+
+        entityChangeRequest.setEntityType(
+                "RULE"
+        );
+
+        entityChangeRequest.setEntityId(
+                ruleId
+        );
+
+        entityChangeRequest.setOperation(
+                "UPDATE"
+        );
+
+        entityChangeRequest.setPreviousValue(
+                previousValue
+        );
+
+        entityChangeRequest.setCurrentValue(
+                currentValue
+        );
+
+        auditEntityChangeService.createAuditEntityChange(
+                entityChangeRequest
+        );
+
+        return ruleMapper.toResponse(
+                savedRule
+        );
+    }
+
+    @Override
+    @Transactional
+    public RuleResponse deactivateRule(
+            UUID ruleId,
+            RuleDeactivationRequest request) {
+
+        if (request.getChangedBy() == null) {
+            throw new RequestValidationException(
+                    "Rule deactivation actor is required"
+            );
+        }
+
+        Rule rule =
+                ruleRepository
+                        .findByRuleId(ruleId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Rule not found: " + ruleId
+                                )
+                        );
+
+        if ("INACTIVE".equals(rule.getStatus())) {
+            return ruleMapper.toResponse(rule);
+        }
+
+        if (!"ACTIVE".equals(rule.getStatus())) {
+            throw new ValidationException(
+                    "Rule must be ACTIVE before deactivation"
+            );
+        }
+
+        Map<String, Object> previousValue =
+                new LinkedHashMap<>();
+
+        previousValue.put(
+                "status",
+                rule.getStatus()
+        );
+
+        Map<String, Object> currentValue =
+                new LinkedHashMap<>();
+
+        currentValue.put(
+                "status",
+                "INACTIVE"
+        );
+
+        rule.setStatus(
+                "INACTIVE"
+        );
+
+        rule.setUpdatedAt(
+                LocalDateTime.now()
+        );
+
+        Rule savedRule =
+                ruleRepository.save(rule);
+
+        RuleHistoryRequest historyRequest =
+                new RuleHistoryRequest();
+
+        historyRequest.setEntityType(
+                "RULE"
+        );
+
+        historyRequest.setEntityId(
+                ruleId
+        );
+
+        historyRequest.setOperationType(
+                "DEACTIVATION"
+        );
+
+        historyRequest.setPreviousValue(
+                previousValue
+        );
+
+        historyRequest.setCurrentValue(
+                currentValue
+        );
+
+        historyRequest.setChangeReason(
+                request.getChangeReason()
+        );
+
+        historyRequest.setChangedBy(
+                request.getChangedBy()
+        );
+
+        historyRequest.setCorrelationId(
+                request.getCorrelationId()
+        );
+
+        ruleHistoryService.createRuleHistory(
+                historyRequest
+        );
+
+        AuditEventRequest auditEventRequest =
+                new AuditEventRequest();
+
+        auditEventRequest.setUserId(
+                request.getChangedBy()
+        );
+
+        auditEventRequest.setEventType(
+                "RULE_DEACTIVATED"
+        );
+
+        auditEventRequest.setEntityType(
+                "RULE"
+        );
+
+        auditEventRequest.setEntityId(
+                ruleId
+        );
+
+        auditEventRequest.setAction(
+                "DEACTIVATE"
+        );
+
+        auditEventRequest.setSourceComponent(
+                "RULE_ENGINE"
+        );
+
+        auditEventRequest.setCorrelationId(
+                request.getCorrelationId()
+        );
+
+        auditEventRequest.setEventResult(
+                "SUCCESS"
+        );
+
+        Map<String, Object> eventDetails =
+                new LinkedHashMap<>();
+
+        eventDetails.put(
+                "ruleId",
+                ruleId.toString()
+        );
+
+        eventDetails.put(
+                "previousStatus",
+                "ACTIVE"
+        );
+
+        eventDetails.put(
+                "newStatus",
+                "INACTIVE"
         );
 
         auditEventRequest.setEventDetails(
