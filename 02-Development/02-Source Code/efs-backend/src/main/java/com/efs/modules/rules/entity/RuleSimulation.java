@@ -47,6 +47,9 @@ public class RuleSimulation {
     @Column(name = "simulation_status", nullable = false, length = 30)
     private String simulationStatus;
 
+    @Column(name = "simulation_source", nullable = false, length = 30)
+    private String simulationSource = "GENERIC";
+
     @Column(name = "match_count", nullable = false)
     private Long matchCount;
 
@@ -142,6 +145,14 @@ public class RuleSimulation {
 
     public void setSimulationStatus(String simulationStatus) {
         this.simulationStatus = simulationStatus;
+    }
+
+    public String getSimulationSource() {
+        return simulationSource;
+    }
+
+    public void setSimulationSource(String simulationSource) {
+        this.simulationSource = simulationSource;
     }
 
     public Long getMatchCount() {

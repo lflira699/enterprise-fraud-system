@@ -444,6 +444,42 @@ class RuleSimulationServiceIntegrationTest {
     }
 
     @Test
+    void shouldPersistGenericSimulationSource() {
+
+        RuleSimulationResponse created =
+                service.createRuleSimulation(
+                        buildRequest(
+                                "Generic Provenance Simulation",
+                                "RULE_VERSION",
+                                ENTITY_ID,
+                                "dataset://generic/provenance",
+                                10L,
+                                "COMPLETED",
+                                2L,
+                                0L,
+                                0L,
+                                0L,
+                                null
+                        )
+                );
+
+        String simulationSource =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT simulation_source
+                        FROM rules.rule_simulation
+                        WHERE simulation_id = ?
+                        """,
+                        String.class,
+                        created.getSimulationId()
+                );
+
+        assertEquals(
+                "GENERIC",
+                simulationSource
+        );
+    }
+    @Test
     void shouldRejectUnknownSimulationId() {
 
         UUID unknownSimulationId =

@@ -26,4 +26,11 @@ public interface RuleSimulationRepository
     List<RuleSimulation> findByExecutedByOrderByStartedAtDesc(
             UUID executedBy
     );
+
+    boolean existsByEntityTypeAndEntityIdAndSimulationSourceAndSimulationStatusAndCompletedAtIsNotNull(
+            String entityType,
+            UUID entityId,
+            String simulationSource,
+            String simulationStatus
+    );
 }

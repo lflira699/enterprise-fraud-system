@@ -35,6 +35,9 @@ public class RuleTestingService {
     private static final String SIMULATION_STATUS_COMPLETED =
             "COMPLETED";
 
+    private static final String SIMULATION_SOURCE_CONTROLLED_RULE_TEST =
+            "CONTROLLED_RULE_TEST";
+
     private final RuleRepository ruleRepository;
 
     private final RuleVersionRepository ruleVersionRepository;
@@ -302,6 +305,10 @@ public class RuleTestingService {
 
         simulation.setSimulationStatus(
                 SIMULATION_STATUS_COMPLETED
+        );
+
+        simulation.setSimulationSource(
+                SIMULATION_SOURCE_CONTROLLED_RULE_TEST
         );
 
         simulation.setMatchCount(

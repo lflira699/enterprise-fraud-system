@@ -162,6 +162,51 @@ class RuleVersionControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectDirectPublishedRuleVersionCreationThroughApi()
+            throws Exception {
+
+        UUID ruleId =
+                insertRule(
+                        "RULE-VERSION-API-PUBLISHED-REJECTED"
+                );
+
+        String requestBody =
+                """
+                {
+                    "versionNumber": 2,
+                    "ruleName": "Direct Published Version",
+                    "description": "Publication workflow bypass attempt",
+                    "category": "TRANSACTION",
+                    "severity": "HIGH",
+                    "priority": 1,
+                    "ownerTeam": "FRAUD_RULES",
+                    "effectiveFrom": "%s",
+                    "effectiveTo": null,
+                    "publicationStatus": "PUBLISHED",
+                    "changeSummary": "Direct publication attempt",
+                    "createdBy": "%s",
+                    "approvedBy": "%s"
+                }
+                """.formatted(
+                        LocalDateTime.now(),
+                        CREATED_BY,
+                        CREATED_BY
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/rules/{ruleId}/versions",
+                                ruleId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(
+                        status().isUnprocessableEntity()
+                );
+    }
+
+    @Test
     void shouldRetrieveRuleVersionByIdThroughApi()
             throws Exception {
 

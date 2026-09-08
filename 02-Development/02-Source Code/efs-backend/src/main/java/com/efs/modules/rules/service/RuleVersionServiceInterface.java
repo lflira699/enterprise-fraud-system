@@ -1,5 +1,6 @@
 package com.efs.modules.rules.service;
 
+import com.efs.modules.rules.dto.RuleVersionPublishRequest;
 import com.efs.modules.rules.dto.RuleVersionRequest;
 import com.efs.modules.rules.dto.RuleVersionResponse;
 
@@ -11,6 +12,12 @@ public interface RuleVersionServiceInterface {
     RuleVersionResponse createRuleVersion(
             UUID ruleId,
             RuleVersionRequest request
+    );
+
+    RuleVersionResponse publishRuleVersion(
+            UUID ruleId,
+            UUID ruleVersionId,
+            RuleVersionPublishRequest request
     );
 
     RuleVersionResponse getRuleVersionById(

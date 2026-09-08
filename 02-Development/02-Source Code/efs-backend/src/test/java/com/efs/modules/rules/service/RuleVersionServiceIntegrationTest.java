@@ -5,6 +5,9 @@ import com.efs.modules.rules.dto.RuleVersionResponse;
 import com.efs.modules.rules.entity.Rule;
 import com.efs.modules.rules.repository.RuleRepository;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.exception.ValidationException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +45,9 @@ class RuleVersionServiceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     @BeforeEach
     void setUp() {
@@ -283,13 +289,29 @@ class RuleVersionServiceIntegrationTest {
                 )
         );
 
+
         service.createRuleVersion(
                 ruleId,
                 buildRequest(
                         2,
-                        "PUBLISHED"
+                        "DRAFT"
                 )
         );
+
+        entityManager.flush();
+
+        jdbcTemplate.update(
+                """
+                UPDATE rules.rule_version
+                SET publication_status = 'PUBLISHED'
+                WHERE rule_id = ?
+                  AND version_number = ?
+                """,
+                ruleId,
+                2
+        );
+
+        entityManager.clear();
 
         List<RuleVersionResponse> versions =
                 service.getRuleVersionsByRuleId(
@@ -335,21 +357,53 @@ class RuleVersionServiceIntegrationTest {
                         "RULE-VERSION-005"
                 );
 
+
         service.createRuleVersion(
                 firstRuleId,
                 buildRequest(
                         1,
-                        "PUBLISHED"
+                        "DRAFT"
                 )
         );
+
+        entityManager.flush();
+
+        jdbcTemplate.update(
+                """
+                UPDATE rules.rule_version
+                SET publication_status = 'PUBLISHED'
+                WHERE rule_id = ?
+                  AND version_number = ?
+                """,
+                firstRuleId,
+                1
+        );
+
+        entityManager.clear();
+
 
         service.createRuleVersion(
                 secondRuleId,
                 buildRequest(
                         1,
-                        "PUBLISHED"
+                        "DRAFT"
                 )
         );
+
+        entityManager.flush();
+
+        jdbcTemplate.update(
+                """
+                UPDATE rules.rule_version
+                SET publication_status = 'PUBLISHED'
+                WHERE rule_id = ?
+                  AND version_number = ?
+                """,
+                secondRuleId,
+                1
+        );
+
+        entityManager.clear();
 
         List<RuleVersionResponse> versions =
                 service.getRuleVersionsByPublicationStatus(
@@ -379,6 +433,50 @@ class RuleVersionServiceIntegrationTest {
         assertEquals(
                 "Rule Version Snapshot",
                 versions.get(1).getRuleName()
+        );
+    }
+
+    @Test
+    void shouldRejectDirectPublishedRuleVersionCreation() {
+
+        UUID ruleId =
+                createRule(
+                        "RULE-VERSION-PUBLISHED-REJECTED"
+                );
+
+        RuleVersionRequest request =
+                buildRequest(
+                        2,
+                        "PUBLISHED"
+                );
+
+        ValidationException exception =
+                assertThrows(
+                        ValidationException.class,
+                        () -> service.createRuleVersion(
+                                ruleId,
+                                request
+                        )
+                );
+
+        assertEquals(
+                "Rule version cannot be created as PUBLISHED; use publication workflow",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                Integer.valueOf(0),
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM rules.rule_version
+                        WHERE rule_id = ?
+                          AND version_number = ?
+                        """,
+                        Integer.class,
+                        ruleId,
+                        2
+                )
         );
     }
 

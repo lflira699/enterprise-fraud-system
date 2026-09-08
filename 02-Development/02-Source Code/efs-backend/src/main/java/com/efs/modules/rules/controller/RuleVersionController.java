@@ -1,5 +1,6 @@
 package com.efs.modules.rules.controller;
 
+import com.efs.modules.rules.dto.RuleVersionPublishRequest;
 import com.efs.modules.rules.dto.RuleVersionRequest;
 import com.efs.modules.rules.dto.RuleVersionResponse;
 import com.efs.modules.rules.service.RuleVersionServiceInterface;
@@ -39,6 +40,22 @@ public class RuleVersionController {
                 .body(response);
     }
 
+    @PostMapping(
+            "/{ruleId}/versions/{ruleVersionId}/publish"
+    )
+    public ResponseEntity<RuleVersionResponse> publishRuleVersion(
+            @PathVariable UUID ruleId,
+            @PathVariable UUID ruleVersionId,
+            @Valid @RequestBody RuleVersionPublishRequest request) {
+
+        return ResponseEntity.ok(
+                ruleVersionService.publishRuleVersion(
+                        ruleId,
+                        ruleVersionId,
+                        request
+                )
+        );
+    }
     @GetMapping("/versions/{ruleVersionId}")
     public ResponseEntity<RuleVersionResponse> getRuleVersionById(
             @PathVariable UUID ruleVersionId) {
