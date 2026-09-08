@@ -2,11 +2,14 @@ package com.efs.modules.rules.controller;
 
 import com.efs.modules.rules.dto.RuleActivationRequest;
 import com.efs.modules.rules.dto.RuleDeactivationRequest;
+import com.efs.modules.rules.dto.RuleSimulationResponse;
+import com.efs.modules.rules.dto.RuleTestingRequest;
 import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
 import com.efs.modules.rules.dto.RuleUpdateRequest;
 import com.efs.modules.rules.dto.RuleVersionResponse;
 import com.efs.modules.rules.service.RuleServiceInterface;
+import com.efs.modules.rules.service.RuleTestingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +24,17 @@ public class RuleController {
 
     private final RuleServiceInterface ruleService;
 
-    public RuleController(
-            RuleServiceInterface ruleService) {
+    private final RuleTestingService ruleTestingService;
 
-        this.ruleService = ruleService;
+    public RuleController(
+            RuleServiceInterface ruleService,
+            RuleTestingService ruleTestingService) {
+
+        this.ruleService =
+                ruleService;
+
+        this.ruleTestingService =
+                ruleTestingService;
     }
 
     @PostMapping
@@ -127,6 +137,26 @@ public class RuleController {
                 ruleService.deactivateRule(
                         ruleId,
                         request
+                )
+        );
+    }
+
+    @PostMapping(
+            "/{ruleId}/versions/{ruleVersionId}/test"
+    )
+    public ResponseEntity<RuleSimulationResponse> testRule(
+            @PathVariable UUID ruleId,
+            @PathVariable UUID ruleVersionId,
+            @Valid @RequestBody RuleTestingRequest request) {
+
+        return ResponseEntity.ok(
+                ruleTestingService.execute(
+                        ruleId,
+                        ruleVersionId,
+                        request.getSimulationName(),
+                        request.getDatasetReference(),
+                        request.getExecutedBy(),
+                        request.getCorrelationId()
                 )
         );
     }
