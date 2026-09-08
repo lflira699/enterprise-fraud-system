@@ -2,8 +2,8 @@ package com.efs.config.security;
 
 import com.efs.shared.security.SecurityContext;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +12,7 @@ import java.util.Objects;
 
 @Component
 public class EfsJwtAuthenticationConverter
-        implements Converter<Jwt, Authentication> {
+        implements Converter<Jwt, AbstractAuthenticationToken> {
 
     private final EfsJwtSecurityContextMapper securityContextMapper;
 
@@ -24,7 +24,7 @@ public class EfsJwtAuthenticationConverter
     }
 
     @Override
-    public Authentication convert(
+    public AbstractAuthenticationToken convert(
             Jwt jwt) {
 
         Objects.requireNonNull(

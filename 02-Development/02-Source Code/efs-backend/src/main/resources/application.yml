@@ -37,3 +37,10 @@ management:
     web:
       exposure:
         include: health,info
+efs:
+  security:
+    enabled: ${EFS_SECURITY_ENABLED:true}
+    jwt:
+      issuer-uri: ${EFS_JWT_ISSUER_URI:https://unconfigured.invalid/efs}
+      jwk-set-uri: ${EFS_JWT_JWK_SET_URI:https://unconfigured.invalid/efs/jwks}
+      audience: ${EFS_JWT_AUDIENCE:UNCONFIGURED_EFS_AUDIENCE}
