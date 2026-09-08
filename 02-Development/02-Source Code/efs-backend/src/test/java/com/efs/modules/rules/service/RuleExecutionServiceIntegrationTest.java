@@ -3,18 +3,22 @@ package com.efs.modules.rules.service;
 import com.efs.modules.rules.dto.RuleExecutionRequest;
 import com.efs.modules.rules.dto.RuleExecutionResponse;
 import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.shared.security.SecurityContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -466,6 +470,229 @@ class RuleExecutionServiceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldAuditAuthorizedRuleExecutionHistoryConsultation() {
+
+        service.createRuleExecution(
+                buildRequest(
+                        "COMPLETED",
+                        true,
+                        10,
+                        null
+                )
+        );
+
+        service.createRuleExecution(
+                buildRequest(
+                        "COMPLETED",
+                        false,
+                        20,
+                        null
+                )
+        );
+
+        List<RuleExecutionResponse> executions =
+                service.getRuleExecutionsByRuleId(
+                        RULE_ID,
+                        authorizedSecurityContext()
+                );
+
+        assertEquals(
+                2,
+                executions.size()
+        );
+
+        assertFalse(
+                executions.get(0)
+                        .getExecutedAt()
+                        .isBefore(
+                                executions.get(1)
+                                        .getExecutedAt()
+                        )
+        );
+
+        UUID auditEventId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT audit_event_id
+                        FROM audit.audit_event
+                        WHERE event_type = 'RULE_EXECUTION_HISTORY_VIEW'
+                          AND entity_type = 'RULE'
+                          AND entity_id = ?
+                          AND event_result = 'SUCCESS'
+                        ORDER BY event_timestamp DESC
+                        LIMIT 1
+                        """,
+                        UUID.class,
+                        RULE_ID
+                );
+
+        assertNotNull(
+                auditEventId
+        );
+
+        assertEquals(
+                USER_ID,
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT user_id
+                        FROM audit.audit_event
+                        WHERE audit_event_id = ?
+                        """,
+                        UUID.class,
+                        auditEventId
+                )
+        );
+
+        assertEquals(
+                "VIEW",
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT action
+                        FROM audit.audit_event
+                        WHERE audit_event_id = ?
+                        """,
+                        String.class,
+                        auditEventId
+                )
+        );
+
+        assertEquals(
+                "RULE_ENGINE",
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT source_component
+                        FROM audit.audit_event
+                        WHERE audit_event_id = ?
+                        """,
+                        String.class,
+                        auditEventId
+                )
+        );
+    }
+
+    @Test
+    void shouldReturnEmptyRuleExecutionHistoryAndAuditConsultation() {
+
+        List<RuleExecutionResponse> executions =
+                service.getRuleExecutionsByRuleId(
+                        RULE_ID,
+                        authorizedSecurityContext()
+                );
+
+        assertEquals(
+                0,
+                executions.size()
+        );
+
+        assertEquals(
+                Integer.valueOf(1),
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'RULE_EXECUTION_HISTORY_VIEW'
+                          AND entity_type = 'RULE'
+                          AND entity_id = ?
+                          AND user_id = ?
+                          AND event_result = 'SUCCESS'
+                        """,
+                        Integer.class,
+                        RULE_ID,
+                        USER_ID
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectUnknownRuleHistoryAndAuditRejection() {
+
+        UUID unknownRuleId =
+                UUID.randomUUID();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getRuleExecutionsByRuleId(
+                        unknownRuleId,
+                        authorizedSecurityContext()
+                )
+        );
+
+        assertEquals(
+                Integer.valueOf(1),
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'RULE_EXECUTION_HISTORY_VIEW'
+                          AND entity_type = 'RULE'
+                          AND entity_id = ?
+                          AND user_id = ?
+                          AND event_result = 'REJECTED'
+                        """,
+                        Integer.class,
+                        unknownRuleId,
+                        USER_ID
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectRuleExecutionHistoryWithoutPermission() {
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> service.getRuleExecutionsByRuleId(
+                        RULE_ID,
+                        securityContextWithoutPermission()
+                )
+        );
+
+        assertEquals(
+                Integer.valueOf(1),
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'RULE_EXECUTION_HISTORY_VIEW'
+                          AND entity_type = 'RULE'
+                          AND entity_id = ?
+                          AND user_id = ?
+                          AND event_result = 'REJECTED'
+                        """,
+                        Integer.class,
+                        RULE_ID,
+                        USER_ID
+                )
+        );
+    }
+
+    private SecurityContext authorizedSecurityContext() {
+
+        return new SecurityContext(
+                USER_ID,
+                null,
+                null,
+                Set.of(),
+                Set.of(
+                        RuleExecutionServiceInterface
+                                .RULE_EXECUTION_VIEW_PERMISSION
+                ),
+                Set.of()
+        );
+    }
+
+    private SecurityContext securityContextWithoutPermission() {
+
+        return new SecurityContext(
+                USER_ID,
+                null,
+                null,
+                Set.of(),
+                Set.of(),
+                Set.of()
+        );
+    }
     private RuleExecutionRequest buildRequest(
             String executionStatus,
             boolean matched,

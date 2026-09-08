@@ -1,5 +1,8 @@
 package com.efs.modules.rules.controller;
 
+import com.efs.modules.rules.service.RuleExecutionServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,12 +10,16 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -61,6 +68,9 @@ class RuleExecutionControllerIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -74,6 +84,13 @@ class RuleExecutionControllerIntegrationTest {
         insertRule();
         insertRuleVersion();
         insertPolicy();
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                authorizedSecurityContext()
+        );
     }
 
     @Test
@@ -280,6 +297,72 @@ class RuleExecutionControllerIntegrationTest {
                 ));
     }
 
+    @Test
+    void shouldRejectRuleExecutionHistoryWithoutPermissionThroughApi()
+            throws Exception {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                securityContextWithoutPermission()
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/rules/executions/rule/{ruleId}",
+                                RULE_ID
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'RULE_EXECUTION_HISTORY_VIEW'
+                          AND entity_type = 'RULE'
+                          AND entity_id = ?
+                          AND user_id = ?
+                          AND event_result = 'REJECTED'
+                        """,
+                        Integer.class,
+                        RULE_ID,
+                        USER_ID
+                )
+        );
+    }
+
+    private SecurityContext authorizedSecurityContext() {
+
+        return new SecurityContext(
+                USER_ID,
+                null,
+                null,
+                Set.of(),
+                Set.of(
+                        RuleExecutionServiceInterface
+                                .RULE_EXECUTION_VIEW_PERMISSION
+                ),
+                Set.of()
+        );
+    }
+
+    private SecurityContext securityContextWithoutPermission() {
+
+        return new SecurityContext(
+                USER_ID,
+                null,
+                null,
+                Set.of(),
+                Set.of(),
+                Set.of()
+        );
+    }
     private UUID insertRuleExecution(
             String executionStatus,
             boolean matched,

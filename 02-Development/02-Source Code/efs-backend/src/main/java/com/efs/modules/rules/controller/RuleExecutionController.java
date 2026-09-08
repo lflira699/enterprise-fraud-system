@@ -3,9 +3,12 @@ package com.efs.modules.rules.controller;
 import com.efs.modules.rules.dto.RuleExecutionRequest;
 import com.efs.modules.rules.dto.RuleExecutionResponse;
 import com.efs.modules.rules.service.RuleExecutionServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,11 +19,17 @@ import java.util.UUID;
 public class RuleExecutionController {
 
     private final RuleExecutionServiceInterface ruleExecutionService;
+    private final SecurityContextProvider securityContextProvider;
 
     public RuleExecutionController(
-            RuleExecutionServiceInterface ruleExecutionService) {
+            RuleExecutionServiceInterface ruleExecutionService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.ruleExecutionService = ruleExecutionService;
+        this.ruleExecutionService =
+                ruleExecutionService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -50,10 +59,26 @@ public class RuleExecutionController {
     getRuleExecutionsByRuleId(
             @PathVariable UUID ruleId) {
 
-        return ResponseEntity.ok(
-                ruleExecutionService
-                        .getRuleExecutionsByRuleId(ruleId)
-        );
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        try {
+
+            return ResponseEntity.ok(
+                    ruleExecutionService
+                            .getRuleExecutionsByRuleId(
+                                    ruleId,
+                                    securityContext
+                            )
+            );
+        }
+        catch (AccessDeniedException exception) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
     }
 
     @GetMapping("/version/{ruleVersionId}")
