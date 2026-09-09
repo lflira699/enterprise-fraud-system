@@ -41,6 +41,7 @@ class RiskAssessmentControllerIntegrationTest {
     private UUID transactionId;
     private UUID organizationId;
     private UUID createdBy;
+    private UUID correlationId;
 
     @BeforeEach
     void setUp() {
@@ -49,6 +50,7 @@ class RiskAssessmentControllerIntegrationTest {
         transactionId = UUID.randomUUID();
         organizationId = UUID.randomUUID();
         createdBy = UUID.randomUUID();
+        correlationId = UUID.randomUUID();
 
         jdbcTemplate.update(
                 """
@@ -87,10 +89,11 @@ class RiskAssessmentControllerIntegrationTest {
                     transaction_status,
                     final_decision,
                     fraud_score,
+                    correlation_id,
                     created_by,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 transactionId,
                 "RISK-CTRL-" + transactionId,
@@ -102,6 +105,7 @@ class RiskAssessmentControllerIntegrationTest {
                 "RECEIVED",
                 "PENDING",
                 BigDecimal.ZERO,
+                correlationId,
                 createdBy,
                 1
         );
@@ -158,6 +162,18 @@ class RiskAssessmentControllerIntegrationTest {
                 .andExpect(
                         jsonPath("$.confidenceScore")
                                 .value(95.0)
+                )
+                .andExpect(
+                        jsonPath("$.modelName")
+                                .value("EFS-RISK")
+                )
+                .andExpect(
+                        jsonPath("$.modelVersion")
+                                .value("1.1")
+                )
+                .andExpect(
+                        jsonPath("$.processingTimeMs")
+                                .exists()
                 )
                 .andExpect(
                         jsonPath("$.assessmentTimestamp")
@@ -228,6 +244,10 @@ class RiskAssessmentControllerIntegrationTest {
                 .andExpect(
                         jsonPath("$.overallRiskScore")
                                 .value(30.0)
+                )
+                .andExpect(
+                        jsonPath("$.riskLevel")
+                                .value("LOW")
                 );
     }
 
@@ -262,7 +282,7 @@ class RiskAssessmentControllerIntegrationTest {
                         "TRANSACTION",
                         "FINAL",
                         new BigDecimal("80.00"),
-                        "HIGH",
+                        "CRITICAL",
                         "REVIEW"
                 );
 
@@ -313,7 +333,7 @@ class RiskAssessmentControllerIntegrationTest {
                         "TRANSACTION",
                         "FINAL",
                         new BigDecimal("80.00"),
-                        "HIGH",
+                        "CRITICAL",
                         "REVIEW"
                 );
 
@@ -342,7 +362,7 @@ class RiskAssessmentControllerIntegrationTest {
                 )
                 .andExpect(
                         jsonPath("$.riskLevel")
-                                .value("HIGH")
+                                .value("CRITICAL")
                 );
     }
 
@@ -355,7 +375,7 @@ class RiskAssessmentControllerIntegrationTest {
                         "TRANSACTION",
                         "INITIAL",
                         new BigDecimal("35.00"),
-                        "MEDIUM",
+                        "LOW",
                         "REVIEW"
                 );
 
@@ -363,7 +383,7 @@ class RiskAssessmentControllerIntegrationTest {
                 "CUSTOMER",
                 "FINAL",
                 new BigDecimal("10.00"),
-                "LOW",
+                "VERY_LOW",
                 "PASS"
         );
 
@@ -400,8 +420,8 @@ class RiskAssessmentControllerIntegrationTest {
                 createAssessment(
                         "TRANSACTION",
                         "FINAL",
-                        new BigDecimal("85.00"),
-                        "HIGH",
+                        new BigDecimal("50.00"),
+                        "MEDIUM",
                         "REVIEW"
                 );
 
@@ -409,13 +429,13 @@ class RiskAssessmentControllerIntegrationTest {
                 "TRANSACTION",
                 "INITIAL",
                 new BigDecimal("15.00"),
-                "LOW",
+                "VERY_LOW",
                 "PASS"
         );
 
         mockMvc.perform(
                         get("/api/v1/risk-assessments")
-                                .param("riskLevel", "HIGH")
+                                .param("riskLevel", "MEDIUM")
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
@@ -431,7 +451,7 @@ class RiskAssessmentControllerIntegrationTest {
                 )
                 .andExpect(
                         jsonPath("$.content[*].riskLevel")
-                                .value(hasItem("HIGH"))
+                                .value(hasItem("MEDIUM"))
                 )
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(25))
@@ -458,7 +478,7 @@ class RiskAssessmentControllerIntegrationTest {
                 "TRANSACTION",
                 "INITIAL",
                 new BigDecimal("15.00"),
-                "LOW",
+                "VERY_LOW",
                 "PASS"
         );
 
@@ -511,7 +531,7 @@ class RiskAssessmentControllerIntegrationTest {
     private JsonNode createAssessment(
             String assessmentType,
             String assessmentStage,
-            BigDecimal overallRiskScore,
+            BigDecimal factorScore,
             String riskLevel,
             String assessmentResult)
             throws Exception {
@@ -520,7 +540,7 @@ class RiskAssessmentControllerIntegrationTest {
                 buildRequest(
                         assessmentType,
                         assessmentStage,
-                        overallRiskScore,
+                        factorScore,
                         riskLevel,
                         assessmentResult
                 );
@@ -549,7 +569,7 @@ class RiskAssessmentControllerIntegrationTest {
     private RiskAssessmentRequest buildRequest(
             String assessmentType,
             String assessmentStage,
-            BigDecimal overallRiskScore,
+            BigDecimal factorScore,
             String riskLevel,
             String assessmentResult) {
 
@@ -559,12 +579,21 @@ class RiskAssessmentControllerIntegrationTest {
         request.setTransactionId(transactionId);
         request.setAssessmentType(assessmentType);
         request.setAssessmentStage(assessmentStage);
-        request.setOverallRiskScore(overallRiskScore);
-        request.setRiskLevel(riskLevel);
-        request.setAssessmentResult(assessmentResult);
+
+        request.setOverallRiskScore(
+                factorScore
+        );
+
+        request.setRiskLevel(
+                riskLevel
+        );
+
+        request.setAssessmentResult(
+                assessmentResult
+        );
 
         request.setRulesScore(
-                new BigDecimal("20.00")
+                factorScore
         );
 
         request.setMachineLearningScore(
@@ -572,28 +601,36 @@ class RiskAssessmentControllerIntegrationTest {
         );
 
         request.setBehavioralScore(
-                new BigDecimal("15.00")
+                factorScore
         );
 
         request.setCustomerScore(
-                new BigDecimal("10.00")
+                factorScore
         );
 
         request.setGeographicScore(
-                new BigDecimal("5.00")
+                factorScore
         );
 
         request.setDeviceScore(
-                new BigDecimal("8.00")
+                factorScore
         );
 
         request.setConfidenceScore(
                 new BigDecimal("95.00")
         );
 
-        request.setModelName("EFS-RISK");
-        request.setModelVersion("1.0");
-        request.setProcessingTimeMs(12L);
+        request.setModelName(
+                "CALLER-MODEL"
+        );
+
+        request.setModelVersion(
+                "999"
+        );
+
+        request.setProcessingTimeMs(
+                999999L
+        );
 
         return request;
     }

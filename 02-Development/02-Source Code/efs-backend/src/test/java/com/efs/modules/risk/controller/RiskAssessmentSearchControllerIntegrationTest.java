@@ -41,6 +41,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
     private UUID transactionId;
     private UUID organizationId;
     private UUID createdBy;
+    private UUID correlationId;
 
     @BeforeEach
     void setUp() {
@@ -49,6 +50,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
         transactionId = UUID.randomUUID();
         organizationId = UUID.randomUUID();
         createdBy = UUID.randomUUID();
+        correlationId = UUID.randomUUID();
 
         jdbcTemplate.update(
                 """
@@ -88,10 +90,11 @@ class RiskAssessmentSearchControllerIntegrationTest {
                     transaction_status,
                     final_decision,
                     fraud_score,
+                    correlation_id,
                     created_by,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 transactionId,
                 "RISK-SEARCH-" + transactionId,
@@ -103,6 +106,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
                 "RECEIVED",
                 "PENDING",
                 BigDecimal.ZERO,
+                correlationId,
                 createdBy,
                 1
         );
@@ -116,12 +120,12 @@ class RiskAssessmentSearchControllerIntegrationTest {
                 createAssessment(
                         "LOW",
                         "PASS",
-                        new BigDecimal("20.00")
+                        new BigDecimal("10.00")
                 );
 
         UUID newerAssessmentId =
                 createAssessment(
-                        "HIGH",
+                        "CRITICAL",
                         "REVIEW",
                         new BigDecimal("80.00")
                 );
@@ -186,15 +190,14 @@ class RiskAssessmentSearchControllerIntegrationTest {
                 );
 
         UUID secondAssessmentId =
-                createAssessment(
-                        "MEDIUM",
+                createAssessment("MEDIUM",
                         "REVIEW",
                         new BigDecimal("50.00")
                 );
 
         UUID thirdAssessmentId =
                 createAssessment(
-                        "HIGH",
+                        "CRITICAL",
                         "REVIEW",
                         new BigDecimal("90.00")
                 );
@@ -266,29 +269,27 @@ class RiskAssessmentSearchControllerIntegrationTest {
             throws Exception {
 
         UUID expectedAssessmentId =
-                createAssessment(
-                        "HIGH",
+                createAssessment("MEDIUM",
                         "REVIEW",
-                        new BigDecimal("85.00")
+                        new BigDecimal("50.00")
                 );
 
-        createAssessment(
-                "HIGH",
+        createAssessment("MEDIUM",
                 "PASS",
-                new BigDecimal("70.00")
+                new BigDecimal("55.00")
         );
 
         createAssessment(
                 "LOW",
                 "REVIEW",
-                new BigDecimal("25.00")
+                new BigDecimal("10.00")
         );
 
         mockMvc.perform(
                         get("/api/v1/risk-assessments")
                                 .param(
                                         "riskLevel",
-                                        "HIGH"
+                                        "MEDIUM"
                                 )
                                 .param(
                                         "assessmentResult",
@@ -311,7 +312,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
                 .andExpect(
                         jsonPath(
                                 "$.content[0].riskLevel"
-                        ).value("HIGH")
+                        ).value("MEDIUM")
                 )
                 .andExpect(
                         jsonPath(
@@ -394,7 +395,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
     private UUID createAssessment(
             String riskLevel,
             String assessmentResult,
-            BigDecimal overallRiskScore)
+            BigDecimal factorScore)
             throws Exception {
 
         RiskAssessmentRequest request =
@@ -413,7 +414,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
         );
 
         request.setOverallRiskScore(
-                overallRiskScore
+                factorScore
         );
 
         request.setRiskLevel(
@@ -425,7 +426,7 @@ class RiskAssessmentSearchControllerIntegrationTest {
         );
 
         request.setRulesScore(
-                new BigDecimal("20.00")
+                factorScore
         );
 
         request.setMachineLearningScore(
@@ -433,19 +434,19 @@ class RiskAssessmentSearchControllerIntegrationTest {
         );
 
         request.setBehavioralScore(
-                new BigDecimal("15.00")
+                factorScore
         );
 
         request.setCustomerScore(
-                new BigDecimal("10.00")
+                factorScore
         );
 
         request.setGeographicScore(
-                new BigDecimal("5.00")
+                factorScore
         );
 
         request.setDeviceScore(
-                new BigDecimal("8.00")
+                factorScore
         );
 
         request.setConfidenceScore(
@@ -453,15 +454,15 @@ class RiskAssessmentSearchControllerIntegrationTest {
         );
 
         request.setModelName(
-                "EFS-RISK"
+                "CALLER-MODEL"
         );
 
         request.setModelVersion(
-                "1.0"
+                "999"
         );
 
         request.setProcessingTimeMs(
-                12L
+                999999L
         );
 
         MvcResult result =

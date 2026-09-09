@@ -231,7 +231,7 @@ class AlertControllerIntegrationTest {
                 "TRANSACTION",
                 "DECISION",
                 new BigDecimal("91.00"),
-                "ALTO",
+                "HIGH",
                 "REVIEW",
                 new BigDecimal("93.00"),
                 LocalDateTime.now(),

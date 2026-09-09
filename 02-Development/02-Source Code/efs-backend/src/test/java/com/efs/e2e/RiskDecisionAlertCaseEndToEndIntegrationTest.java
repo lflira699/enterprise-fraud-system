@@ -219,14 +219,14 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
                     "transactionId": "%s",
                     "assessmentType": "TRANSACTION",
                     "assessmentStage": "DECISION",
-                    "overallRiskScore": 90.00,
-                    "riskLevel": "ALTO",
+                    "overallRiskScore": 70.00,
+                    "riskLevel": "HIGH",
                     "assessmentResult": "REVIEW",
-                    "rulesScore": 35.00,
-                    "behavioralScore": 20.00,
-                    "customerScore": 15.00,
-                    "geographicScore": 10.00,
-                    "deviceScore": 10.00,
+                    "rulesScore": 70.00,
+                    "behavioralScore": 70.00,
+                    "customerScore": 70.00,
+                    "geographicScore": 70.00,
+                    "deviceScore": 70.00,
                     "confidenceScore": 92.00,
                     "modelName": "EFS-RISK",
                     "modelVersion": "1.0",
@@ -281,7 +281,7 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
                                 jsonPath(
                                         "$.riskLevel"
                                 ).value(
-                                        "ALTO"
+                                        "HIGH"
                                 )
                         )
                         .andExpect(
@@ -419,7 +419,7 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
                     "category": "TRANSACTION",
                     "severity": "HIGH",
                     "priority": "HIGH",
-                    "riskScore": 90.00
+                    "riskScore": 70.00
                 }
                 """.formatted(
                         decisionId
@@ -717,7 +717,7 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
                         Integer.class,
                         riskAssessmentId,
                         transactionId,
-                        "ALTO"
+                        "HIGH"
                 );
 
         assertEquals(

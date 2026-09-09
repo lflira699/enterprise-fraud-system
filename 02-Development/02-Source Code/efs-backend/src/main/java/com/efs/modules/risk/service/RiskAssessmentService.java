@@ -1,10 +1,14 @@
 package com.efs.modules.risk.service;
 
+import com.efs.modules.integration.event.DomainEventEnvelope;
+import com.efs.modules.integration.service.DomainEventOutboxService;
 import com.efs.modules.risk.dto.RiskAssessmentRequest;
 import com.efs.modules.risk.dto.RiskAssessmentResponse;
 import com.efs.modules.risk.entity.RiskAssessment;
 import com.efs.modules.risk.mapper.RiskAssessmentMapper;
 import com.efs.modules.risk.repository.RiskAssessmentRepository;
+import com.efs.modules.transaction.entity.Transaction;
+import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.pagination.PageResponse;
@@ -16,34 +20,85 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class RiskAssessmentService
         implements RiskAssessmentServiceInterface {
 
     private static final int MAX_PAGE_SIZE = 100;
+
     private static final String DEFAULT_RISK_SORT =
             "assessmentTimestamp";
+
     private static final String SORT_DIRECTION_ASC =
             "ASC";
+
     private static final String SORT_DIRECTION_DESC =
             "DESC";
 
-    private final RiskAssessmentRepository riskAssessmentRepository;
-    private final RiskAssessmentMapper riskAssessmentMapper;
+    private static final String EVENT_TYPE =
+            "RiskCalculated";
+
+    private static final String EVENT_SCHEMA_VERSION =
+            "1.0";
+
+    private static final String EVENT_PRODUCER =
+            "Risk Engine";
+
+    private static final String AGGREGATE_TYPE =
+            "RiskAssessment";
+
+    private final RiskAssessmentRepository
+            riskAssessmentRepository;
+
+    private final RiskAssessmentMapper
+            riskAssessmentMapper;
+
+    private final TransactionRepository
+            transactionRepository;
+
+    private final RiskScoringModelResolver
+            riskScoringModelResolver;
+
+    private final RiskCalculator
+            riskCalculator;
+
+    private final DomainEventOutboxService
+            domainEventOutboxService;
 
     public RiskAssessmentService(
             RiskAssessmentRepository riskAssessmentRepository,
-            RiskAssessmentMapper riskAssessmentMapper) {
+            RiskAssessmentMapper riskAssessmentMapper,
+            TransactionRepository transactionRepository,
+            RiskScoringModelResolver riskScoringModelResolver,
+            RiskCalculator riskCalculator,
+            DomainEventOutboxService domainEventOutboxService) {
 
         this.riskAssessmentRepository =
                 riskAssessmentRepository;
 
         this.riskAssessmentMapper =
                 riskAssessmentMapper;
+
+        this.transactionRepository =
+                transactionRepository;
+
+        this.riskScoringModelResolver =
+                riskScoringModelResolver;
+
+        this.riskCalculator =
+                riskCalculator;
+
+        this.domainEventOutboxService =
+                domainEventOutboxService;
     }
 
     @Override
@@ -51,14 +106,284 @@ public class RiskAssessmentService
     public RiskAssessmentResponse createRiskAssessment(
             RiskAssessmentRequest request) {
 
+        long startedAtNanos =
+                System.nanoTime();
+
+        Transaction transaction =
+                transactionRepository
+                        .findByTransactionIdAndDeletedAtIsNull(
+                                request.getTransactionId()
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Transaction not found: "
+                                                + request.getTransactionId()
+                                )
+                        );
+
+        if (transaction.getCorrelationId() == null) {
+            throw new IllegalStateException(
+                    "Transaction correlationId is required "
+                            + "for RiskCalculated event"
+            );
+        }
+
+        RiskScoringModel model =
+                riskScoringModelResolver.resolve(
+                        transaction.getOrganizationId(),
+                        transaction.getTenantId()
+                );
+
+        Map<String, BigDecimal> factorScores =
+                buildFactorScores(request);
+
+        RiskCalculationResult calculation =
+                riskCalculator.calculate(
+                        model,
+                        factorScores
+                );
+
+        RiskAssessment reusableAssessment =
+                findReusableAssessment(
+                        request,
+                        calculation
+                );
+
+        if (reusableAssessment != null) {
+            return riskAssessmentMapper.toResponse(
+                    reusableAssessment
+            );
+        }
+
         RiskAssessment assessment =
                 riskAssessmentMapper.toEntity(request);
 
+        assessment.setOverallRiskScore(
+                calculation.overallRiskScore()
+        );
+
+        assessment.setRiskLevel(
+                calculation.riskLevel()
+        );
+
+        assessment.setModelName(
+                calculation.modelName()
+        );
+
+        assessment.setModelVersion(
+                calculation.modelVersion()
+        );
+
+        assessment.setProcessingTimeMs(
+                TimeUnit.NANOSECONDS.toMillis(
+                        System.nanoTime()
+                                - startedAtNanos
+                )
+        );
+
         RiskAssessment savedAssessment =
-                riskAssessmentRepository.save(assessment);
+                riskAssessmentRepository.save(
+                        assessment
+                );
+
+        publishRiskCalculated(
+                savedAssessment,
+                transaction
+        );
 
         return riskAssessmentMapper.toResponse(
                 savedAssessment
+        );
+    }
+
+    private Map<String, BigDecimal> buildFactorScores(
+            RiskAssessmentRequest request) {
+
+        Map<String, BigDecimal> factorScores =
+                new HashMap<>();
+
+        factorScores.put(
+                "RULES",
+                request.getRulesScore()
+        );
+
+        factorScores.put(
+                "BEHAVIORAL",
+                request.getBehavioralScore()
+        );
+
+        factorScores.put(
+                "CUSTOMER",
+                request.getCustomerScore()
+        );
+
+        factorScores.put(
+                "GEOGRAPHIC",
+                request.getGeographicScore()
+        );
+
+        factorScores.put(
+                "DEVICE",
+                request.getDeviceScore()
+        );
+
+        return factorScores;
+    }
+
+    private RiskAssessment findReusableAssessment(
+            RiskAssessmentRequest request,
+            RiskCalculationResult calculation) {
+
+        return riskAssessmentRepository
+                .findByTransactionIdAndAssessmentTypeOrderByAssessmentTimestampDesc(
+                        request.getTransactionId(),
+                        request.getAssessmentType()
+                )
+                .stream()
+                .filter(
+                        assessment ->
+                                Objects.equals(
+                                        assessment.getAssessmentStage(),
+                                        request.getAssessmentStage()
+                                )
+                )
+                .filter(
+                        assessment ->
+                                Objects.equals(
+                                        assessment.getModelName(),
+                                        calculation.modelName()
+                                )
+                )
+                .filter(
+                        assessment ->
+                                Objects.equals(
+                                        assessment.getModelVersion(),
+                                        calculation.modelVersion()
+                                )
+                )
+                .filter(
+                        assessment ->
+                                hasSameFactorContributions(
+                                        assessment,
+                                        calculation
+                                                .factorContributions()
+                                )
+                )
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean hasSameFactorContributions(
+            RiskAssessment assessment,
+            List<RiskCalculationResult.FactorContribution>
+                    factorContributions) {
+
+        for (
+                RiskCalculationResult.FactorContribution contribution
+                : factorContributions
+        ) {
+
+            BigDecimal persistedScore =
+                    getPersistedFactorScore(
+                            assessment,
+                            contribution.factorCode()
+                    );
+
+            if (!sameScore(
+                    persistedScore,
+                    contribution.score()
+            )) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private BigDecimal getPersistedFactorScore(
+            RiskAssessment assessment,
+            String factorCode) {
+
+        return switch (factorCode) {
+            case "RULES" ->
+                    assessment.getRulesScore();
+
+            case "BEHAVIORAL" ->
+                    assessment.getBehavioralScore();
+
+            case "CUSTOMER" ->
+                    assessment.getCustomerScore();
+
+            case "GEOGRAPHIC" ->
+                    assessment.getGeographicScore();
+
+            case "DEVICE" ->
+                    assessment.getDeviceScore();
+
+            default ->
+                    null;
+        };
+    }
+
+    private boolean sameScore(
+            BigDecimal first,
+            BigDecimal second) {
+
+        if (first == null || second == null) {
+            return first == null
+                    && second == null;
+        }
+
+        return first.compareTo(second) == 0;
+    }
+
+    private void publishRiskCalculated(
+            RiskAssessment assessment,
+            Transaction transaction) {
+
+        DomainEventEnvelope envelope =
+                new DomainEventEnvelope();
+
+        envelope.setEventType(
+                EVENT_TYPE
+        );
+
+        envelope.setSchemaVersion(
+                EVENT_SCHEMA_VERSION
+        );
+
+        envelope.setOccurredAt(
+                assessment.getAssessmentTimestamp()
+        );
+
+        envelope.setProducer(
+                EVENT_PRODUCER
+        );
+
+        envelope.setCorrelationId(
+                transaction.getCorrelationId()
+        );
+
+        envelope.setTenantId(
+                transaction.getTenantId()
+        );
+
+        envelope.setPayload(
+                Map.of(
+                        "riskAssessmentId",
+                        assessment.getRiskAssessmentId()
+                                .toString()
+                )
+        );
+
+        envelope.setMetadata(
+                Map.of()
+        );
+
+        domainEventOutboxService.persist(
+                AGGREGATE_TYPE,
+                assessment.getRiskAssessmentId(),
+                envelope
         );
     }
 

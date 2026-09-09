@@ -8,11 +8,11 @@ import java.util.Set;
 public class DecisionEvaluationValidator {
 
     private static final Set<String> VALID_RISK_LEVELS = Set.of(
-            "MUY_BAJO",
-            "BAJO",
-            "MEDIO",
-            "ALTO",
-            "CRITICO"
+            "VERY_LOW",
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
     );
 
     private static final Set<String> VALID_CONFIDENCE_LEVELS = Set.of(

@@ -145,7 +145,7 @@ class DecisionExecutionServiceIntegrationTest {
                 "TRANSACTION",
                 "DECISION",
                 new BigDecimal("90.00"),
-                "ALTO",
+                "HIGH",
                 "REVIEW",
                 new BigDecimal("92.00"),
                 LocalDateTime.now(),

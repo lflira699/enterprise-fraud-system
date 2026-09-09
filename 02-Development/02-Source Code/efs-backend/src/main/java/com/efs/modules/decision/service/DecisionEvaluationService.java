@@ -110,7 +110,7 @@ public class DecisionEvaluationService
             String riskLevel,
             String confidenceLevel) {
 
-        if ("MUY_BAJO".equals(riskLevel)
+        if ("VERY_LOW".equals(riskLevel)
                 && ("MUY_ALTA".equals(confidenceLevel)
                 || "ALTA".equals(confidenceLevel))) {
 
@@ -120,7 +120,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("BAJO".equals(riskLevel)
+        if ("LOW".equals(riskLevel)
                 && "ALTA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -129,7 +129,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("BAJO".equals(riskLevel)
+        if ("LOW".equals(riskLevel)
                 && "MEDIA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -138,7 +138,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("MEDIO".equals(riskLevel)
+        if ("MEDIUM".equals(riskLevel)
                 && "ALTA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -147,7 +147,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("MEDIO".equals(riskLevel)
+        if ("MEDIUM".equals(riskLevel)
                 && "MEDIA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -156,7 +156,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("MEDIO".equals(riskLevel)
+        if ("MEDIUM".equals(riskLevel)
                 && "BAJA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -165,7 +165,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("ALTO".equals(riskLevel)
+        if ("HIGH".equals(riskLevel)
                 && "ALTA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -174,7 +174,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("ALTO".equals(riskLevel)
+        if ("HIGH".equals(riskLevel)
                 && "MUY_ALTA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -183,7 +183,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("ALTO".equals(riskLevel)
+        if ("HIGH".equals(riskLevel)
                 && "BAJA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -192,7 +192,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("CRITICO".equals(riskLevel)
+        if ("CRITICAL".equals(riskLevel)
                 && "MUY_ALTA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -201,7 +201,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("CRITICO".equals(riskLevel)
+        if ("CRITICAL".equals(riskLevel)
                 && "ALTA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -210,7 +210,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("CRITICO".equals(riskLevel)
+        if ("CRITICAL".equals(riskLevel)
                 && "MEDIA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(
@@ -219,7 +219,7 @@ public class DecisionEvaluationService
             );
         }
 
-        if ("CRITICO".equals(riskLevel)
+        if ("CRITICAL".equals(riskLevel)
                 && "BAJA".equals(confidenceLevel)) {
 
             return new DecisionRecommendation(

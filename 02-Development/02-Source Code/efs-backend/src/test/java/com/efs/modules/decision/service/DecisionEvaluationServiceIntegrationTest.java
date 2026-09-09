@@ -112,7 +112,7 @@ class DecisionEvaluationServiceIntegrationTest {
         );
 
         insertRiskAssessment(
-                "ALTO",
+                "HIGH",
                 new BigDecimal("90.00")
         );
     }
