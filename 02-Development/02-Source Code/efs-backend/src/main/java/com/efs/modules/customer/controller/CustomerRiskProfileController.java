@@ -3,6 +3,7 @@ package com.efs.modules.customer.controller;
 import com.efs.modules.customer.dto.CustomerRiskProfileRequest;
 import com.efs.modules.customer.dto.CustomerRiskProfileResponse;
 import com.efs.modules.customer.service.CustomerRiskProfileServiceInterface;
+import com.efs.modules.risk.service.CustomerRiskAssessmentServiceInterface;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,20 +15,38 @@ import java.util.UUID;
 @RequestMapping("/api/v1/customers")
 public class CustomerRiskProfileController {
 
-    private final CustomerRiskProfileServiceInterface customerRiskProfileService;
+    private final CustomerRiskProfileServiceInterface
+            customerRiskProfileService;
+
+    private final CustomerRiskAssessmentServiceInterface
+            customerRiskAssessmentService;
 
     public CustomerRiskProfileController(
-            CustomerRiskProfileServiceInterface customerRiskProfileService) {
-        this.customerRiskProfileService = customerRiskProfileService;
+            CustomerRiskProfileServiceInterface
+                    customerRiskProfileService,
+            CustomerRiskAssessmentServiceInterface
+                    customerRiskAssessmentService) {
+
+        this.customerRiskProfileService =
+                customerRiskProfileService;
+
+        this.customerRiskAssessmentService =
+                customerRiskAssessmentService;
     }
 
     @PostMapping("/{customerId}/risk-profile")
-    public ResponseEntity<CustomerRiskProfileResponse> createRiskProfile(
+    public ResponseEntity<CustomerRiskProfileResponse>
+    createRiskProfile(
             @PathVariable UUID customerId,
-            @Valid @RequestBody CustomerRiskProfileRequest request) {
+            @Valid @RequestBody
+            CustomerRiskProfileRequest request) {
 
         CustomerRiskProfileResponse response =
-                customerRiskProfileService.createRiskProfile(customerId, request);
+                customerRiskAssessmentService
+                        .createRiskAssessment(
+                                customerId,
+                                request
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -35,21 +54,31 @@ public class CustomerRiskProfileController {
     }
 
     @GetMapping("/{customerId}/risk-profile")
-    public ResponseEntity<CustomerRiskProfileResponse> getRiskProfile(
+    public ResponseEntity<CustomerRiskProfileResponse>
+    getRiskProfile(
             @PathVariable UUID customerId) {
 
         return ResponseEntity.ok(
-                customerRiskProfileService.getRiskProfileByCustomerId(customerId)
+                customerRiskProfileService
+                        .getRiskProfileByCustomerId(
+                                customerId
+                        )
         );
     }
 
     @PutMapping("/{customerId}/risk-profile")
-    public ResponseEntity<CustomerRiskProfileResponse> updateRiskProfile(
+    public ResponseEntity<CustomerRiskProfileResponse>
+    updateRiskProfile(
             @PathVariable UUID customerId,
-            @Valid @RequestBody CustomerRiskProfileRequest request) {
+            @Valid @RequestBody
+            CustomerRiskProfileRequest request) {
 
         return ResponseEntity.ok(
-                customerRiskProfileService.updateRiskProfile(customerId, request)
+                customerRiskAssessmentService
+                        .updateRiskAssessment(
+                                customerId,
+                                request
+                        )
         );
     }
 
@@ -57,8 +86,13 @@ public class CustomerRiskProfileController {
     public ResponseEntity<Void> deleteRiskProfile(
             @PathVariable UUID customerId) {
 
-        customerRiskProfileService.deleteRiskProfile(customerId);
+        customerRiskProfileService
+                .deleteRiskProfile(
+                        customerId
+                );
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity
+                .noContent()
+                .build();
     }
 }

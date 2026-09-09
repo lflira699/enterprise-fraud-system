@@ -28,6 +28,9 @@ public class DomainEventRoutingKeyResolver {
             case "DecisionGenerated" ->
                     "decision.generated.v1";
 
+            case "RiskProfileChanged" ->
+                    "risk.profile.changed.v1";
+
             case "AlertCreated" ->
                     "alert.created.v1";
 

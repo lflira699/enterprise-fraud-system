@@ -35,6 +35,23 @@ public class RiskScoringModelResolver {
                     "CRITICAL"
             );
 
+    private static final String CUSTOMER_ACTIVE_MODEL_KEY =
+            "EFS.RISK.CUSTOMER.ACTIVE_MODEL";
+
+    private static final String CUSTOMER_MODEL_PREFIX =
+            "EFS.RISK.CUSTOMER.MODEL.";
+
+    private static final List<String> CUSTOMER_FACTOR_CODES =
+            List.of(
+                    "BEHAVIOR",
+                    "FRAUD",
+                    "AML",
+                    "KYC",
+                    "DEVICE",
+                    "SANCTIONS",
+                    "PEP",
+                    "WATCHLIST"
+            );
     private final SystemConfigurationServiceInterface
             systemConfigurationService;
 
@@ -50,15 +67,42 @@ public class RiskScoringModelResolver {
             UUID organizationId,
             UUID tenantId) {
 
+        return resolveModel(
+                ACTIVE_MODEL_KEY,
+                MODEL_PREFIX,
+                FACTOR_CODES,
+                organizationId,
+                tenantId
+        );
+    }
+
+    public RiskScoringModel resolveCustomer() {
+
+        return resolveModel(
+                CUSTOMER_ACTIVE_MODEL_KEY,
+                CUSTOMER_MODEL_PREFIX,
+                CUSTOMER_FACTOR_CODES,
+                null,
+                null
+        );
+    }
+
+    private RiskScoringModel resolveModel(
+            String activeModelKey,
+            String modelPrefix,
+            List<String> factorCodes,
+            UUID organizationId,
+            UUID tenantId) {
+
         String modelVersion =
                 requiredString(
-                        ACTIVE_MODEL_KEY,
+                        activeModelKey,
                         organizationId,
                         tenantId
                 );
 
         String modelKeyPrefix =
-                MODEL_PREFIX
+                modelPrefix
                         + modelVersion;
 
         String modelName =
@@ -83,7 +127,7 @@ public class RiskScoringModelResolver {
                 );
 
         List<RiskScoringModel.Factor> factors =
-                FACTOR_CODES
+                factorCodes
                         .stream()
                         .map(
                                 factorCode ->

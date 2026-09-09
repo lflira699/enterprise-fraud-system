@@ -22,4 +22,9 @@ public interface CustomerHistoryRepository
             UUID customerId,
             String eventType
     );
+    Optional<CustomerHistory>
+    findFirstByCustomerIdAndEventTypeOrderByEventTimestampDesc(
+            UUID customerId,
+            String eventType
+    );
 }

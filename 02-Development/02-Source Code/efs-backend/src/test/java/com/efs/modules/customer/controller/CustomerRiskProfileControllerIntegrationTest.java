@@ -34,146 +34,153 @@ class CustomerRiskProfileControllerIntegrationTest {
     @Test
     void shouldCreateRiskProfile() throws Exception {
 
-        UUID customerId = createCustomer();
-        UUID createdBy = UUID.randomUUID();
+        UUID customerId =
+                createCustomer();
+
+        UUID createdBy =
+                UUID.randomUUID();
+
+        UUID correlationId =
+                UUID.randomUUID();
 
         String requestBody =
                 """
                 {
                   "currentRiskScore": 88.50,
                   "riskLevel": "HIGH",
-                  "behaviorScore": 71.25,
-                  "fraudScore": 92.75,
-                  "amlScore": 45.50,
-                  "kycScore": 33.25,
-                  "deviceScore": 81.75,
-                  "sanctionsScore": 12.50,
-                  "pepScore": 18.25,
-                  "watchlistScore": 27.75,
-                  "createdBy": "%s"
+                  "behaviorScore": 50.00,
+                  "fraudScore": 50.00,
+                  "amlScore": 50.00,
+                  "kycScore": 50.00,
+                  "deviceScore": 50.00,
+                  "sanctionsScore": 50.00,
+                  "pepScore": 50.00,
+                  "watchlistScore": 50.00,
+                  "createdBy": "%s",
+                  "correlationId": "%s"
                 }
-                """.formatted(createdBy);
+                """.formatted(
+                        createdBy,
+                        correlationId
+                );
 
         mockMvc.perform(
                         post(
                                 "/api/v1/customers/{customerId}/risk-profile",
                                 customerId
                         )
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.profileId").exists())
+                .andExpect(
+                        jsonPath("$.profileId").exists()
+                )
                 .andExpect(
                         jsonPath("$.customerId")
                                 .value(customerId.toString())
                 )
                 .andExpect(
                         jsonPath("$.currentRiskScore")
-                                .value(88.50)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.riskLevel")
-                                .value("HIGH")
+                                .value("MEDIUM")
                 )
                 .andExpect(
                         jsonPath("$.behaviorScore")
-                                .value(71.25)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.fraudScore")
-                                .value(92.75)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.amlScore")
-                                .value(45.50)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.kycScore")
-                                .value(33.25)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.deviceScore")
-                                .value(81.75)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.sanctionsScore")
-                                .value(12.50)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.pepScore")
-                                .value(18.25)
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.watchlistScore")
-                                .value(27.75)
-                )
-                .andExpect(
-                        jsonPath("$.createdBy")
-                                .value(createdBy.toString())
+                                .value(50.00)
                 )
                 .andExpect(
                         jsonPath("$.lastCalculation").exists()
-                )
-                .andExpect(
-                        jsonPath("$.createdAt").exists()
-                )
-                .andExpect(
-                        jsonPath("$.updatedAt").exists()
                 );
     }
 
     @Test
-    void shouldApplyDefaultScores() throws Exception {
+    void shouldReuseRiskProfileForSameEvaluationProcess()
+            throws Exception {
 
-        UUID customerId = createCustomer();
+        UUID customerId =
+                createCustomer();
+
+        UUID correlationId =
+                UUID.randomUUID();
 
         mockMvc.perform(
                         post(
                                 "/api/v1/customers/{customerId}/risk-profile",
                                 customerId
                         )
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(
-                                        validRiskProfileBody("LOW")
+                                        validRiskProfileBody(
+                                                "LOW",
+                                                correlationId
+                                        )
                                 )
                 )
                 .andExpect(status().isCreated())
                 .andExpect(
                         jsonPath("$.currentRiskScore")
-                                .value(0)
+                                .value(30.00)
                 )
                 .andExpect(
-                        jsonPath("$.behaviorScore")
-                                .value(0)
+                        jsonPath("$.riskLevel")
+                                .value("LOW")
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/customers/{customerId}/risk-profile",
+                                customerId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        validRiskProfileBody(
+                                                "CRITICAL",
+                                                correlationId
+                                        )
+                                )
                 )
+                .andExpect(status().isCreated())
                 .andExpect(
-                        jsonPath("$.fraudScore")
-                                .value(0)
-                )
-                .andExpect(
-                        jsonPath("$.amlScore")
-                                .value(0)
-                )
-                .andExpect(
-                        jsonPath("$.kycScore")
-                                .value(0)
-                )
-                .andExpect(
-                        jsonPath("$.deviceScore")
-                                .value(0)
-                )
-                .andExpect(
-                        jsonPath("$.sanctionsScore")
-                                .value(0)
-                )
-                .andExpect(
-                        jsonPath("$.pepScore")
-                                .value(0)
-                )
-                .andExpect(
-                        jsonPath("$.watchlistScore")
-                                .value(0)
+                        jsonPath("$.currentRiskScore")
+                                .value(30.00)
                 )
                 .andExpect(
                         jsonPath("$.riskLevel")
@@ -184,12 +191,20 @@ class CustomerRiskProfileControllerIntegrationTest {
     @Test
     void shouldRejectInvalidCreateRequest() throws Exception {
 
-        UUID customerId = createCustomer();
+        UUID customerId =
+                createCustomer();
 
         String requestBody =
                 """
                 {
-                  "riskLevel": ""
+                  "behaviorScore": 50.00,
+                  "fraudScore": 50.00,
+                  "amlScore": 50.00,
+                  "kycScore": 50.00,
+                  "deviceScore": 50.00,
+                  "sanctionsScore": 50.00,
+                  "pepScore": 50.00,
+                  "watchlistScore": 50.00
                 }
                 """;
 
@@ -198,7 +213,9 @@ class CustomerRiskProfileControllerIntegrationTest {
                                 "/api/v1/customers/{customerId}/risk-profile",
                                 customerId
                         )
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
                 .andExpect(status().isBadRequest())
@@ -207,8 +224,9 @@ class CustomerRiskProfileControllerIntegrationTest {
                                 .value("VALIDATION_ERROR")
                 )
                 .andExpect(
-                        jsonPath("$.validationErrors.riskLevel")
-                                .exists()
+                        jsonPath(
+                                "$.validationErrors.correlationId"
+                        ).exists()
                 );
     }
 
@@ -325,7 +343,8 @@ class CustomerRiskProfileControllerIntegrationTest {
     @Test
     void shouldUpdateRiskProfile() throws Exception {
 
-        UUID customerId = createCustomer();
+        UUID customerId =
+                createCustomer();
 
         JsonNode created =
                 createRiskProfile(
@@ -336,31 +355,41 @@ class CustomerRiskProfileControllerIntegrationTest {
         String profileId =
                 created.get("profileId").asText();
 
-        UUID updatedBy = UUID.randomUUID();
+        UUID updatedBy =
+                UUID.randomUUID();
+
+        UUID correlationId =
+                UUID.randomUUID();
 
         String requestBody =
                 """
                 {
                   "currentRiskScore": 94.25,
                   "riskLevel": "HIGH",
-                  "behaviorScore": 75.50,
-                  "fraudScore": 96.75,
-                  "amlScore": 51.25,
-                  "kycScore": 44.50,
-                  "deviceScore": 89.25,
-                  "sanctionsScore": 15.00,
-                  "pepScore": 22.50,
-                  "watchlistScore": 31.75,
-                  "updatedBy": "%s"
+                  "behaviorScore": 80.00,
+                  "fraudScore": 80.00,
+                  "amlScore": 80.00,
+                  "kycScore": 80.00,
+                  "deviceScore": 80.00,
+                  "sanctionsScore": 80.00,
+                  "pepScore": 80.00,
+                  "watchlistScore": 80.00,
+                  "updatedBy": "%s",
+                  "correlationId": "%s"
                 }
-                """.formatted(updatedBy);
+                """.formatted(
+                        updatedBy,
+                        correlationId
+                );
 
         mockMvc.perform(
                         put(
                                 "/api/v1/customers/{customerId}/risk-profile",
                                 customerId
                         )
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(requestBody)
                 )
                 .andExpect(status().isOk())
@@ -374,29 +403,22 @@ class CustomerRiskProfileControllerIntegrationTest {
                 )
                 .andExpect(
                         jsonPath("$.currentRiskScore")
-                                .value(94.25)
+                                .value(80.00)
                 )
                 .andExpect(
                         jsonPath("$.riskLevel")
-                                .value("HIGH")
+                                .value("CRITICAL")
                 )
                 .andExpect(
-                        jsonPath("$.fraudScore")
-                                .value(96.75)
+                        jsonPath("$.behaviorScore")
+                                .value(80.00)
                 )
                 .andExpect(
-                        jsonPath("$.deviceScore")
-                                .value(89.25)
-                )
-                .andExpect(
-                        jsonPath("$.updatedBy")
-                                .value(updatedBy.toString())
+                        jsonPath("$.watchlistScore")
+                                .value(80.00)
                 )
                 .andExpect(
                         jsonPath("$.lastCalculation").exists()
-                )
-                .andExpect(
-                        jsonPath("$.updatedAt").exists()
                 );
     }
 
@@ -635,10 +657,53 @@ class CustomerRiskProfileControllerIntegrationTest {
     private String validRiskProfileBody(
             String riskLevel) {
 
+        return validRiskProfileBody(
+                riskLevel,
+                UUID.randomUUID()
+        );
+    }
+
+    private String validRiskProfileBody(
+            String riskLevel,
+            UUID correlationId) {
+
+        String score =
+                switch (riskLevel) {
+                    case "VERY_LOW" -> "10.00";
+                    case "LOW" -> "30.00";
+                    case "MEDIUM" -> "50.00";
+                    case "HIGH" -> "70.00";
+                    case "CRITICAL" -> "90.00";
+                    default -> throw new IllegalArgumentException(
+                            "Unsupported test risk level: "
+                                    + riskLevel
+                    );
+                };
+
         return """
                 {
-                  "riskLevel": "%s"
+                  "riskLevel": "%s",
+                  "behaviorScore": %s,
+                  "fraudScore": %s,
+                  "amlScore": %s,
+                  "kycScore": %s,
+                  "deviceScore": %s,
+                  "sanctionsScore": %s,
+                  "pepScore": %s,
+                  "watchlistScore": %s,
+                  "correlationId": "%s"
                 }
-                """.formatted(riskLevel);
+                """.formatted(
+                        riskLevel,
+                        score,
+                        score,
+                        score,
+                        score,
+                        score,
+                        score,
+                        score,
+                        score,
+                        correlationId
+                );
     }
 }

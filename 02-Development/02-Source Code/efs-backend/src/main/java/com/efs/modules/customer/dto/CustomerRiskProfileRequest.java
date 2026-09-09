@@ -1,6 +1,6 @@
 package com.efs.modules.customer.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -8,8 +8,6 @@ import java.util.UUID;
 public class CustomerRiskProfileRequest {
 
     private BigDecimal currentRiskScore;
-
-    @NotBlank
     private String riskLevel;
 
     private BigDecimal behaviorScore;
@@ -23,6 +21,9 @@ public class CustomerRiskProfileRequest {
 
     private UUID createdBy;
     private UUID updatedBy;
+
+    @NotNull
+    private UUID correlationId;
 
     public BigDecimal getCurrentRiskScore() {
         return currentRiskScore;
@@ -118,5 +119,12 @@ public class CustomerRiskProfileRequest {
 
     public void setUpdatedBy(UUID updatedBy) {
         this.updatedBy = updatedBy;
+    }
+    public UUID getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(UUID correlationId) {
+        this.correlationId = correlationId;
     }
 }
