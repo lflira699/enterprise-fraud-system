@@ -1,5 +1,7 @@
 package com.efs.modules.risk.service;
 
+import com.efs.modules.audit.dto.AuditEventRequest;
+import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.integration.event.DomainEventEnvelope;
 import com.efs.modules.integration.service.DomainEventOutboxService;
 import com.efs.modules.risk.dto.RiskAssessmentRequest;
@@ -12,17 +14,22 @@ import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.pagination.PageResponse;
+import com.efs.shared.security.SecurityContext;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,6 +39,23 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class RiskAssessmentService
         implements RiskAssessmentServiceInterface {
+
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(
+                    RiskAssessmentService.class
+            );
+
+    private static final String REVIEW_EVENT_TYPE =
+            "RISK_SCORE_REVIEWED";
+
+    private static final String REVIEW_ENTITY_TYPE =
+            "RISK_ASSESSMENT";
+
+    private static final String REVIEW_ACTION =
+            "VIEW";
+
+    private static final String REVIEW_SOURCE_COMPONENT =
+            "RISK_ENGINE";
 
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -74,13 +98,17 @@ public class RiskAssessmentService
     private final DomainEventOutboxService
             domainEventOutboxService;
 
+    private final AuditEventServiceInterface
+            auditEventService;
+
     public RiskAssessmentService(
             RiskAssessmentRepository riskAssessmentRepository,
             RiskAssessmentMapper riskAssessmentMapper,
             TransactionRepository transactionRepository,
             RiskScoringModelResolver riskScoringModelResolver,
             RiskCalculator riskCalculator,
-            DomainEventOutboxService domainEventOutboxService) {
+            DomainEventOutboxService domainEventOutboxService,
+            AuditEventServiceInterface auditEventService) {
 
         this.riskAssessmentRepository =
                 riskAssessmentRepository;
@@ -99,6 +127,9 @@ public class RiskAssessmentService
 
         this.domainEventOutboxService =
                 domainEventOutboxService;
+
+        this.auditEventService =
+                auditEventService;
     }
 
     @Override
@@ -600,6 +631,574 @@ public class RiskAssessmentService
         );
     }
 
+    @Override
+    public RiskAssessmentResponse getRiskAssessmentById(
+            UUID riskAssessmentId,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                riskAssessmentId,
+                "riskAssessmentId is required"
+        );
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "riskAssessmentId",
+                riskAssessmentId.toString()
+        );
+
+        requireViewPermission(
+                riskAssessmentId,
+                securityContext,
+                details
+        );
+
+        try {
+
+            RiskAssessmentResponse response =
+                    getRiskAssessmentById(
+                            riskAssessmentId
+                    );
+
+            recordReviewAudit(
+                    riskAssessmentId,
+                    securityContext,
+                    "SUCCESS",
+                    null,
+                    1,
+                    details,
+                    null
+            );
+
+            return response;
+        }
+        catch (ResourceNotFoundException exception) {
+
+            recordReviewAudit(
+                    riskAssessmentId,
+                    securityContext,
+                    "REJECTED",
+                    "RISK_ASSESSMENT_NOT_FOUND",
+                    null,
+                    details,
+                    null
+            );
+
+            throw exception;
+        }
+        catch (RuntimeException exception) {
+
+            LOGGER.error(
+                    "UC-029 risk assessment retrieval failed for riskAssessmentId={} userId={}",
+                    riskAssessmentId,
+                    securityContext.getUserId(),
+                    exception
+            );
+
+            recordReviewAudit(
+                    riskAssessmentId,
+                    securityContext,
+                    "FAILURE",
+                    "RISK_ASSESSMENT_RETRIEVAL_FAILED",
+                    null,
+                    details,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    @Override
+    public List<RiskAssessmentResponse>
+    getAssessmentsByTransaction(
+            UUID transactionId,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                transactionId,
+                "transactionId is required"
+        );
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "transactionId",
+                transactionId.toString()
+        );
+
+        requireViewPermission(
+                null,
+                securityContext,
+                details
+        );
+
+        try {
+
+            List<RiskAssessmentResponse> assessments =
+                    getAssessmentsByTransaction(
+                            transactionId
+                    );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "SUCCESS",
+                    null,
+                    assessments.size(),
+                    details,
+                    null
+            );
+
+            return assessments;
+        }
+        catch (RuntimeException exception) {
+
+            LOGGER.error(
+                    "UC-029 risk assessment retrieval failed for transactionId={} userId={}",
+                    transactionId,
+                    securityContext.getUserId(),
+                    exception
+            );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "FAILURE",
+                    "RISK_ASSESSMENT_RETRIEVAL_FAILED",
+                    null,
+                    details,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    @Override
+    public RiskAssessmentResponse
+    getLatestAssessmentByTransaction(
+            UUID transactionId,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                transactionId,
+                "transactionId is required"
+        );
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "transactionId",
+                transactionId.toString()
+        );
+
+        requireViewPermission(
+                null,
+                securityContext,
+                details
+        );
+
+        try {
+
+            RiskAssessmentResponse response =
+                    getLatestAssessmentByTransaction(
+                            transactionId
+                    );
+
+            details.put(
+                    "riskAssessmentId",
+                    response.getRiskAssessmentId()
+                            .toString()
+            );
+
+            recordReviewAudit(
+                    response.getRiskAssessmentId(),
+                    securityContext,
+                    "SUCCESS",
+                    null,
+                    1,
+                    details,
+                    null
+            );
+
+            return response;
+        }
+        catch (ResourceNotFoundException exception) {
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "REJECTED",
+                    "RISK_ASSESSMENT_NOT_FOUND",
+                    null,
+                    details,
+                    null
+            );
+
+            throw exception;
+        }
+        catch (RuntimeException exception) {
+
+            LOGGER.error(
+                    "UC-029 latest risk assessment retrieval failed for transactionId={} userId={}",
+                    transactionId,
+                    securityContext.getUserId(),
+                    exception
+            );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "FAILURE",
+                    "RISK_ASSESSMENT_RETRIEVAL_FAILED",
+                    null,
+                    details,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    @Override
+    public List<RiskAssessmentResponse>
+    getAssessmentsByTransactionAndType(
+            UUID transactionId,
+            String assessmentType,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                transactionId,
+                "transactionId is required"
+        );
+
+        Objects.requireNonNull(
+                assessmentType,
+                "assessmentType is required"
+        );
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "transactionId",
+                transactionId.toString()
+        );
+
+        details.put(
+                "assessmentType",
+                assessmentType
+        );
+
+        requireViewPermission(
+                null,
+                securityContext,
+                details
+        );
+
+        try {
+
+            List<RiskAssessmentResponse> assessments =
+                    getAssessmentsByTransactionAndType(
+                            transactionId,
+                            assessmentType
+                    );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "SUCCESS",
+                    null,
+                    assessments.size(),
+                    details,
+                    null
+            );
+
+            return assessments;
+        }
+        catch (RuntimeException exception) {
+
+            LOGGER.error(
+                    "UC-029 risk assessment retrieval failed for transactionId={} assessmentType={} userId={}",
+                    transactionId,
+                    assessmentType,
+                    securityContext.getUserId(),
+                    exception
+            );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "FAILURE",
+                    "RISK_ASSESSMENT_RETRIEVAL_FAILED",
+                    null,
+                    details,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    @Override
+    public PageResponse<RiskAssessmentResponse>
+    searchAssessments(
+            String riskLevel,
+            String assessmentResult,
+            int page,
+            int size,
+            String sort,
+            String direction,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        if (hasText(riskLevel)) {
+            details.put(
+                    "riskLevel",
+                    riskLevel
+            );
+        }
+
+        if (hasText(assessmentResult)) {
+            details.put(
+                    "assessmentResult",
+                    assessmentResult
+            );
+        }
+
+        details.put(
+                "page",
+                page
+        );
+
+        details.put(
+                "size",
+                size
+        );
+
+        details.put(
+                "sort",
+                sort
+        );
+
+        details.put(
+                "direction",
+                direction
+        );
+
+        requireViewPermission(
+                null,
+                securityContext,
+                details
+        );
+
+        try {
+
+            PageResponse<RiskAssessmentResponse> response =
+                    searchAssessments(
+                            riskLevel,
+                            assessmentResult,
+                            page,
+                            size,
+                            sort,
+                            direction
+                    );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "SUCCESS",
+                    null,
+                    response.getContent().size(),
+                    details,
+                    null
+            );
+
+            return response;
+        }
+        catch (RequestValidationException exception) {
+            throw exception;
+        }
+        catch (RuntimeException exception) {
+
+            LOGGER.error(
+                    "UC-029 risk assessment search failed for userId={}",
+                    securityContext.getUserId(),
+                    exception
+            );
+
+            recordReviewAudit(
+                    null,
+                    securityContext,
+                    "FAILURE",
+                    "RISK_ASSESSMENT_RETRIEVAL_FAILED",
+                    null,
+                    details,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    private void requireViewPermission(
+            UUID entityId,
+            SecurityContext securityContext,
+            Map<String, Object> details) {
+
+        if (!securityContext.hasPermission(
+                RISK_ASSESSMENT_VIEW_PERMISSION
+        )) {
+
+            recordReviewAudit(
+                    entityId,
+                    securityContext,
+                    "REJECTED",
+                    "MISSING_PERMISSION",
+                    null,
+                    details,
+                    null
+            );
+
+            throw new AccessDeniedException(
+                    "Missing required permission: "
+                            + RISK_ASSESSMENT_VIEW_PERMISSION
+            );
+        }
+    }
+
+    private void recordReviewAudit(
+            UUID entityId,
+            SecurityContext securityContext,
+            String eventResult,
+            String reason,
+            Integer resultCount,
+            Map<String, Object> criteria,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        request.setTenantId(
+                securityContext.getTenantId()
+        );
+
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                REVIEW_EVENT_TYPE
+        );
+
+        request.setEntityType(
+                REVIEW_ENTITY_TYPE
+        );
+
+        request.setEntityId(
+                entityId
+        );
+
+        request.setAction(
+                REVIEW_ACTION
+        );
+
+        request.setSourceComponent(
+                REVIEW_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                RISK_ASSESSMENT_VIEW_PERMISSION
+        );
+
+        if (criteria != null) {
+            details.putAll(
+                    criteria
+            );
+        }
+
+        if (reason != null) {
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
+
+        if (resultCount != null) {
+            details.put(
+                    "resultCount",
+                    resultCount
+            );
+        }
+
+        if (exception != null) {
+
+            details.put(
+                    "errorType",
+                    exception.getClass()
+                            .getSimpleName()
+            );
+
+            details.put(
+                    "errorMessage",
+                    exception.getMessage() == null
+                            ? "Risk assessment retrieval failed"
+                            : exception.getMessage()
+            );
+        }
+
+        request.setEventDetails(
+                details
+        );
+
+        auditEventService.createAuditEvent(
+                request
+        );
+    }
     private void validateRiskAssessmentSearchRequest(
             int page,
             int size,

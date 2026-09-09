@@ -4,9 +4,12 @@ import com.efs.modules.risk.dto.RiskAssessmentRequest;
 import com.efs.modules.risk.dto.RiskAssessmentResponse;
 import com.efs.modules.risk.service.RiskAssessmentServiceInterface;
 import com.efs.shared.pagination.PageResponse;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,20 +25,33 @@ import java.util.UUID;
 @RequestMapping("/api/v1/risk-assessments")
 public class RiskAssessmentController {
 
-    private final RiskAssessmentServiceInterface riskAssessmentService;
+    private final RiskAssessmentServiceInterface
+            riskAssessmentService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public RiskAssessmentController(
-            RiskAssessmentServiceInterface riskAssessmentService) {
+            RiskAssessmentServiceInterface riskAssessmentService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.riskAssessmentService = riskAssessmentService;
+        this.riskAssessmentService =
+                riskAssessmentService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
-    public ResponseEntity<RiskAssessmentResponse> createRiskAssessment(
+    public ResponseEntity<RiskAssessmentResponse>
+    createRiskAssessment(
             @Valid @RequestBody RiskAssessmentRequest request) {
 
         RiskAssessmentResponse response =
-                riskAssessmentService.createRiskAssessment(request);
+                riskAssessmentService
+                        .createRiskAssessment(
+                                request
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -43,14 +59,30 @@ public class RiskAssessmentController {
     }
 
     @GetMapping("/{riskAssessmentId}")
-    public ResponseEntity<RiskAssessmentResponse> getRiskAssessmentById(
+    public ResponseEntity<RiskAssessmentResponse>
+    getRiskAssessmentById(
             @PathVariable UUID riskAssessmentId) {
 
-        return ResponseEntity.ok(
-                riskAssessmentService.getRiskAssessmentById(
-                        riskAssessmentId
-                )
-        );
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        try {
+
+            return ResponseEntity.ok(
+                    riskAssessmentService
+                            .getRiskAssessmentById(
+                                    riskAssessmentId,
+                                    securityContext
+                            )
+            );
+        }
+        catch (AccessDeniedException exception) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
     }
 
     @GetMapping("/transaction/{transactionId}")
@@ -58,11 +90,26 @@ public class RiskAssessmentController {
     getAssessmentsByTransaction(
             @PathVariable UUID transactionId) {
 
-        return ResponseEntity.ok(
-                riskAssessmentService.getAssessmentsByTransaction(
-                        transactionId
-                )
-        );
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        try {
+
+            return ResponseEntity.ok(
+                    riskAssessmentService
+                            .getAssessmentsByTransaction(
+                                    transactionId,
+                                    securityContext
+                            )
+            );
+        }
+        catch (AccessDeniedException exception) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
     }
 
     @GetMapping("/transaction/{transactionId}/latest")
@@ -70,11 +117,26 @@ public class RiskAssessmentController {
     getLatestAssessmentByTransaction(
             @PathVariable UUID transactionId) {
 
-        return ResponseEntity.ok(
-                riskAssessmentService.getLatestAssessmentByTransaction(
-                        transactionId
-                )
-        );
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        try {
+
+            return ResponseEntity.ok(
+                    riskAssessmentService
+                            .getLatestAssessmentByTransaction(
+                                    transactionId,
+                                    securityContext
+                            )
+            );
+        }
+        catch (AccessDeniedException exception) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
     }
 
     @GetMapping("/transaction/{transactionId}/type/{assessmentType}")
@@ -83,12 +145,27 @@ public class RiskAssessmentController {
             @PathVariable UUID transactionId,
             @PathVariable String assessmentType) {
 
-        return ResponseEntity.ok(
-                riskAssessmentService.getAssessmentsByTransactionAndType(
-                        transactionId,
-                        assessmentType
-                )
-        );
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        try {
+
+            return ResponseEntity.ok(
+                    riskAssessmentService
+                            .getAssessmentsByTransactionAndType(
+                                    transactionId,
+                                    assessmentType,
+                                    securityContext
+                            )
+            );
+        }
+        catch (AccessDeniedException exception) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
     }
 
     @GetMapping
@@ -101,15 +178,30 @@ public class RiskAssessmentController {
             @RequestParam(defaultValue = "assessmentTimestamp") String sort,
             @RequestParam(defaultValue = "DESC") String direction) {
 
-        return ResponseEntity.ok(
-                riskAssessmentService.searchAssessments(
-                        riskLevel,
-                        assessmentResult,
-                        page,
-                        size,
-                        sort,
-                        direction
-                )
-        );
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        try {
+
+            return ResponseEntity.ok(
+                    riskAssessmentService
+                            .searchAssessments(
+                                    riskLevel,
+                                    assessmentResult,
+                                    page,
+                                    size,
+                                    sort,
+                                    direction,
+                                    securityContext
+                            )
+            );
+        }
+        catch (AccessDeniedException exception) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
     }
 }

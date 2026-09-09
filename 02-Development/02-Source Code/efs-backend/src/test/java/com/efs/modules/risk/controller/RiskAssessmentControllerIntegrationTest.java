@@ -1,6 +1,9 @@
 package com.efs.modules.risk.controller;
 
+import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.risk.dto.RiskAssessmentRequest;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,14 +13,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +43,14 @@ class RiskAssessmentControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
+
+    @MockitoBean
+    private AuditEventServiceInterface
+            auditEventService;
+
     private UUID customerId;
     private UUID transactionId;
     private UUID organizationId;
@@ -51,6 +65,25 @@ class RiskAssessmentControllerIntegrationTest {
         organizationId = UUID.randomUUID();
         createdBy = UUID.randomUUID();
         correlationId = UUID.randomUUID();
+
+        SecurityContext securityContext =
+                new SecurityContext(
+                        createdBy,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(
+                                "risk.assessment.view"
+                        ),
+                        Set.of()
+                );
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                securityContext
+        );
 
         jdbcTemplate.update(
                 """
@@ -633,5 +666,77 @@ class RiskAssessmentControllerIntegrationTest {
         );
 
         return request;
+    }
+
+    @Test
+    void shouldRejectAllRiskAssessmentReadsWithoutPermission()
+            throws Exception {
+
+        SecurityContext deniedContext =
+                new SecurityContext(
+                        createdBy,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(),
+                        Set.of()
+                );
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                deniedContext
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/risk-assessments/{riskAssessmentId}",
+                                UUID.randomUUID()
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/risk-assessments/transaction/{transactionId}",
+                                transactionId
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/risk-assessments/transaction/{transactionId}/latest",
+                                transactionId
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/risk-assessments/transaction/{transactionId}/type/{assessmentType}",
+                                transactionId,
+                                "TRANSACTION"
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/risk-assessments"
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
     }
 }
