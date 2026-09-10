@@ -284,10 +284,15 @@ public class CaseController {
             @PathVariable UUID caseId,
             @Valid @RequestBody CaseResolutionRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         CaseResolutionResponse response =
                 caseService.createCaseResolution(
                         caseId,
-                        request
+                        request,
+                        securityContext
                 );
 
         return ResponseEntity

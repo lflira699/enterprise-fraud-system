@@ -115,7 +115,8 @@ public interface CaseServiceInterface {
 
     CaseResolutionResponse createCaseResolution(
             UUID caseId,
-            CaseResolutionRequest request
+            CaseResolutionRequest request,
+            SecurityContext securityContext
     );
 
     CaseResolutionResponse getCaseResolutionById(

@@ -107,6 +107,15 @@ class CaseServiceIntegrationTest {
                     Set.of("case.view"),
                     Set.of()
             );
+    private static final SecurityContext CASE_CLOSE_SECURITY_CONTEXT =
+            new SecurityContext(
+                    ASSIGNED_TO,
+                    null,
+                    null,
+                    Set.of(),
+                    Set.of("case.close"),
+                    Set.of()
+            );
 
     @Autowired
     private CaseServiceInterface service;
@@ -758,7 +767,7 @@ class CaseServiceIntegrationTest {
                 buildResolutionRequest(
                         "CONFIRMED_FRAUD"
                 )
-        );
+        , CASE_CLOSE_SECURITY_CONTEXT);
 
         entityManager.flush();
 
@@ -1553,7 +1562,7 @@ class CaseServiceIntegrationTest {
                         buildResolutionRequest(
                                 "CONFIRMED_FRAUD"
                         )
-                );
+                , CASE_CLOSE_SECURITY_CONTEXT);
 
         assertNotNull(resolution.getResolutionId());
         assertEquals(created.getCaseId(), resolution.getCaseId());
@@ -1670,7 +1679,7 @@ class CaseServiceIntegrationTest {
                 buildResolutionRequest(
                         "CONFIRMED_FRAUD"
                 )
-        );
+        , CASE_CLOSE_SECURITY_CONTEXT);
 
         entityManager.flush();
 
@@ -1693,7 +1702,7 @@ class CaseServiceIntegrationTest {
                                 buildResolutionRequest(
                                         "FALSE_POSITIVE"
                                 )
-                        )
+                        , CASE_CLOSE_SECURITY_CONTEXT)
                 );
 
         assertEquals(
@@ -1798,7 +1807,7 @@ class CaseServiceIntegrationTest {
                         buildResolutionRequest(
                                 "CONFIRMED_FRAUD"
                         )
-                );
+                , CASE_CLOSE_SECURITY_CONTEXT);
 
         assertThrows(
                 ResourceNotFoundException.class,

@@ -135,6 +135,21 @@ public class CaseService
 
     private static final String CASE_UPDATE_SOURCE_COMPONENT =
             "CASE";
+    private static final String CASE_CLOSE_PERMISSION =
+            "case.close";
+
+    private static final String CASE_CLOSURE_EVENT_TYPE =
+            "CASE_CLOSURE";
+
+    private static final String CASE_CLOSURE_ENTITY_TYPE =
+            "CASE";
+
+    private static final String CASE_CLOSURE_ACTION =
+            "CLOSE";
+
+    private static final String CASE_CLOSURE_SOURCE_COMPONENT =
+            "CASE";
+
     private static final String CASE_REVIEW_EVENT_TYPE =
             "CASE_REVIEW";
 
@@ -1253,19 +1268,61 @@ public class CaseService
     }
 
     @Override
-    @Transactional
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class,
+                    ValidationException.class
+            }
+    )
     public CaseResolutionResponse createCaseResolution(
             UUID caseId,
-            CaseResolutionRequest request) {
+            CaseResolutionRequest request,
+            SecurityContext securityContext) {
 
-        Case caseEntity =
-                getExistingCase(
-                        caseId
-                );
+        Objects.requireNonNull(
+                request,
+                "request is required"
+        );
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        requireCaseClosePermission(
+                securityContext,
+                caseId
+        );
+
+        Case caseEntity;
+
+        try {
+            caseEntity =
+                    getExistingCase(
+                            caseId
+                    );
+
+        } catch (ResourceNotFoundException exception) {
+
+            recordCaseClosureRejectedAudit(
+                    securityContext,
+                    caseId,
+                    "CASE_NOT_FOUND"
+            );
+
+            throw exception;
+        }
 
         if ("CLOSED".equals(
                 caseEntity.getCurrentStatus())
                 || caseEntity.getClosedAt() != null) {
+
+            recordCaseClosureRejectedAudit(
+                    securityContext,
+                    caseId,
+                    "CASE_ALREADY_CLOSED"
+            );
 
             throw new ValidationException(
                     "Case already closed: "
@@ -1279,70 +1336,91 @@ public class CaseService
         LocalDateTime now =
                 LocalDateTime.now();
 
-        CaseResolution resolution =
-                caseResolutionMapper.toEntity(
-                        request
-                );
+        try {
+            CaseResolution resolution =
+                    caseResolutionMapper.toEntity(
+                            request
+                    );
 
-        resolution.setCaseId(
-                caseId
-        );
+            resolution.setCaseId(
+                    caseId
+            );
 
-        resolution.setResolvedAt(
-                now
-        );
+            resolution.setResolvedAt(
+                    now
+            );
 
-        CaseResolution savedResolution =
-                caseResolutionRepository.save(
-                        resolution
-                );
+            CaseResolution savedResolution =
+                    caseResolutionRepository
+                            .saveAndFlush(
+                                    resolution
+                            );
 
-        caseEntity.setCurrentStatus(
-                "CLOSED"
-        );
+            caseEntity.setCurrentStatus(
+                    "CLOSED"
+            );
 
-        caseEntity.setClosedAt(
-                now
-        );
+            caseEntity.setClosedAt(
+                    now
+            );
 
-        caseEntity.setUpdatedAt(
-                now
-        );
+            caseEntity.setUpdatedAt(
+                    now
+            );
 
-        caseRepository.save(
-                caseEntity
-        );
+            caseRepository.saveAndFlush(
+                    caseEntity
+            );
 
-        CaseStatusHistory history =
-                new CaseStatusHistory();
+            CaseStatusHistory history =
+                    new CaseStatusHistory();
 
-        history.setCaseId(
-                caseId
-        );
+            history.setCaseId(
+                    caseId
+            );
 
-        history.setPreviousStatus(
-                previousStatus
-        );
+            history.setPreviousStatus(
+                    previousStatus
+            );
 
-        history.setCurrentStatus(
-                "CLOSED"
-        );
+            history.setCurrentStatus(
+                    "CLOSED"
+            );
 
-        history.setChangedBy(
-                request.getResolvedBy()
-        );
+            history.setChangedBy(
+                    request.getResolvedBy()
+            );
 
-        history.setChangedAt(
-                now
-        );
+            history.setChangedAt(
+                    now
+            );
 
-        caseStatusHistoryRepository.save(
-                history
-        );
+            caseStatusHistoryRepository
+                    .saveAndFlush(
+                            history
+                    );
 
-        return caseResolutionMapper.toResponse(
-                savedResolution
-        );
+            recordCaseClosureSuccessAudit(
+                    securityContext,
+                    caseId,
+                    savedResolution,
+                    previousStatus
+            );
+
+            return caseResolutionMapper.toResponse(
+                    savedResolution
+            );
+
+        } catch (RuntimeException exception) {
+
+            recordCaseClosureFailureAudit(
+                    securityContext,
+                    caseId,
+                    exception
+            );
+
+            throw exception;
+        }
     }
 
     @Override
@@ -2304,6 +2382,218 @@ public class CaseService
         criteria.put("direction", direction);
 
         return criteria;
+    }
+
+    private void requireCaseClosePermission(
+            SecurityContext securityContext,
+            UUID caseId) {
+
+        if (!securityContext.hasPermission(
+                CASE_CLOSE_PERMISSION
+        )) {
+
+            recordCaseClosureRejectedAudit(
+                    securityContext,
+                    caseId,
+                    "MISSING_PERMISSION"
+            );
+
+            throw new AccessDeniedException(
+                    "Missing required permission: "
+                            + CASE_CLOSE_PERMISSION
+            );
+        }
+    }
+
+    private void recordCaseClosureSuccessAudit(
+            SecurityContext securityContext,
+            UUID caseId,
+            CaseResolution resolution,
+            String previousStatus) {
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                CASE_CLOSE_PERMISSION
+        );
+
+        details.put(
+                "resolutionId",
+                resolution.getResolutionId()
+                        .toString()
+        );
+
+        details.put(
+                "resolutionType",
+                resolution.getResolutionType()
+        );
+
+        details.put(
+                "resolvedBy",
+                resolution.getResolvedBy()
+                        .toString()
+        );
+
+        details.put(
+                "approvedBy",
+                resolution.getApprovedBy() == null
+                        ? null
+                        : resolution.getApprovedBy()
+                                .toString()
+        );
+
+        details.put(
+                "previousStatus",
+                previousStatus
+        );
+
+        details.put(
+                "currentStatus",
+                "CLOSED"
+        );
+
+        details.put(
+                "closedAt",
+                resolution.getResolvedAt()
+                        .toString()
+        );
+
+        auditEventService.createAuditEvent(
+                buildCaseClosureAuditRequest(
+                        securityContext,
+                        caseId,
+                        "SUCCESS",
+                        null,
+                        details,
+                        null
+                )
+        );
+    }
+
+    private void recordCaseClosureRejectedAudit(
+            SecurityContext securityContext,
+            UUID caseId,
+            String reason) {
+
+        auditEventService
+                .createAuditEvent(
+                        buildCaseClosureAuditRequest(
+                                securityContext,
+                                caseId,
+                                "REJECTED",
+                                reason,
+                                null,
+                                null
+                        )
+                );
+    }
+
+    private void recordCaseClosureFailureAudit(
+            SecurityContext securityContext,
+            UUID caseId,
+            RuntimeException exception) {
+
+        auditEventService
+                .createAuditEventRequiresNew(
+                        buildCaseClosureAuditRequest(
+                                securityContext,
+                                caseId,
+                                "FAILURE",
+                                "CASE_CLOSURE_FAILED",
+                                null,
+                                exception
+                        )
+                );
+    }
+
+    private AuditEventRequest buildCaseClosureAuditRequest(
+            SecurityContext securityContext,
+            UUID caseId,
+            String eventResult,
+            String reason,
+            Map<String, Object> closureDetails,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        request.setTenantId(
+                securityContext.getTenantId()
+        );
+
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                CASE_CLOSURE_EVENT_TYPE
+        );
+
+        request.setEntityType(
+                CASE_CLOSURE_ENTITY_TYPE
+        );
+
+        request.setEntityId(
+                caseId
+        );
+
+        request.setAction(
+                CASE_CLOSURE_ACTION
+        );
+
+        request.setSourceComponent(
+                CASE_CLOSURE_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                CASE_CLOSE_PERMISSION
+        );
+
+        if (closureDetails != null) {
+            details.putAll(
+                    closureDetails
+            );
+        }
+
+        if (reason != null) {
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
+
+        if (exception != null) {
+            details.put(
+                    "errorType",
+                    exception.getClass()
+                            .getName()
+            );
+
+            details.put(
+                    "errorMessage",
+                    exception.getMessage()
+            );
+        }
+
+        request.setEventDetails(
+                details
+        );
+
+        return request;
     }
 
     private void requireCaseUpdatePermission(

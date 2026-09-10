@@ -101,7 +101,7 @@ class CaseControllerIntegrationTest {
                         null,
                         null,
                         Set.of(),
-                        Set.of("case.view"),
+                        Set.of("case.view", "case.close"),
                         Set.of()
                 )
         );
@@ -2895,4 +2895,144 @@ class CaseControllerIntegrationTest {
 
         return caseNotificationId;
     }
-}
+
+    @Test
+    void shouldRejectCaseClosureThroughApiWhenPermissionIsMissing()
+            throws Exception {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        ASSIGNED_FROM,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of("case.view"),
+                        Set.of()
+                )
+        );
+
+        UUID caseId =
+                UUID.randomUUID();
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO case_management.case (
+                    case_id,
+                    case_number,
+                    organization_id,
+                    case_type,
+                    category,
+                    severity,
+                    priority,
+                    current_status,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                )
+                """,
+                caseId,
+                "UC036-HTTP-"
+                        + UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8),
+                ORGANIZATION_ID,
+                "FRAUD_INVESTIGATION",
+                "TRANSACTION",
+                "MEDIUM",
+                "NORMAL",
+                "OPEN"
+        );
+
+        String requestBody =
+                """
+                {
+                    "resolutionType": "CONFIRMED_FRAUD",
+                    "resolutionSummary":
+                        "Investigation completed with documented resolution",
+                    "resolvedBy": "%s",
+                    "approvedBy": "%s"
+                }
+                """.formatted(
+                        ASSIGNED_FROM,
+                        ASSIGNED_FROM
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/cases/{caseId}/resolutions",
+                                caseId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        requestBody
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        assertEquals(
+                "OPEN",
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT current_status
+                        FROM case_management.case
+                        WHERE case_id = ?
+                        """,
+                        String.class,
+                        caseId
+                )
+        );
+
+        Integer resolutionCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_resolution
+                        WHERE case_id = ?
+                        """,
+                        Integer.class,
+                        caseId
+                );
+
+        assertEquals(
+                Integer.valueOf(0),
+                resolutionCount
+        );
+
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_type = 'CASE_CLOSURE'
+                          AND entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND action = 'CLOSE'
+                          AND source_component = 'CASE'
+                          AND event_result = 'REJECTED'
+                          AND event_details ->> 'reason' =
+                              'MISSING_PERMISSION'
+                          AND event_details ->> 'permissionCode' =
+                              'case.close'
+                        """,
+                        Integer.class,
+                        ASSIGNED_FROM,
+                        caseId
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
+    }}
