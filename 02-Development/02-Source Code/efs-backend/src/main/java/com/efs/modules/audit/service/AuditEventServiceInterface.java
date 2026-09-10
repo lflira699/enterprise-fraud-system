@@ -12,6 +12,9 @@ public interface AuditEventServiceInterface {
             AuditEventRequest request
     );
 
+    AuditEventResponse createAuditEventRequiresNew(
+            AuditEventRequest request
+    );
     AuditEventResponse getAuditEventById(
             UUID auditEventId
     );

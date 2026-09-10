@@ -7,6 +7,7 @@ import com.efs.modules.audit.mapper.AuditEventMapper;
 import com.efs.modules.audit.repository.AuditEventRepository;
 import com.efs.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -44,6 +45,32 @@ public class AuditEventService
                 auditEventRepository.save(auditEvent);
 
         return auditEventMapper.toResponse(savedAuditEvent);
+    }
+
+    @Override
+    @Transactional(
+            propagation = Propagation.REQUIRES_NEW
+    )
+    public AuditEventResponse createAuditEventRequiresNew(
+            AuditEventRequest request) {
+
+        AuditEvent auditEvent =
+                auditEventMapper.toEntity(
+                        request
+                );
+
+        auditEvent.setEventTimestamp(
+                LocalDateTime.now()
+        );
+
+        AuditEvent savedAuditEvent =
+                auditEventRepository.save(
+                        auditEvent
+                );
+
+        return auditEventMapper.toResponse(
+                savedAuditEvent
+        );
     }
 
     @Override

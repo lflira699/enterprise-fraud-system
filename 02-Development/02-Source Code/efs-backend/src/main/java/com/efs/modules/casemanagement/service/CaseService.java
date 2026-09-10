@@ -29,6 +29,7 @@ import com.efs.modules.casemanagement.dto.CaseSlaRequest;
 import com.efs.modules.casemanagement.dto.CaseSlaResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusHistoryResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
+import com.efs.modules.casemanagement.dto.CaseUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.modules.casemanagement.entity.Case;
@@ -120,6 +121,20 @@ public class CaseService
     private static final String CASE_VIEW_PERMISSION =
             "case.view";
 
+    private static final String CASE_UPDATE_PERMISSION =
+            "case.update";
+
+    private static final String CASE_UPDATE_EVENT_TYPE =
+            "CASE_UPDATE";
+
+    private static final String CASE_UPDATE_ENTITY_TYPE =
+            "CASE";
+
+    private static final String CASE_UPDATE_ACTION =
+            "UPDATE";
+
+    private static final String CASE_UPDATE_SOURCE_COMPONENT =
+            "CASE";
     private static final String CASE_REVIEW_EVENT_TYPE =
             "CASE_REVIEW";
 
@@ -1697,6 +1712,225 @@ public class CaseService
     }
 
     @Override
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class,
+                    RequestValidationException.class,
+                    ValidationException.class
+            }
+    )
+    public CaseResponse updateCase(
+            UUID caseId,
+            CaseUpdateRequest request,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                request,
+                "request is required"
+        );
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        requireCaseUpdatePermission(
+                securityContext,
+                caseId
+        );
+
+        Case caseEntity;
+
+        try {
+            caseEntity =
+                    getExistingCase(
+                            caseId
+                    );
+
+        } catch (ResourceNotFoundException exception) {
+
+            recordCaseUpdateAudit(
+                    securityContext,
+                    caseId,
+                    "REJECTED",
+                    "CASE_NOT_FOUND",
+                    null,
+                    null
+            );
+
+            throw exception;
+        }
+
+        if ("CLOSED".equals(
+                caseEntity.getCurrentStatus()
+        )) {
+
+            recordCaseUpdateAudit(
+                    securityContext,
+                    caseId,
+                    "REJECTED",
+                    "CASE_CLOSED",
+                    null,
+                    null
+            );
+
+            throw new ValidationException(
+                    "Closed case cannot be updated"
+            );
+        }
+
+        Map<String, Object> previousValue =
+                new LinkedHashMap<>();
+
+        Map<String, Object> currentValue =
+                new LinkedHashMap<>();
+
+        if (request.getPriority() != null) {
+
+            if (request.getPriority().isBlank()) {
+
+                recordCaseUpdateAudit(
+                        securityContext,
+                        caseId,
+                        "REJECTED",
+                        "INVALID_UPDATE_REQUEST",
+                        null,
+                        null
+                );
+
+                throw new RequestValidationException(
+                        "Priority cannot be blank"
+                );
+            }
+
+            previousValue.put(
+                    "priority",
+                    caseEntity.getPriority()
+            );
+
+            caseEntity.setPriority(
+                    request.getPriority()
+            );
+
+            currentValue.put(
+                    "priority",
+                    caseEntity.getPriority()
+            );
+        }
+
+        if (request.getDueDate() != null) {
+
+            previousValue.put(
+                    "dueDate",
+                    caseEntity.getDueDate() == null
+                            ? null
+                            : caseEntity.getDueDate()
+                                    .toString()
+            );
+
+            caseEntity.setDueDate(
+                    request.getDueDate()
+            );
+
+            currentValue.put(
+                    "dueDate",
+                    caseEntity.getDueDate()
+                            .toString()
+            );
+        }
+
+        if (currentValue.isEmpty()) {
+
+            recordCaseUpdateAudit(
+                    securityContext,
+                    caseId,
+                    "REJECTED",
+                    "INVALID_UPDATE_REQUEST",
+                    null,
+                    null
+            );
+
+            throw new RequestValidationException(
+                    "At least one case field is required for update"
+            );
+        }
+
+        caseEntity.setUpdatedAt(
+                LocalDateTime.now()
+        );
+
+        try {
+            Case savedCase =
+                    caseRepository.saveAndFlush(
+                            caseEntity
+                    );
+
+            AuditEventResponse auditEvent =
+                    recordCaseUpdateAudit(
+                            securityContext,
+                            caseId,
+                            "SUCCESS",
+                            null,
+                            currentValue,
+                            null
+                    );
+
+            AuditEntityChangeRequest
+                    entityChangeRequest =
+                    new AuditEntityChangeRequest();
+
+            entityChangeRequest.setAuditEventId(
+                    auditEvent.getAuditEventId()
+            );
+
+            entityChangeRequest.setEntityType(
+                    CASE_UPDATE_ENTITY_TYPE
+            );
+
+            entityChangeRequest.setEntityId(
+                    caseId
+            );
+
+            entityChangeRequest.setOperation(
+                    CASE_UPDATE_ACTION
+            );
+
+            entityChangeRequest.setPreviousValue(
+                    new LinkedHashMap<>(
+                            previousValue
+                    )
+            );
+
+            entityChangeRequest.setCurrentValue(
+                    new LinkedHashMap<>(
+                            currentValue
+                    )
+            );
+
+            auditEntityChangeService
+                    .createAuditEntityChange(
+                            entityChangeRequest
+                    );
+
+            return caseMapper.toResponse(
+                    savedCase
+            );
+
+        } catch (RuntimeException exception) {
+
+            recordCaseUpdateFailureAudit(
+                    securityContext,
+                    caseId,
+                    currentValue,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    @Override
     public CaseResponse getCaseById(
             UUID caseId,
             SecurityContext securityContext) {
@@ -2072,6 +2306,167 @@ public class CaseService
         return criteria;
     }
 
+    private void requireCaseUpdatePermission(
+            SecurityContext securityContext,
+            UUID caseId) {
+
+        if (!securityContext.hasPermission(
+                CASE_UPDATE_PERMISSION
+        )) {
+
+            recordCaseUpdateAudit(
+                    securityContext,
+                    caseId,
+                    "REJECTED",
+                    "MISSING_PERMISSION",
+                    null,
+                    null
+            );
+
+            throw new AccessDeniedException(
+                    "Missing required permission: "
+                            + CASE_UPDATE_PERMISSION
+            );
+        }
+    }
+
+    private AuditEventResponse recordCaseUpdateAudit(
+            SecurityContext securityContext,
+            UUID caseId,
+            String eventResult,
+            String reason,
+            Map<String, Object> currentValue,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                buildCaseUpdateAuditRequest(
+                        securityContext,
+                        caseId,
+                        eventResult,
+                        reason,
+                        currentValue,
+                        exception
+                );
+
+        return auditEventService.createAuditEvent(
+                request
+        );
+    }
+
+    private void recordCaseUpdateFailureAudit(
+            SecurityContext securityContext,
+            UUID caseId,
+            Map<String, Object> currentValue,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                buildCaseUpdateAuditRequest(
+                        securityContext,
+                        caseId,
+                        "FAILURE",
+                        "CASE_UPDATE_FAILED",
+                        currentValue,
+                        exception
+                );
+
+        auditEventService
+                .createAuditEventRequiresNew(
+                        request
+                );
+    }
+
+    private AuditEventRequest buildCaseUpdateAuditRequest(
+            SecurityContext securityContext,
+            UUID caseId,
+            String eventResult,
+            String reason,
+            Map<String, Object> currentValue,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        request.setTenantId(
+                securityContext.getTenantId()
+        );
+
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                CASE_UPDATE_EVENT_TYPE
+        );
+
+        request.setEntityType(
+                CASE_UPDATE_ENTITY_TYPE
+        );
+
+        request.setEntityId(
+                caseId
+        );
+
+        request.setAction(
+                CASE_UPDATE_ACTION
+        );
+
+        request.setSourceComponent(
+                CASE_UPDATE_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                CASE_UPDATE_PERMISSION
+        );
+
+        if (currentValue != null
+                && !currentValue.isEmpty()) {
+
+            details.put(
+                    "fields",
+                    new ArrayList<>(
+                            currentValue.keySet()
+                    )
+            );
+        }
+
+        if (reason != null) {
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
+
+        if (exception != null) {
+            details.put(
+                    "errorType",
+                    exception.getClass()
+                            .getName()
+            );
+
+            details.put(
+                    "errorMessage",
+                    exception.getMessage()
+            );
+        }
+
+        request.setEventDetails(
+                details
+        );
+
+        return request;
+    }
     private void requireCaseReviewPermission(
             SecurityContext securityContext,
             UUID caseId) {

@@ -22,6 +22,7 @@ import com.efs.modules.casemanagement.dto.CaseSlaRequest;
 import com.efs.modules.casemanagement.dto.CaseSlaResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusHistoryResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
+import com.efs.modules.casemanagement.dto.CaseUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.shared.pagination.PageResponse;
@@ -187,6 +188,11 @@ public interface CaseServiceInterface {
             SecurityContext securityContext
     );
 
+    CaseResponse updateCase(
+            UUID caseId,
+            CaseUpdateRequest request,
+            SecurityContext securityContext
+    );
     CaseResponse getCaseByNumber(
             String caseNumber
     );

@@ -22,6 +22,7 @@ import com.efs.modules.casemanagement.dto.CaseSlaRequest;
 import com.efs.modules.casemanagement.dto.CaseSlaResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusHistoryResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
+import com.efs.modules.casemanagement.dto.CaseUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.modules.casemanagement.service.CaseServiceInterface;
@@ -490,6 +491,23 @@ public class CaseController {
         );
     }
 
+    @PatchMapping("/{caseId}")
+    public ResponseEntity<CaseResponse> updateCase(
+            @PathVariable UUID caseId,
+            @Valid @RequestBody CaseUpdateRequest request) {
+
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        return ResponseEntity.ok(
+                caseService.updateCase(
+                        caseId,
+                        request,
+                        securityContext
+                )
+        );
+    }
     @GetMapping("/{caseId}")
     public ResponseEntity<CaseResponse> getCaseById(
             @PathVariable UUID caseId) {
