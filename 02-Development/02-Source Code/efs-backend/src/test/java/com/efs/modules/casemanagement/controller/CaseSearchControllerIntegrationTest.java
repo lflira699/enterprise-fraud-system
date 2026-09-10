@@ -1,17 +1,31 @@
 package com.efs.modules.casemanagement.controller;
 
+import com.efs.modules.audit.dto.AuditEventRequest;
+import com.efs.modules.audit.service.AuditEventServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -58,8 +72,21 @@ class CaseSearchControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private AuditEventServiceInterface auditEventService;
+
     @BeforeEach
     void setUp() {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                authorizedSecurityContext()
+        );
 
         jdbcTemplate.update(
                 """
@@ -593,6 +620,286 @@ class CaseSearchControllerIntegrationTest {
                                         "VALIDATION_ERROR"
                                 )
                 );
+    }
+
+    @Test
+    void shouldAuditSuccessfulInvestigationSearch()
+            throws Exception {
+
+        insertCase(
+                "CASE-SEARCH-AUDIT-001",
+                "OPEN",
+                "HIGH",
+                ASSIGNED_USER,
+                "FRAUD_INVESTIGATION",
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        1,
+                        12,
+                        0
+                )
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/cases")
+                                .param("status", "OPEN")
+                                .param("priority", "HIGH")
+                                .param(
+                                        "assignedUser",
+                                        ASSIGNED_USER.toString()
+                                )
+                                .param(
+                                        "assignedTeam",
+                                        "FRAUD_INVESTIGATION"
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.totalElements"
+                        ).value(1)
+                );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest audit =
+                captor.getValue();
+
+        assertEquals(
+                "INVESTIGATION_SEARCH",
+                audit.getEventType()
+        );
+
+        assertEquals(
+                "CASE",
+                audit.getEntityType()
+        );
+
+        assertNull(
+                audit.getEntityId()
+        );
+
+        assertEquals(
+                "SEARCH",
+                audit.getAction()
+        );
+
+        assertEquals(
+                "CASE",
+                audit.getSourceComponent()
+        );
+
+        assertEquals(
+                "SUCCESS",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                ASSIGNED_USER,
+                audit.getUserId()
+        );
+
+        assertEquals(
+                "case.view",
+                audit.getEventDetails()
+                        .get("permissionCode")
+        );
+
+        assertEquals(
+                1L,
+                ((Number) audit.getEventDetails()
+                        .get("resultCount"))
+                        .longValue()
+        );
+
+        Object criteriaObject =
+                audit.getEventDetails()
+                        .get("criteria");
+
+        assertTrue(
+                criteriaObject instanceof Map<?, ?>
+        );
+
+        Map<?, ?> criteria =
+                (Map<?, ?>) criteriaObject;
+
+        assertEquals(
+                "OPEN",
+                criteria.get("status")
+        );
+
+        assertEquals(
+                "HIGH",
+                criteria.get("priority")
+        );
+
+        assertEquals(
+                ASSIGNED_USER.toString(),
+                criteria.get("assignedUser")
+        );
+
+        assertEquals(
+                "FRAUD_INVESTIGATION",
+                criteria.get("assignedTeam")
+        );
+    }
+
+    @Test
+    void shouldAuditEmptyInvestigationSearchAsSuccess()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/api/v1/cases")
+                                .param("status", "CLOSED")
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.totalElements"
+                        ).value(0)
+                );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest audit =
+                captor.getValue();
+
+        assertEquals(
+                "SUCCESS",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                0L,
+                ((Number) audit.getEventDetails()
+                        .get("resultCount"))
+                        .longValue()
+        );
+    }
+
+    @Test
+    void shouldRejectInvestigationSearchWithoutPermission()
+            throws Exception {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                securityContextWithoutCaseView()
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/cases")
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest audit =
+                captor.getValue();
+
+        assertEquals(
+                "REJECTED",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                "MISSING_PERMISSION",
+                audit.getEventDetails()
+                        .get("reason")
+        );
+    }
+
+    @Test
+    void shouldAuditInvalidInvestigationSearchCriteria()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/api/v1/cases")
+                                .param("page", "-1")
+                )
+                .andExpect(
+                        status().isBadRequest()
+                );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest audit =
+                captor.getValue();
+
+        assertEquals(
+                "REJECTED",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                "INVALID_SEARCH_CRITERIA",
+                audit.getEventDetails()
+                        .get("reason")
+        );
+    }
+
+    private SecurityContext authorizedSecurityContext() {
+
+        return new SecurityContext(
+                ASSIGNED_USER,
+                null,
+                null,
+                Set.of(),
+                Set.of("case.view"),
+                Set.of()
+        );
+    }
+
+    private SecurityContext securityContextWithoutCaseView() {
+
+        return new SecurityContext(
+                ASSIGNED_USER,
+                null,
+                null,
+                Set.of(),
+                Set.of(),
+                Set.of()
+        );
     }
 
     private void insertUser(

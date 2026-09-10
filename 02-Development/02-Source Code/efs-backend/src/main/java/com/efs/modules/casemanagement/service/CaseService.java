@@ -71,11 +71,13 @@ import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.exception.ValidationException;
 import com.efs.shared.pagination.PageResponse;
+import com.efs.shared.security.SecurityContext;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,6 +86,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -113,6 +116,21 @@ public class CaseService
 
     private static final String SORT_DIRECTION_DESC =
             "DESC";
+
+    private static final String CASE_VIEW_PERMISSION =
+            "case.view";
+
+    private static final String INVESTIGATION_SEARCH_EVENT_TYPE =
+            "INVESTIGATION_SEARCH";
+
+    private static final String INVESTIGATION_SEARCH_ENTITY_TYPE =
+            "CASE";
+
+    private static final String INVESTIGATION_SEARCH_ACTION =
+            "SEARCH";
+
+    private static final String INVESTIGATION_SEARCH_SOURCE_COMPONENT =
+            "CASE";
 
     private final CaseRepository caseRepository;
     private final CaseAlertRepository caseAlertRepository;
@@ -1785,8 +1803,187 @@ public class CaseService
     }
 
     @Override
-    @Transactional(readOnly = true)
     public PageResponse<CaseResponse> searchCases(
+            String status,
+            String priority,
+            UUID assignedUser,
+            String assignedTeam,
+            int page,
+            int size,
+            String sort,
+            String direction,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> criteria =
+                investigationSearchCriteria(
+                        status,
+                        priority,
+                        assignedUser,
+                        assignedTeam,
+                        page,
+                        size,
+                        sort,
+                        direction
+                );
+
+        requireCaseViewPermission(
+                securityContext,
+                criteria
+        );
+
+        PageResponse<CaseResponse> response;
+
+        try {
+            validateCaseSearchRequest(
+                    page,
+                    size,
+                    sort,
+                    direction
+            );
+
+            Sort.Direction sortDirection =
+                    SORT_DIRECTION_ASC.equalsIgnoreCase(
+                            direction
+                    )
+                            ? Sort.Direction.ASC
+                            : Sort.Direction.DESC;
+
+            PageRequest pageRequest =
+                    PageRequest.of(
+                            page,
+                            size,
+                            Sort.by(
+                                    sortDirection,
+                                    sort
+                            )
+                    );
+
+            Specification<Case> specification =
+                    (root, query, criteriaBuilder) -> {
+
+                        List<Predicate> predicates =
+                                new ArrayList<>();
+
+                        if (hasText(status)) {
+                            predicates.add(
+                                    criteriaBuilder.equal(
+                                            root.get(
+                                                    "currentStatus"
+                                            ),
+                                            status
+                                    )
+                            );
+                        }
+
+                        if (hasText(priority)) {
+                            predicates.add(
+                                    criteriaBuilder.equal(
+                                            root.get(
+                                                    "priority"
+                                            ),
+                                            priority
+                                    )
+                            );
+                        }
+
+                        if (assignedUser != null) {
+                            predicates.add(
+                                    criteriaBuilder.equal(
+                                            root.get(
+                                                    "assignedUser"
+                                            ),
+                                            assignedUser
+                                    )
+                            );
+                        }
+
+                        if (hasText(assignedTeam)) {
+                            predicates.add(
+                                    criteriaBuilder.equal(
+                                            root.get(
+                                                    "assignedTeam"
+                                            ),
+                                            assignedTeam
+                                    )
+                            );
+                        }
+
+                        return criteriaBuilder.and(
+                                predicates.toArray(
+                                        new Predicate[0]
+                                )
+                        );
+                    };
+
+            Page<Case> casePage =
+                    caseRepository.findAll(
+                            specification,
+                            pageRequest
+                    );
+
+            List<CaseResponse> content =
+                    casePage
+                            .getContent()
+                            .stream()
+                            .map(caseMapper::toResponse)
+                            .toList();
+
+            response =
+                    new PageResponse<>(
+                            content,
+                            casePage.getNumber(),
+                            casePage.getSize(),
+                            casePage.getTotalElements(),
+                            casePage.getTotalPages(),
+                            casePage.hasNext(),
+                            casePage.hasPrevious()
+                    );
+        }
+        catch (RequestValidationException exception) {
+
+            recordInvestigationSearchAudit(
+                    securityContext,
+                    "REJECTED",
+                    "INVALID_SEARCH_CRITERIA",
+                    null,
+                    criteria,
+                    null
+            );
+
+            throw exception;
+        }
+        catch (RuntimeException exception) {
+
+            recordInvestigationSearchAudit(
+                    securityContext,
+                    "FAILURE",
+                    "INVESTIGATION_SEARCH_FAILED",
+                    null,
+                    criteria,
+                    exception
+            );
+
+            throw exception;
+        }
+
+        recordInvestigationSearchAudit(
+                securityContext,
+                "SUCCESS",
+                null,
+                response.getTotalElements(),
+                criteria,
+                null
+        );
+
+        return response;
+    }
+
+    private Map<String, Object> investigationSearchCriteria(
             String status,
             String priority,
             UUID assignedUser,
@@ -1796,108 +1993,143 @@ public class CaseService
             String sort,
             String direction) {
 
-        validateCaseSearchRequest(
-                page,
-                size,
-                sort,
-                direction
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put("status", status);
+        criteria.put("priority", priority);
+        criteria.put(
+                "assignedUser",
+                assignedUser == null
+                        ? null
+                        : assignedUser.toString()
+        );
+        criteria.put("assignedTeam", assignedTeam);
+        criteria.put("page", page);
+        criteria.put("size", size);
+        criteria.put("sort", sort);
+        criteria.put("direction", direction);
+
+        return criteria;
+    }
+
+    private void requireCaseViewPermission(
+            SecurityContext securityContext,
+            Map<String, Object> criteria) {
+
+        if (!securityContext.hasPermission(
+                CASE_VIEW_PERMISSION
+        )) {
+
+            recordInvestigationSearchAudit(
+                    securityContext,
+                    "REJECTED",
+                    "MISSING_PERMISSION",
+                    null,
+                    criteria,
+                    null
+            );
+
+            throw new AccessDeniedException(
+                    "Missing required permission: "
+                            + CASE_VIEW_PERMISSION
+            );
+        }
+    }
+
+    private void recordInvestigationSearchAudit(
+            SecurityContext securityContext,
+            String eventResult,
+            String reason,
+            Long resultCount,
+            Map<String, Object> criteria,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        request.setTenantId(
+                securityContext.getTenantId()
         );
 
-        Sort.Direction sortDirection =
-                SORT_DIRECTION_ASC.equalsIgnoreCase(
-                        direction
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                INVESTIGATION_SEARCH_EVENT_TYPE
+        );
+
+        request.setEntityType(
+                INVESTIGATION_SEARCH_ENTITY_TYPE
+        );
+
+        request.setEntityId(null);
+
+        request.setAction(
+                INVESTIGATION_SEARCH_ACTION
+        );
+
+        request.setSourceComponent(
+                INVESTIGATION_SEARCH_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                CASE_VIEW_PERMISSION
+        );
+
+        details.put(
+                "criteria",
+                new LinkedHashMap<>(
+                        criteria
                 )
-                        ? Sort.Direction.ASC
-                        : Sort.Direction.DESC;
+        );
 
-        PageRequest pageRequest =
-                PageRequest.of(
-                        page,
-                        size,
-                        Sort.by(
-                                sortDirection,
-                                sort
-                        )
-                );
+        if (reason != null) {
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
 
-        Specification<Case> specification =
-                (root, query, criteriaBuilder) -> {
+        if (resultCount != null) {
+            details.put(
+                    "resultCount",
+                    resultCount
+            );
+        }
 
-                    List<Predicate> predicates =
-                            new ArrayList<>();
+        if (exception != null) {
+            details.put(
+                    "errorType",
+                    exception.getClass()
+                            .getSimpleName()
+            );
 
-                    if (hasText(status)) {
-                        predicates.add(
-                                criteriaBuilder.equal(
-                                        root.get(
-                                                "currentStatus"
-                                        ),
-                                        status
-                                )
-                        );
-                    }
+            details.put(
+                    "errorMessage",
+                    exception.getMessage()
+            );
+        }
 
-                    if (hasText(priority)) {
-                        predicates.add(
-                                criteriaBuilder.equal(
-                                        root.get(
-                                                "priority"
-                                        ),
-                                        priority
-                                )
-                        );
-                    }
+        request.setEventDetails(
+                details
+        );
 
-                    if (assignedUser != null) {
-                        predicates.add(
-                                criteriaBuilder.equal(
-                                        root.get(
-                                                "assignedUser"
-                                        ),
-                                        assignedUser
-                                )
-                        );
-                    }
-
-                    if (hasText(assignedTeam)) {
-                        predicates.add(
-                                criteriaBuilder.equal(
-                                        root.get(
-                                                "assignedTeam"
-                                        ),
-                                        assignedTeam
-                                )
-                        );
-                    }
-
-                    return criteriaBuilder.and(
-                            predicates.toArray(
-                                    new Predicate[0]
-                            )
-                    );
-                };
-
-        Page<Case> casePage =
-                caseRepository.findAll(
-                        specification,
-                        pageRequest
-                );
-
-        List<CaseResponse> content =
-                casePage
-                        .getContent()
-                        .stream()
-                        .map(caseMapper::toResponse)
-                        .toList();
-
-        return new PageResponse<>(
-                content,
-                casePage.getNumber(),
-                casePage.getSize(),
-                casePage.getTotalElements(),
-                casePage.getTotalPages(),
-                casePage.hasNext(),
-                casePage.hasPrevious()
+        auditEventService.createAuditEvent(
+                request
         );
     }
 

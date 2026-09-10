@@ -26,6 +26,8 @@ import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
 import com.efs.modules.casemanagement.service.CaseServiceInterface;
 import com.efs.shared.pagination.PageResponse;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,11 +49,17 @@ public class CaseController {
 
     private final CaseServiceInterface caseService;
 
+    private final SecurityContextProvider securityContextProvider;
+
     public CaseController(
-            CaseServiceInterface caseService) {
+            CaseServiceInterface caseService,
+            SecurityContextProvider securityContextProvider) {
 
         this.caseService =
                 caseService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -539,6 +547,10 @@ public class CaseController {
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "DESC") String direction) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
                 caseService.searchCases(
                         status,
@@ -548,7 +560,8 @@ public class CaseController {
                         page,
                         size,
                         sort,
-                        direction
+                        direction,
+                        securityContext
                 )
         );
     }
