@@ -21,11 +21,9 @@ public class RiskAssessmentRequest {
     @Size(max = 40)
     private String assessmentStage;
 
-    @NotNull
     @DecimalMin("0.00")
     private BigDecimal overallRiskScore;
 
-    @NotNull
     @Size(max = 20)
     private String riskLevel;
 

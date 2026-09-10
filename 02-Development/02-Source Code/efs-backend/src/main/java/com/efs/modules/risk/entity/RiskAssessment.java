@@ -28,6 +28,9 @@ public class RiskAssessment {
     @Column(name = "transaction_id", nullable = false)
     private UUID transactionId;
 
+    @Column(name = "correlation_id")
+    private UUID correlationId;
+
     @Column(name = "assessment_type", nullable = false, length = 40)
     private String assessmentType;
 
@@ -122,6 +125,14 @@ public class RiskAssessment {
 
     public void setTransactionId(UUID transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public UUID getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(UUID correlationId) {
+        this.correlationId = correlationId;
     }
 
     public String getAssessmentType() {

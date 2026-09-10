@@ -101,6 +101,9 @@ public class RiskAssessmentService
     private final AuditEventServiceInterface
             auditEventService;
 
+    private final TransactionRiskAssessmentAuditService
+            transactionRiskAssessmentAuditService;
+
     public RiskAssessmentService(
             RiskAssessmentRepository riskAssessmentRepository,
             RiskAssessmentMapper riskAssessmentMapper,
@@ -108,7 +111,8 @@ public class RiskAssessmentService
             RiskScoringModelResolver riskScoringModelResolver,
             RiskCalculator riskCalculator,
             DomainEventOutboxService domainEventOutboxService,
-            AuditEventServiceInterface auditEventService) {
+            AuditEventServiceInterface auditEventService,
+            TransactionRiskAssessmentAuditService transactionRiskAssessmentAuditService) {
 
         this.riskAssessmentRepository =
                 riskAssessmentRepository;
@@ -130,6 +134,9 @@ public class RiskAssessmentService
 
         this.auditEventService =
                 auditEventService;
+
+        this.transactionRiskAssessmentAuditService =
+                transactionRiskAssessmentAuditService;
     }
 
     @Override
@@ -140,7 +147,11 @@ public class RiskAssessmentService
         long startedAtNanos =
                 System.nanoTime();
 
-        Transaction transaction =
+        Transaction transaction = null;
+
+        try {
+
+            transaction =
                 transactionRepository
                         .findByTransactionIdAndDeletedAtIsNull(
                                 request.getTransactionId()
@@ -177,10 +188,19 @@ public class RiskAssessmentService
         RiskAssessment reusableAssessment =
                 findReusableAssessment(
                         request,
-                        calculation
+                        calculation,
+                        transaction.getCorrelationId()
                 );
 
         if (reusableAssessment != null) {
+
+            recordAssessmentSuccessAudit(
+                    reusableAssessment,
+                    calculation,
+                    transaction,
+                    true
+            );
+
             return riskAssessmentMapper.toResponse(
                     reusableAssessment
             );
@@ -188,6 +208,10 @@ public class RiskAssessmentService
 
         RiskAssessment assessment =
                 riskAssessmentMapper.toEntity(request);
+
+        assessment.setCorrelationId(
+                transaction.getCorrelationId()
+        );
 
         assessment.setOverallRiskScore(
                 calculation.overallRiskScore()
@@ -222,9 +246,251 @@ public class RiskAssessmentService
                 transaction
         );
 
+        recordAssessmentSuccessAudit(
+                savedAssessment,
+                calculation,
+                transaction,
+                false
+        );
+
         return riskAssessmentMapper.toResponse(
                 savedAssessment
         );
+        }
+        catch (ResourceNotFoundException exception) {
+
+            throw exception;
+        }
+        catch (IllegalArgumentException exception) {
+
+            if (isMissingEnabledFactor(exception)) {
+
+                transactionRiskAssessmentAuditService
+                        .recordRejected(
+                                request.getTransactionId(),
+                                auditCorrelationId(transaction),
+                                "TRANSACTION_INFORMATION_INSUFFICIENT",
+                                exception
+                        );
+            }
+            else {
+
+                transactionRiskAssessmentAuditService
+                        .recordFailure(
+                                request.getTransactionId(),
+                                auditCorrelationId(transaction),
+                                "TRANSACTION_RISK_ASSESSMENT_FAILED",
+                                exception
+                        );
+            }
+
+            throw exception;
+        }
+        catch (IllegalStateException exception) {
+
+            if (isCorrelationIdRequired(exception)) {
+
+                transactionRiskAssessmentAuditService
+                        .recordRejected(
+                                request.getTransactionId(),
+                                null,
+                                "TRANSACTION_CORRELATION_ID_REQUIRED",
+                                exception
+                        );
+            }
+            else if (isRiskConfigurationUnavailable(exception)) {
+
+                transactionRiskAssessmentAuditService
+                        .recordRejected(
+                                request.getTransactionId(),
+                                auditCorrelationId(transaction),
+                                "RISK_EVALUATION_RULES_UNAVAILABLE",
+                                exception
+                        );
+            }
+            else {
+
+                transactionRiskAssessmentAuditService
+                        .recordFailure(
+                                request.getTransactionId(),
+                                auditCorrelationId(transaction),
+                                "TRANSACTION_RISK_ASSESSMENT_FAILED",
+                                exception
+                        );
+            }
+
+            throw exception;
+        }
+        catch (RuntimeException exception) {
+
+            transactionRiskAssessmentAuditService
+                    .recordFailure(
+                            request.getTransactionId(),
+                            auditCorrelationId(transaction),
+                            "TRANSACTION_RISK_ASSESSMENT_FAILED",
+                            exception
+                    );
+
+            throw exception;
+        }
+    }
+
+    private void recordAssessmentSuccessAudit(
+            RiskAssessment assessment,
+            RiskCalculationResult calculation,
+            Transaction transaction,
+            boolean reused) {
+
+        Map<String, Object> factorScores =
+                new HashMap<>();
+
+        Map<String, Object> factorWeights =
+                new HashMap<>();
+
+        calculation.factorContributions()
+                .forEach(contribution -> {
+
+                    factorScores.put(
+                            contribution.factorCode(),
+                            contribution.score()
+                    );
+
+                    factorWeights.put(
+                            contribution.factorCode(),
+                            contribution.weight()
+                    );
+                });
+
+        Map<String, Object> eventDetails =
+                new HashMap<>();
+
+        eventDetails.put(
+                "transactionId",
+                transaction.getTransactionId().toString()
+        );
+
+        eventDetails.put(
+                "riskAssessmentId",
+                assessment.getRiskAssessmentId().toString()
+        );
+
+        eventDetails.put(
+                "modelName",
+                calculation.modelName()
+        );
+
+        eventDetails.put(
+                "modelVersion",
+                calculation.modelVersion()
+        );
+
+        eventDetails.put(
+                "factorScores",
+                factorScores
+        );
+
+        eventDetails.put(
+                "factorWeights",
+                factorWeights
+        );
+
+        eventDetails.put(
+                "overallRiskScore",
+                calculation.overallRiskScore()
+        );
+
+        eventDetails.put(
+                "riskLevel",
+                calculation.riskLevel()
+        );
+
+        eventDetails.put(
+                "reused",
+                reused
+        );
+
+        AuditEventRequest auditEventRequest =
+                new AuditEventRequest();
+
+        auditEventRequest.setEventType(
+                "TRANSACTION_RISK_ASSESSED"
+        );
+
+        auditEventRequest.setEntityType(
+                "RISK_ASSESSMENT"
+        );
+
+        auditEventRequest.setEntityId(
+                assessment.getRiskAssessmentId()
+        );
+
+        auditEventRequest.setAction(
+                "CALCULATE"
+        );
+
+        auditEventRequest.setSourceComponent(
+                "RISK_ENGINE"
+        );
+
+        auditEventRequest.setCorrelationId(
+                transaction.getCorrelationId()
+        );
+
+        auditEventRequest.setEventResult(
+                "SUCCESS"
+        );
+
+        auditEventRequest.setEventDetails(
+                eventDetails
+        );
+
+        auditEventService.createAuditEvent(
+                auditEventRequest
+        );
+    }
+
+    private UUID auditCorrelationId(
+            Transaction transaction) {
+
+        return transaction == null
+                ? null
+                : transaction.getCorrelationId();
+    }
+
+    private boolean isMissingEnabledFactor(
+            IllegalArgumentException exception) {
+
+        String message =
+                exception.getMessage();
+
+        return message != null
+                && message.startsWith(
+                        "Risk score is required for enabled factor:"
+                );
+    }
+
+    private boolean isRiskConfigurationUnavailable(
+            IllegalStateException exception) {
+
+        String message =
+                exception.getMessage();
+
+        return message != null
+                && message.startsWith(
+                        "Required risk configuration is unavailable:"
+                );
+    }
+
+    private boolean isCorrelationIdRequired(
+            IllegalStateException exception) {
+
+        String message =
+                exception.getMessage();
+
+        return message != null
+                && message.startsWith(
+                        "Transaction correlationId is required "
+                );
     }
 
     private Map<String, BigDecimal> buildFactorScores(
@@ -263,7 +529,8 @@ public class RiskAssessmentService
 
     private RiskAssessment findReusableAssessment(
             RiskAssessmentRequest request,
-            RiskCalculationResult calculation) {
+            RiskCalculationResult calculation,
+            UUID correlationId) {
 
         return riskAssessmentRepository
                 .findByTransactionIdAndAssessmentTypeOrderByAssessmentTimestampDesc(
@@ -271,6 +538,13 @@ public class RiskAssessmentService
                         request.getAssessmentType()
                 )
                 .stream()
+                .filter(
+                        assessment ->
+                                Objects.equals(
+                                        assessment.getCorrelationId(),
+                                        correlationId
+                                )
+                )
                 .filter(
                         assessment ->
                                 Objects.equals(
