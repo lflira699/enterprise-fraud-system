@@ -2,6 +2,8 @@ package com.efs.e2e;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,13 +11,16 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +39,9 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
 
     private UUID organizationId;
     private UUID customerId;
@@ -72,6 +80,53 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
                 "GT",
                 "America/Guatemala",
                 "ACTIVE"
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status,
+                    failed_login_attempts
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                createdBy,
+                organizationId,
+                "efs.e2e."
+                        + createdBy
+                                .toString()
+                                .substring(0, 8),
+                "EFS End To End User",
+                "efs.e2e."
+                        + createdBy
+                                .toString()
+                                .substring(0, 8)
+                        + "@example.com",
+                "LOCAL",
+                false,
+                "ACTIVE",
+                0
+        );
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        createdBy,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of("case.view"),
+                        Set.of()
+                )
         );
 
         jdbcTemplate.update(

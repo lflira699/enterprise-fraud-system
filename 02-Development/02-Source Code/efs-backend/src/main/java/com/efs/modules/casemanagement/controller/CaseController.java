@@ -494,9 +494,14 @@ public class CaseController {
     public ResponseEntity<CaseResponse> getCaseById(
             @PathVariable UUID caseId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
                 caseService.getCaseById(
-                        caseId
+                        caseId,
+                        securityContext
                 )
         );
     }

@@ -183,7 +183,8 @@ public interface CaseServiceInterface {
     );
 
     CaseResponse getCaseById(
-            UUID caseId
+            UUID caseId,
+            SecurityContext securityContext
     );
 
     CaseResponse getCaseByNumber(

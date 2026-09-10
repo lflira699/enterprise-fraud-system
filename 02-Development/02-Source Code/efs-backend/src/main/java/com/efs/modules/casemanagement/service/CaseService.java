@@ -120,6 +120,18 @@ public class CaseService
     private static final String CASE_VIEW_PERMISSION =
             "case.view";
 
+    private static final String CASE_REVIEW_EVENT_TYPE =
+            "CASE_REVIEW";
+
+    private static final String CASE_REVIEW_ENTITY_TYPE =
+            "CASE";
+
+    private static final String CASE_REVIEW_ACTION =
+            "REVIEW";
+
+    private static final String CASE_REVIEW_SOURCE_COMPONENT =
+            "CASE";
+
     private static final String INVESTIGATION_SEARCH_EVENT_TYPE =
             "INVESTIGATION_SEARCH";
 
@@ -1685,15 +1697,62 @@ public class CaseService
     }
 
     @Override
-    @Transactional(readOnly = true)
     public CaseResponse getCaseById(
-            UUID caseId) {
+            UUID caseId,
+            SecurityContext securityContext) {
 
-        return caseMapper.toResponse(
-                getExistingCase(
-                        caseId
-                )
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
         );
+
+        requireCaseReviewPermission(
+                securityContext,
+                caseId
+        );
+
+        try {
+            CaseResponse response =
+                    caseMapper.toResponse(
+                            getExistingCase(
+                                    caseId
+                            )
+                    );
+
+            recordCaseReviewAudit(
+                    securityContext,
+                    caseId,
+                    "SUCCESS",
+                    null,
+                    null
+            );
+
+            return response;
+
+        } catch (ResourceNotFoundException exception) {
+
+            recordCaseReviewAudit(
+                    securityContext,
+                    caseId,
+                    "REJECTED",
+                    "CASE_NOT_FOUND",
+                    null
+            );
+
+            throw exception;
+
+        } catch (RuntimeException exception) {
+
+            recordCaseReviewAudit(
+                    securityContext,
+                    caseId,
+                    "FAILURE",
+                    "CASE_REVIEW_FAILED",
+                    exception
+            );
+
+            throw exception;
+        }
     }
 
     @Override
@@ -2011,6 +2070,111 @@ public class CaseService
         criteria.put("direction", direction);
 
         return criteria;
+    }
+
+    private void requireCaseReviewPermission(
+            SecurityContext securityContext,
+            UUID caseId) {
+
+        if (!securityContext.hasPermission(
+                CASE_VIEW_PERMISSION
+        )) {
+
+            recordCaseReviewAudit(
+                    securityContext,
+                    caseId,
+                    "REJECTED",
+                    "MISSING_PERMISSION",
+                    null
+            );
+
+            throw new AccessDeniedException(
+                    "Missing required permission: "
+                            + CASE_VIEW_PERMISSION
+            );
+        }
+    }
+
+    private void recordCaseReviewAudit(
+            SecurityContext securityContext,
+            UUID caseId,
+            String eventResult,
+            String reason,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        request.setTenantId(
+                securityContext.getTenantId()
+        );
+
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                CASE_REVIEW_EVENT_TYPE
+        );
+
+        request.setEntityType(
+                CASE_REVIEW_ENTITY_TYPE
+        );
+
+        request.setEntityId(
+                caseId
+        );
+
+        request.setAction(
+                CASE_REVIEW_ACTION
+        );
+
+        request.setSourceComponent(
+                CASE_REVIEW_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                CASE_VIEW_PERMISSION
+        );
+
+        if (reason != null) {
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
+
+        if (exception != null) {
+            details.put(
+                    "errorType",
+                    exception.getClass().getName()
+            );
+
+            details.put(
+                    "errorMessage",
+                    exception.getMessage()
+            );
+        }
+
+        request.setEventDetails(
+                details
+        );
+
+        auditEventService.createAuditEvent(
+                request
+        );
     }
 
     private void requireCaseViewPermission(

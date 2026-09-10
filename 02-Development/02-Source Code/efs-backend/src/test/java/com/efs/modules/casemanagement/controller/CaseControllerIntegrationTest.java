@@ -416,6 +416,31 @@ class CaseControllerIntegrationTest {
                 updatedAtBefore,
                 updatedAtAfter
         );
+
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_type = 'CASE_REVIEW'
+                          AND entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND action = 'REVIEW'
+                          AND source_component = 'CASE'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'case.view'
+                        """,
+                        Integer.class,
+                        ASSIGNED_FROM,
+                        caseId
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
     }
 
     @Test
@@ -431,6 +456,37 @@ class CaseControllerIntegrationTest {
                 )
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void shouldRejectCaseReviewWhenCaseViewPermissionIsMissing()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-REVIEW-PERMISSION-API-001"
+                );
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        ASSIGNED_FROM,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(),
+                        Set.of()
+                )
+        );
+
+        mockMvc.perform(
+                        get("/api/v1/cases/{caseId}",
+                                caseId)
+                )
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void shouldRetrieveCaseByNumberThroughApi() throws Exception {
 

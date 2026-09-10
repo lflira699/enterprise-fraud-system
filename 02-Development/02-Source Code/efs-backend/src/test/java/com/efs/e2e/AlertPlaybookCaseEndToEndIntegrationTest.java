@@ -6,6 +6,8 @@ import com.efs.modules.playbook.dto.PlaybookVersionRequest;
 import com.efs.modules.playbook.dto.PlaybookVersionResponse;
 import com.efs.modules.playbook.service.PlaybookServiceInterface;
 import com.efs.modules.playbook.service.PlaybookVersionServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,16 +16,19 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -81,6 +86,9 @@ class AlertPlaybookCaseEndToEndIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
     @Autowired
     private PlaybookServiceInterface playbookService;
 
@@ -93,6 +101,21 @@ class AlertPlaybookCaseEndToEndIntegrationTest {
 
         insertOrganization();
         insertUser();
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        CREATED_BY,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of("case.view"),
+                        Set.of()
+                )
+        );
+
         insertCustomer();
         insertTransaction();
         insertRiskAssessment();

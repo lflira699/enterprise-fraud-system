@@ -25,6 +25,7 @@ import com.efs.modules.casemanagement.dto.CaseStatusHistoryResponse;
 import com.efs.modules.casemanagement.dto.CaseStatusUpdateRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskRequest;
 import com.efs.modules.casemanagement.dto.CaseTaskResponse;
+import com.efs.shared.security.SecurityContext;
 import com.efs.shared.exception.DuplicateRecordException;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,6 +96,16 @@ class CaseServiceIntegrationTest {
     private static final UUID ASSIGNED_TO =
             UUID.fromString(
                     "99999999-cccc-9999-cccc-999999999999"
+            );
+
+    private static final SecurityContext CASE_VIEW_SECURITY_CONTEXT =
+            new SecurityContext(
+                    ASSIGNED_FROM,
+                    null,
+                    null,
+                    Set.of(),
+                    Set.of("case.view"),
+                    Set.of()
             );
 
     @Autowired
@@ -670,7 +682,8 @@ class CaseServiceIntegrationTest {
 
         CaseResponse updated =
                 service.getCaseById(
-                        created.getCaseId()
+                        created.getCaseId(),
+                        CASE_VIEW_SECURITY_CONTEXT
                 );
 
         assertEquals(ASSIGNED_TO, updated.getAssignedUser());
@@ -773,7 +786,8 @@ class CaseServiceIntegrationTest {
 
         CaseResponse persistedCase =
                 service.getCaseById(
-                        created.getCaseId()
+                        created.getCaseId(),
+                        CASE_VIEW_SECURITY_CONTEXT
                 );
 
         assertEquals(
