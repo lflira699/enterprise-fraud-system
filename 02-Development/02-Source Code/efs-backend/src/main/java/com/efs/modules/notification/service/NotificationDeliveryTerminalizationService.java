@@ -64,6 +64,12 @@ public class NotificationDeliveryTerminalizationService {
     private static final String AUDIT_RESULT_SUCCESS =
             "SUCCESS";
 
+    private static final String AUDIT_RESULT_FAILURE =
+            "FAILURE";
+
+    private static final String NOTIFICATION_DELIVERY_FAILED =
+            "NOTIFICATION_DELIVERY_FAILED";
+
     private static final String OUTBOUND_EVENT_TYPE =
             "NotificationDeliveryCompleted";
 
@@ -337,6 +343,293 @@ public class NotificationDeliveryTerminalizationService {
         );
     }
 
+    @Transactional
+    public void completeUnexpectedFailure(
+            UUID notificationId,
+            NotificationRequestedEventMessage message,
+            Map<UUID, ExternalNotificationDeliveryResult>
+                    confirmedResults,
+            UUID failedDeliveryId) {
+
+        requireUnexpectedFailureInputs(
+                notificationId,
+                message,
+                confirmedResults,
+                failedDeliveryId
+        );
+
+        Notification notification =
+                notificationRepository
+                        .findByNotificationIdForUpdate(
+                                notificationId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Notification not found: "
+                                                        + notificationId
+                                        )
+                        );
+
+        requireProcessingNotification(
+                notification
+        );
+
+        requireMessageContext(
+                notification,
+                message
+        );
+
+        List<NotificationRecipientDelivery> deliveries =
+                notificationRecipientDeliveryRepository
+                        .findByNotificationIdOrderByCreatedAtAsc(
+                                notificationId
+                        );
+
+        requireUnexpectedFailureResults(
+                notification,
+                deliveries,
+                confirmedResults,
+                failedDeliveryId
+        );
+
+        LocalDateTime processedAt =
+                LocalDateTime.now();
+
+        long deliveredCount =
+                0L;
+
+        for (
+                NotificationRecipientDelivery delivery
+                : deliveries
+        ) {
+
+            ExternalNotificationDeliveryResult confirmedResult =
+                    confirmedResults.get(
+                            delivery.getNotificationDeliveryId()
+                    );
+
+            if (confirmedResult != null) {
+
+                if (confirmedResult.isDelivered()) {
+
+                    delivery.setDeliveryStatus(
+                            "DELIVERED"
+                    );
+
+                    deliveredCount++;
+
+                } else {
+
+                    delivery.setDeliveryStatus(
+                            DELIVERY_STATUS_FAILED
+                    );
+                }
+
+                delivery.setDeliveryReference(
+                        confirmedResult.getDeliveryReference()
+                );
+
+                delivery.setDeliveryResult(
+                        confirmedResult.getDeliveryResult()
+                );
+
+            } else {
+
+                delivery.setDeliveryStatus(
+                        DELIVERY_STATUS_FAILED
+                );
+
+                delivery.setDeliveryReference(
+                        null
+                );
+
+                delivery.setDeliveryResult(
+                        NOTIFICATION_DELIVERY_FAILED
+                );
+            }
+
+            delivery.setProcessedAt(
+                    processedAt
+            );
+        }
+
+        notificationRecipientDeliveryRepository
+                .saveAll(
+                        deliveries
+                );
+
+        notification.setNotificationStatus(
+                deriveTerminalStatus(
+                        deliveredCount,
+                        deliveries.size()
+                )
+        );
+
+        notification.setProcessedAt(
+                processedAt
+        );
+
+        notificationRepository.save(
+                notification
+        );
+
+        recordFailureAudit(
+                notification
+        );
+
+        persistCompletionEvent(
+                notification,
+                message,
+                deliveries
+        );
+    }
+
+    private void requireUnexpectedFailureInputs(
+            UUID notificationId,
+            NotificationRequestedEventMessage message,
+            Map<UUID, ExternalNotificationDeliveryResult>
+                    confirmedResults,
+            UUID failedDeliveryId) {
+
+        if (notificationId == null) {
+            throw new IllegalArgumentException(
+                    "Notification id is required"
+            );
+        }
+
+        if (message == null) {
+            throw new IllegalArgumentException(
+                    "NotificationRequested event message is required"
+            );
+        }
+
+        if (confirmedResults == null) {
+            throw new IllegalArgumentException(
+                    "Confirmed delivery results are required"
+            );
+        }
+
+        if (failedDeliveryId == null) {
+            throw new IllegalArgumentException(
+                    "Failed delivery id is required"
+            );
+        }
+
+        if (confirmedResults.containsKey(
+                failedDeliveryId
+        )) {
+
+            throw new IllegalArgumentException(
+                    "Failed delivery must not already have "
+                            + "a confirmed result"
+            );
+        }
+    }
+
+    private void requireUnexpectedFailureResults(
+            Notification notification,
+            List<NotificationRecipientDelivery> deliveries,
+            Map<UUID, ExternalNotificationDeliveryResult>
+                    confirmedResults,
+            UUID failedDeliveryId) {
+
+        if (deliveries.isEmpty()) {
+            throw new IllegalStateException(
+                    "Notification deliveries are required"
+            );
+        }
+
+        boolean failedDeliveryFound =
+                false;
+
+        Map<UUID, NotificationRecipientDelivery>
+                deliveriesById =
+                new LinkedHashMap<>();
+
+        for (
+                NotificationRecipientDelivery delivery
+                : deliveries
+        ) {
+
+            if (delivery == null) {
+                throw new IllegalStateException(
+                        "Notification delivery must not be null"
+                );
+            }
+
+            if (!Objects.equals(
+                    notification.getNotificationId(),
+                    delivery.getNotificationId()
+            )) {
+
+                throw new IllegalStateException(
+                        "Notification delivery belongs "
+                                + "to a different Notification"
+                );
+            }
+
+            if (!DELIVERY_STATUS_PENDING.equals(
+                    delivery.getDeliveryStatus()
+            )) {
+
+                throw new IllegalStateException(
+                        "Notification delivery must be PENDING "
+                                + "before unexpected failure terminalization"
+                );
+            }
+
+            UUID deliveryId =
+                    delivery.getNotificationDeliveryId();
+
+            if (deliveryId == null) {
+                throw new IllegalStateException(
+                        "Notification delivery id is required"
+                );
+            }
+
+            deliveriesById.put(
+                    deliveryId,
+                    delivery
+            );
+
+            if (deliveryId.equals(
+                    failedDeliveryId
+            )) {
+
+                failedDeliveryFound =
+                        true;
+            }
+        }
+
+        if (!failedDeliveryFound) {
+            throw new IllegalStateException(
+                    "Failed delivery does not belong "
+                            + "to Notification"
+            );
+        }
+
+        for (
+                Map.Entry<
+                        UUID,
+                        ExternalNotificationDeliveryResult
+                        > entry
+                : confirmedResults.entrySet()
+        ) {
+
+            if (entry.getKey() == null
+                    || entry.getValue() == null
+                    || !deliveriesById.containsKey(
+                            entry.getKey()
+                    )) {
+
+                throw new IllegalStateException(
+                        "Confirmed result references "
+                                + "an invalid Notification delivery"
+                );
+            }
+        }
+    }
     private void requireCompletionInputs(
             UUID notificationId,
             NotificationRequestedEventMessage message,
@@ -606,6 +899,19 @@ public class NotificationDeliveryTerminalizationService {
                 notification,
                 AUDIT_RESULT_SUCCESS,
                 Map.of()
+        );
+    }
+
+    private void recordFailureAudit(
+            Notification notification) {
+
+        recordAudit(
+                notification,
+                AUDIT_RESULT_FAILURE,
+                Map.of(
+                        "reason",
+                        NOTIFICATION_DELIVERY_FAILED
+                )
         );
     }
 
