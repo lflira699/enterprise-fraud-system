@@ -2,6 +2,8 @@ package com.efs.modules.catalog.service;
 
 import com.efs.modules.catalog.dto.NotificationTemplateRequest;
 import com.efs.modules.catalog.dto.NotificationTemplateResponse;
+import com.efs.modules.catalog.dto.NotificationTemplateUpdateRequest;
+import com.efs.shared.security.SecurityContext;
 
 import java.util.List;
 import java.util.UUID;
@@ -10,6 +12,12 @@ public interface NotificationTemplateServiceInterface {
 
     NotificationTemplateResponse createNotificationTemplate(
             NotificationTemplateRequest request
+    );
+
+    NotificationTemplateResponse updateNotificationTemplate(
+            UUID notificationTemplateId,
+            NotificationTemplateUpdateRequest request,
+            SecurityContext securityContext
     );
 
     NotificationTemplateResponse getNotificationTemplateById(
