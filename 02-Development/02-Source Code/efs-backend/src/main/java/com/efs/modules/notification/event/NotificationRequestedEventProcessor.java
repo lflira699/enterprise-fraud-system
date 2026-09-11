@@ -131,7 +131,7 @@ public class NotificationRequestedEventProcessor {
     }
 
     @Transactional
-    public void process(
+    public NotificationRequestedProcessingResult process(
             NotificationRequestedEventMessage message) {
 
         if (message == null) {
@@ -148,7 +148,8 @@ public class NotificationRequestedEventProcessor {
                 );
 
         if (!registered) {
-            return;
+            return NotificationRequestedProcessingResult
+                    .duplicate();
         }
 
         Notification notification =
@@ -178,7 +179,10 @@ public class NotificationRequestedEventProcessor {
                     NO_AUTHORIZED_RECIPIENTS
             );
 
-            return;
+            return NotificationRequestedProcessingResult
+                    .terminal(
+                            notification.getNotificationId()
+                    );
         }
 
         NotificationTemplateResponse template;
@@ -203,7 +207,10 @@ public class NotificationRequestedEventProcessor {
                     DELIVERY_CONFIGURATION_UNAVAILABLE
             );
 
-            return;
+            return NotificationRequestedProcessingResult
+                    .terminal(
+                            notification.getNotificationId()
+                    );
         }
 
         if (template.getNotificationTemplateId() == null
@@ -217,7 +224,10 @@ public class NotificationRequestedEventProcessor {
                     DELIVERY_CONFIGURATION_UNAVAILABLE
             );
 
-            return;
+            return NotificationRequestedProcessingResult
+                    .terminal(
+                            notification.getNotificationId()
+                    );
         }
 
         notification.setNotificationTemplateId(
@@ -268,7 +278,11 @@ public class NotificationRequestedEventProcessor {
                 .saveAll(
                         deliveries
                 );
-    }
+
+        return NotificationRequestedProcessingResult
+                .ready(
+                        notification.getNotificationId()
+                );    }
 
     private Notification createPendingNotification(
             NotificationRequestedEventMessage message) {
