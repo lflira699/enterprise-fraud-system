@@ -41,6 +41,11 @@ class NotificationRequestedEventParserTest {
                     "16616616-6166-4166-8166-166166166166"
             );
 
+    private static final UUID LANGUAGE_ID =
+            UUID.fromString(
+                    "16716716-7167-4167-8167-167167167167"
+            );
+
     private final NotificationRequestedEventParser parser =
             new NotificationRequestedEventParser(
                     new ObjectMapper()
@@ -75,6 +80,16 @@ class NotificationRequestedEventParserTest {
         assertEquals(
                 "CASE_STATUS_CHANGED",
                 message.templateCode()
+        );
+
+        assertEquals(
+                "EMAIL",
+                message.channel()
+        );
+
+        assertEquals(
+                LANGUAGE_ID,
+                message.languageId()
         );
 
         assertEquals(
@@ -146,8 +161,52 @@ class NotificationRequestedEventParserTest {
         String body =
                 validEvent()
                         .replace(
-                                "\"schemaVersion\":\"1.0\"",
-                                "\"schemaVersion\":\"2.0\""
+                                "\"schemaVersion\":\"1.1\"",
+                                "\"schemaVersion\":\"1.0\""
+                        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        parser.parse(
+                                body.getBytes(
+                                        StandardCharsets.UTF_8
+                                )
+                        )
+        );
+    }
+
+    @Test
+    void shouldRejectMissingChannel() {
+
+        String body =
+                validEvent()
+                        .replace(
+                                "\"channel\":\"EMAIL\",",
+                                ""
+                        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        parser.parse(
+                                body.getBytes(
+                                        StandardCharsets.UTF_8
+                                )
+                        )
+        );
+    }
+
+    @Test
+    void shouldRejectMissingLanguageId() {
+
+        String body =
+                validEvent()
+                        .replace(
+                                "\"languageId\":\""
+                                        + LANGUAGE_ID
+                                        + "\",",
+                                ""
                         );
 
         assertThrows(
@@ -211,13 +270,15 @@ class NotificationRequestedEventParserTest {
                 {
                   "messageId":"%s",
                   "eventType":"NotificationRequested",
-                  "schemaVersion":"1.0",
+                  "schemaVersion":"1.1",
                   "occurredAt":"2026-09-11T12:00:00",
                   "producer":"CASE",
                   "correlationId":"%s",
                   "payload":{
                     "notificationType":"CASE_STATUS_CHANGED",
                     "templateCode":"CASE_STATUS_CHANGED",
+                    "channel":"EMAIL",
+                    "languageId":"%s",
                     "organizationId":"%s",
                     "tenantId":"%s",
                     "sourceComponent":"CASE",
@@ -234,6 +295,7 @@ class NotificationRequestedEventParserTest {
                 """.formatted(
                 MESSAGE_ID,
                 CORRELATION_ID,
+                LANGUAGE_ID,
                 ORGANIZATION_ID,
                 TENANT_ID,
                 SOURCE_ENTITY_ID,

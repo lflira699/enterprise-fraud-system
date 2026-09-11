@@ -9,6 +9,8 @@ public record NotificationRequestedEventMessage(
         UUID correlationId,
         String notificationType,
         String templateCode,
+        String channel,
+        UUID languageId,
         UUID organizationId,
         UUID tenantId,
         String sourceComponent,

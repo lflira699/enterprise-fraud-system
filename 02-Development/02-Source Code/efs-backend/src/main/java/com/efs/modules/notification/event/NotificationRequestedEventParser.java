@@ -17,7 +17,7 @@ public class NotificationRequestedEventParser {
             "NotificationRequested";
 
     private static final String SCHEMA_VERSION =
-            "1.0";
+            "1.1";
 
     private final ObjectMapper objectMapper;
 
@@ -101,6 +101,22 @@ public class NotificationRequestedEventParser {
                         "payload.templateCode"
                 );
 
+        String channel =
+                requireText(
+                        payload.get(
+                                "channel"
+                        ),
+                        "payload.channel"
+                );
+
+        UUID languageId =
+                requireUuid(
+                        payload.get(
+                                "languageId"
+                        ),
+                        "payload.languageId"
+                );
+
         UUID organizationId =
                 requireUuid(
                         payload.get(
@@ -162,6 +178,8 @@ public class NotificationRequestedEventParser {
                 correlationId,
                 notificationType,
                 templateCode,
+                channel,
+                languageId,
                 organizationId,
                 tenantId,
                 sourceComponent,
