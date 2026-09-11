@@ -2,6 +2,7 @@ package com.efs.modules.notification.service;
 
 import com.efs.modules.audit.dto.AuditEventRequest;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
+import com.efs.modules.integration.dto.ExternalNotificationDeliveryResult;
 import com.efs.modules.integration.event.DomainEventEnvelope;
 import com.efs.modules.integration.service.DomainEventOutboxService;
 import com.efs.modules.notification.entity.Notification;
@@ -59,6 +60,9 @@ public class NotificationDeliveryTerminalizationService {
 
     private static final String AUDIT_RESULT_REJECTED =
             "REJECTED";
+
+    private static final String AUDIT_RESULT_SUCCESS =
+            "SUCCESS";
 
     private static final String OUTBOUND_EVENT_TYPE =
             "NotificationDeliveryCompleted";
@@ -211,6 +215,253 @@ public class NotificationDeliveryTerminalizationService {
         );
     }
 
+    @Transactional
+    public void completeConfirmedResults(
+            UUID notificationId,
+            NotificationRequestedEventMessage message,
+            Map<UUID, ExternalNotificationDeliveryResult>
+                    confirmedResults) {
+
+        requireCompletionInputs(
+                notificationId,
+                message,
+                confirmedResults
+        );
+
+        Notification notification =
+                notificationRepository
+                        .findByNotificationIdForUpdate(
+                                notificationId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Notification not found: "
+                                                        + notificationId
+                                        )
+                        );
+
+        requireProcessingNotification(
+                notification
+        );
+
+        requireMessageContext(
+                notification,
+                message
+        );
+
+        List<NotificationRecipientDelivery> deliveries =
+                notificationRecipientDeliveryRepository
+                        .findByNotificationIdOrderByCreatedAtAsc(
+                                notificationId
+                        );
+
+        requireConfirmedResults(
+                notification,
+                deliveries,
+                confirmedResults
+        );
+
+        LocalDateTime processedAt =
+                LocalDateTime.now();
+
+        long deliveredCount =
+                0L;
+
+        for (
+                NotificationRecipientDelivery delivery
+                : deliveries
+        ) {
+
+            ExternalNotificationDeliveryResult result =
+                    confirmedResults.get(
+                            delivery.getNotificationDeliveryId()
+                    );
+
+            if (result.isDelivered()) {
+
+                delivery.setDeliveryStatus(
+                        "DELIVERED"
+                );
+
+                deliveredCount++;
+
+            } else {
+
+                delivery.setDeliveryStatus(
+                        DELIVERY_STATUS_FAILED
+                );
+            }
+
+            delivery.setDeliveryReference(
+                    result.getDeliveryReference()
+            );
+
+            delivery.setDeliveryResult(
+                    result.getDeliveryResult()
+            );
+
+            delivery.setProcessedAt(
+                    processedAt
+            );
+        }
+
+        notificationRecipientDeliveryRepository
+                .saveAll(
+                        deliveries
+                );
+
+        notification.setNotificationStatus(
+                deriveTerminalStatus(
+                        deliveredCount,
+                        deliveries.size()
+                )
+        );
+
+        notification.setProcessedAt(
+                processedAt
+        );
+
+        notificationRepository.save(
+                notification
+        );
+
+        recordSuccessfulAudit(
+                notification
+        );
+
+        persistCompletionEvent(
+                notification,
+                message,
+                deliveries
+        );
+    }
+
+    private void requireCompletionInputs(
+            UUID notificationId,
+            NotificationRequestedEventMessage message,
+            Map<UUID, ExternalNotificationDeliveryResult>
+                    confirmedResults) {
+
+        if (notificationId == null) {
+            throw new IllegalArgumentException(
+                    "Notification id is required"
+            );
+        }
+
+        if (message == null) {
+            throw new IllegalArgumentException(
+                    "NotificationRequested event message is required"
+            );
+        }
+
+        if (confirmedResults == null) {
+            throw new IllegalArgumentException(
+                    "Confirmed delivery results are required"
+            );
+        }
+    }
+
+    private void requireProcessingNotification(
+            Notification notification) {
+
+        if (!STATUS_PROCESSING.equals(
+                notification.getNotificationStatus()
+        )) {
+
+            throw new IllegalStateException(
+                    "Notification must be PROCESSING "
+                            + "for confirmed result terminalization"
+            );
+        }
+    }
+
+    private void requireConfirmedResults(
+            Notification notification,
+            List<NotificationRecipientDelivery> deliveries,
+            Map<UUID, ExternalNotificationDeliveryResult>
+                    confirmedResults) {
+
+        if (deliveries.isEmpty()) {
+            throw new IllegalStateException(
+                    "Notification deliveries are required"
+            );
+        }
+
+        if (confirmedResults.size()
+                != deliveries.size()) {
+
+            throw new IllegalStateException(
+                    "Confirmed delivery results must match "
+                            + "all Notification deliveries"
+            );
+        }
+
+        for (
+                NotificationRecipientDelivery delivery
+                : deliveries
+        ) {
+
+            if (delivery == null) {
+                throw new IllegalStateException(
+                        "Notification delivery must not be null"
+                );
+            }
+
+            if (!Objects.equals(
+                    notification.getNotificationId(),
+                    delivery.getNotificationId()
+            )) {
+
+                throw new IllegalStateException(
+                        "Notification delivery belongs "
+                                + "to a different Notification"
+                );
+            }
+
+            if (!DELIVERY_STATUS_PENDING.equals(
+                    delivery.getDeliveryStatus()
+            )) {
+
+                throw new IllegalStateException(
+                        "Notification delivery must be PENDING "
+                                + "before confirmed result terminalization"
+                );
+            }
+
+            UUID deliveryId =
+                    delivery.getNotificationDeliveryId();
+
+            if (deliveryId == null
+                    || !confirmedResults.containsKey(
+                            deliveryId
+                    )
+                    || confirmedResults.get(
+                            deliveryId
+                    ) == null) {
+
+                throw new IllegalStateException(
+                        "Confirmed result is required "
+                                + "for every Notification delivery"
+                );
+            }
+        }
+    }
+
+    private String deriveTerminalStatus(
+            long deliveredCount,
+            int totalCount) {
+
+        if (deliveredCount == totalCount) {
+            return "DELIVERED";
+        }
+
+        if (deliveredCount == 0L) {
+            return STATUS_FAILED;
+        }
+
+        return "PARTIALLY_DELIVERED";
+    }
     private void requireInputs(
             UUID notificationId,
             NotificationRequestedEventMessage message,
@@ -338,6 +589,31 @@ public class NotificationDeliveryTerminalizationService {
             Notification notification,
             String reason) {
 
+        recordAudit(
+                notification,
+                AUDIT_RESULT_REJECTED,
+                Map.of(
+                        "reason",
+                        reason
+                )
+        );
+    }
+
+    private void recordSuccessfulAudit(
+            Notification notification) {
+
+        recordAudit(
+                notification,
+                AUDIT_RESULT_SUCCESS,
+                Map.of()
+        );
+    }
+
+    private void recordAudit(
+            Notification notification,
+            String eventResult,
+            Map<String, Object> eventDetails) {
+
         AuditEventRequest request =
                 new AuditEventRequest();
 
@@ -370,26 +646,17 @@ public class NotificationDeliveryTerminalizationService {
         );
 
         request.setEventResult(
-                AUDIT_RESULT_REJECTED
-        );
-
-        Map<String, Object> details =
-                new LinkedHashMap<>();
-
-        details.put(
-                "reason",
-                reason
+                eventResult
         );
 
         request.setEventDetails(
-                details
+                eventDetails
         );
 
         auditEventService.createAuditEvent(
                 request
         );
     }
-
     private void persistCompletionEvent(
             Notification notification,
             NotificationRequestedEventMessage message,
