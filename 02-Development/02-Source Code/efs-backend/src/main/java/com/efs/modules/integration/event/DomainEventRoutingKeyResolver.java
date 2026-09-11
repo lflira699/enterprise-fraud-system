@@ -37,6 +37,9 @@ public class DomainEventRoutingKeyResolver {
             case "CaseCreated" ->
                     "case.created.v1";
 
+            case "NotificationDeliveryCompleted" ->
+                    "notification.delivery.completed.v1";
+
             default ->
                     throw new IllegalArgumentException(
                             "Unsupported domain event type: "
