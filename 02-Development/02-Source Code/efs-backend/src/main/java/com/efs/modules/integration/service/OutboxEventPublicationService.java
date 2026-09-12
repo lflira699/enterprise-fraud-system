@@ -18,8 +18,11 @@ public class OutboxEventPublicationService {
             OutboxEventLifecycleService lifecycleService,
             OutboxEventRabbitPublisher rabbitPublisher) {
 
-        this.lifecycleService = lifecycleService;
-        this.rabbitPublisher = rabbitPublisher;
+        this.lifecycleService =
+                lifecycleService;
+
+        this.rabbitPublisher =
+                rabbitPublisher;
     }
 
     public CompletableFuture<Void> publish(
@@ -29,18 +32,36 @@ public class OutboxEventPublicationService {
 
             Optional<OutboxEvent> claimedEvent =
                     lifecycleService
-                            .claimForPublication(eventId);
+                            .claimForPublication(
+                                    eventId
+                            );
 
             if (claimedEvent.isEmpty()) {
                 return CompletableFuture
-                        .completedFuture(null);
+                        .completedFuture(
+                                null
+                        );
             }
 
             OutboxEvent event =
                     claimedEvent.get();
 
+            Integer attemptCount =
+                    event.getAttemptCount();
+
+            if (attemptCount == null) {
+                throw new IllegalStateException(
+                        "Outbox event attempt count is required"
+                );
+            }
+
+            int expectedAttemptCount =
+                    attemptCount;
+
             return rabbitPublisher
-                    .publish(event)
+                    .publish(
+                            event
+                    )
                     .handle(
                             (ignored, throwable) -> {
 
@@ -48,18 +69,22 @@ public class OutboxEventPublicationService {
 
                                     lifecycleService
                                             .markPublished(
-                                                    eventId
+                                                    eventId,
+                                                    expectedAttemptCount
                                             );
 
                                     return null;
                                 }
 
                                 Throwable cause =
-                                        unwrap(throwable);
+                                        unwrap(
+                                                throwable
+                                        );
 
                                 lifecycleService
                                         .markFailed(
                                                 eventId,
+                                                expectedAttemptCount,
                                                 errorMessage(
                                                         cause
                                                 )
@@ -74,7 +99,9 @@ public class OutboxEventPublicationService {
         } catch (Exception exception) {
 
             return CompletableFuture
-                    .failedFuture(exception);
+                    .failedFuture(
+                            exception
+                    );
         }
     }
 

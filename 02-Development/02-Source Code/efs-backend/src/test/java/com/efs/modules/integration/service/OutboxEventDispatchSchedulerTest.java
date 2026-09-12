@@ -20,8 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +33,9 @@ class OutboxEventDispatchSchedulerTest {
 
     private OutboxEventRepository
             outboxEventRepository;
+
+    private OutboxEventLifecycleService
+            outboxEventLifecycleService;
 
     private OutboxEventPublicationService
             outboxEventPublicationService;
@@ -45,6 +51,11 @@ class OutboxEventDispatchSchedulerTest {
                         OutboxEventRepository.class
                 );
 
+        outboxEventLifecycleService =
+                mock(
+                        OutboxEventLifecycleService.class
+                );
+
         outboxEventPublicationService =
                 mock(
                         OutboxEventPublicationService.class
@@ -53,7 +64,10 @@ class OutboxEventDispatchSchedulerTest {
         scheduler =
                 new OutboxEventDispatchScheduler(
                         outboxEventRepository,
-                        outboxEventPublicationService
+                        outboxEventLifecycleService,
+                        outboxEventPublicationService,
+                        30000L,
+                        5000L
                 );
     }
 
@@ -66,15 +80,15 @@ class OutboxEventDispatchSchedulerTest {
         UUID failedId =
                 UUID.randomUUID();
 
-        OutboxEvent pending =
-                event(
-                        pendingId
-                );
-
-        OutboxEvent failed =
-                event(
-                        failedId
-                );
+        when(
+                outboxEventRepository
+                        .findByStatusAndProcessingStartedAtLessThanEqualOrderByOccurredAtAsc(
+                                eq("PROCESSING"),
+                                any(LocalDateTime.class)
+                        )
+        ).thenReturn(
+                List.of()
+        );
 
         when(
                 outboxEventRepository
@@ -83,7 +97,9 @@ class OutboxEventDispatchSchedulerTest {
                         )
         ).thenReturn(
                 List.of(
-                        pending
+                        event(
+                                pendingId
+                        )
                 )
         );
 
@@ -95,7 +111,9 @@ class OutboxEventDispatchSchedulerTest {
                         )
         ).thenReturn(
                 List.of(
-                        failed
+                        event(
+                                failedId
+                        )
                 )
         );
 
@@ -137,6 +155,85 @@ class OutboxEventDispatchSchedulerTest {
     }
 
     @Test
+    void shouldRecoverStaleProcessingBeforeNormalDispatch() {
+
+        UUID staleId =
+                UUID.randomUUID();
+
+        UUID pendingId =
+                UUID.randomUUID();
+
+        when(
+                outboxEventRepository
+                        .findByStatusAndProcessingStartedAtLessThanEqualOrderByOccurredAtAsc(
+                                eq("PROCESSING"),
+                                any(LocalDateTime.class)
+                        )
+        ).thenReturn(
+                List.of(
+                        event(
+                                staleId
+                        )
+                )
+        );
+
+        when(
+                outboxEventRepository
+                        .findByStatusOrderByOccurredAtAsc(
+                                "PENDING"
+                        )
+        ).thenReturn(
+                List.of(
+                        event(
+                                pendingId
+                        )
+                )
+        );
+
+        when(
+                outboxEventRepository
+                        .findByStatusAndNextAttemptAtLessThanEqualOrderByOccurredAtAsc(
+                                eq("FAILED"),
+                                any(LocalDateTime.class)
+                        )
+        ).thenReturn(
+                List.of()
+        );
+
+        when(
+                outboxEventPublicationService
+                        .publish(
+                                pendingId
+                        )
+        ).thenReturn(
+                CompletableFuture.completedFuture(
+                        null
+                )
+        );
+
+        scheduler.dispatch();
+
+        var ordered =
+                inOrder(
+                        outboxEventLifecycleService,
+                        outboxEventPublicationService
+                );
+
+        ordered.verify(
+                outboxEventLifecycleService
+        ).recoverStaleProcessing(
+                eq(staleId),
+                any(LocalDateTime.class)
+        );
+
+        ordered.verify(
+                outboxEventPublicationService
+        ).publish(
+                pendingId
+        );
+    }
+
+    @Test
     void shouldContinueAfterIndividualPublicationFailure() {
 
         UUID failedPublicationId =
@@ -144,6 +241,16 @@ class OutboxEventDispatchSchedulerTest {
 
         UUID followingId =
                 UUID.randomUUID();
+
+        when(
+                outboxEventRepository
+                        .findByStatusAndProcessingStartedAtLessThanEqualOrderByOccurredAtAsc(
+                                eq("PROCESSING"),
+                                any(LocalDateTime.class)
+                        )
+        ).thenReturn(
+                List.of()
+        );
 
         when(
                 outboxEventRepository
@@ -213,6 +320,94 @@ class OutboxEventDispatchSchedulerTest {
     }
 
     @Test
+    void shouldContinueAfterIndividualStaleRecoveryFailure() {
+
+        UUID firstId =
+                UUID.randomUUID();
+
+        UUID secondId =
+                UUID.randomUUID();
+
+        when(
+                outboxEventRepository
+                        .findByStatusAndProcessingStartedAtLessThanEqualOrderByOccurredAtAsc(
+                                eq("PROCESSING"),
+                                any(LocalDateTime.class)
+                        )
+        ).thenReturn(
+                List.of(
+                        event(
+                                firstId
+                        ),
+                        event(
+                                secondId
+                        )
+                )
+        );
+
+        when(
+                outboxEventLifecycleService
+                        .recoverStaleProcessing(
+                                eq(firstId),
+                                any(LocalDateTime.class)
+                        )
+        ).thenThrow(
+                new IllegalStateException(
+                        "forced recovery failure"
+                )
+        );
+
+        when(
+                outboxEventRepository
+                        .findByStatusOrderByOccurredAtAsc(
+                                "PENDING"
+                        )
+        ).thenReturn(
+                List.of()
+        );
+
+        when(
+                outboxEventRepository
+                        .findByStatusAndNextAttemptAtLessThanEqualOrderByOccurredAtAsc(
+                                eq("FAILED"),
+                                any(LocalDateTime.class)
+                        )
+        ).thenReturn(
+                List.of()
+        );
+
+        assertDoesNotThrow(
+                scheduler::dispatch
+        );
+
+        verify(
+                outboxEventLifecycleService
+        ).recoverStaleProcessing(
+                eq(secondId),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void shouldRejectInvalidRuntimeConfigurationBeforeDispatchBeanCreation() {
+
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                new OutboxEventDispatchConfiguration(
+                                        5000L,
+                                        5000L
+                                )
+                );
+
+        assertEquals(
+                "Outbox stale processing threshold must be greater than publisher confirm timeout",
+                exception.getMessage()
+        );
+    }
+
+    @Test
     void shouldUseApprovedDispatchIntervalProperty()
             throws Exception {
 
@@ -238,13 +433,29 @@ class OutboxEventDispatchSchedulerTest {
     }
 
     @Test
-    void shouldKeepRuntimeDispatchFailClosedByDefault() {
+    void shouldKeepRuntimeDispatchFailClosedByDefault()
+            throws Exception {
 
-        ConditionalOnProperty condition =
+        assertNull(
                 OutboxEventDispatchConfiguration.class
                         .getAnnotation(
                                 ConditionalOnProperty.class
+                        )
+        );
+
+        Method factoryMethod =
+                OutboxEventDispatchConfiguration.class
+                        .getMethod(
+                                "outboxEventDispatchScheduler",
+                                OutboxEventRepository.class,
+                                OutboxEventLifecycleService.class,
+                                OutboxEventPublicationService.class
                         );
+
+        ConditionalOnProperty condition =
+                factoryMethod.getAnnotation(
+                        ConditionalOnProperty.class
+                );
 
         assertNotNull(
                 condition

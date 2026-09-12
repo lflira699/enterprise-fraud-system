@@ -51,20 +51,29 @@ class OutboxEventPublicationServiceTest {
                 UUID.randomUUID();
 
         OutboxEvent event =
-                createEvent(eventId);
+                createEvent(
+                        eventId,
+                        2
+                );
 
         CompletableFuture<Void> brokerResult =
                 new CompletableFuture<>();
 
         when(
                 lifecycleService
-                        .claimForPublication(eventId)
+                        .claimForPublication(
+                                eventId
+                        )
         ).thenReturn(
-                Optional.of(event)
+                Optional.of(
+                        event
+                )
         );
 
         when(
-                rabbitPublisher.publish(event)
+                rabbitPublisher.publish(
+                        event
+                )
         ).thenReturn(
                 brokerResult
         );
@@ -81,20 +90,14 @@ class OutboxEventPublicationServiceTest {
         verify(
                 lifecycleService,
                 never()
-        ).markPublished(eventId);
-
-        verify(
-                lifecycleService,
-                never()
-        ).markFailed(
-                org.mockito.ArgumentMatchers.eq(
-                        eventId
-                ),
-                org.mockito.ArgumentMatchers
-                        .anyString()
+        ).markPublished(
+                eventId,
+                2
         );
 
-        brokerResult.complete(null);
+        brokerResult.complete(
+                null
+        );
 
         result.join();
 
@@ -104,7 +107,10 @@ class OutboxEventPublicationServiceTest {
 
         verify(
                 lifecycleService
-        ).markPublished(eventId);
+        ).markPublished(
+                eventId,
+                2
+        );
 
         verify(
                 lifecycleService,
@@ -112,6 +118,9 @@ class OutboxEventPublicationServiceTest {
         ).markFailed(
                 org.mockito.ArgumentMatchers.eq(
                         eventId
+                ),
+                org.mockito.ArgumentMatchers.eq(
+                        2
                 ),
                 org.mockito.ArgumentMatchers
                         .anyString()
@@ -125,17 +134,26 @@ class OutboxEventPublicationServiceTest {
                 UUID.randomUUID();
 
         OutboxEvent event =
-                createEvent(eventId);
+                createEvent(
+                        eventId,
+                        1
+                );
 
         when(
                 lifecycleService
-                        .claimForPublication(eventId)
+                        .claimForPublication(
+                                eventId
+                        )
         ).thenReturn(
-                Optional.of(event)
+                Optional.of(
+                        event
+                )
         );
 
         when(
-                rabbitPublisher.publish(event)
+                rabbitPublisher.publish(
+                        event
+                )
         ).thenReturn(
                 CompletableFuture.failedFuture(
                         new IllegalStateException(
@@ -165,12 +183,16 @@ class OutboxEventPublicationServiceTest {
         verify(
                 lifecycleService,
                 never()
-        ).markPublished(eventId);
+        ).markPublished(
+                eventId,
+                1
+        );
 
         verify(
                 lifecycleService
         ).markFailed(
                 eventId,
+                1,
                 "broker-nack"
         );
     }
@@ -183,7 +205,9 @@ class OutboxEventPublicationServiceTest {
 
         when(
                 lifecycleService
-                        .claimForPublication(eventId)
+                        .claimForPublication(
+                                eventId
+                        )
         ).thenReturn(
                 Optional.empty()
         );
@@ -212,7 +236,9 @@ class OutboxEventPublicationServiceTest {
                 never()
         ).markPublished(
                 org.mockito.ArgumentMatchers
-                        .any()
+                        .any(),
+                org.mockito.ArgumentMatchers
+                        .anyInt()
         );
 
         verify(
@@ -221,6 +247,8 @@ class OutboxEventPublicationServiceTest {
         ).markFailed(
                 org.mockito.ArgumentMatchers
                         .any(),
+                org.mockito.ArgumentMatchers
+                        .anyInt(),
                 org.mockito.ArgumentMatchers
                         .anyString()
         );
@@ -234,7 +262,9 @@ class OutboxEventPublicationServiceTest {
 
         when(
                 lifecycleService
-                        .claimForPublication(eventId)
+                        .claimForPublication(
+                                eventId
+                        )
         ).thenThrow(
                 new IllegalStateException(
                         "claim-failure"
@@ -275,17 +305,26 @@ class OutboxEventPublicationServiceTest {
                 UUID.randomUUID();
 
         OutboxEvent event =
-                createEvent(eventId);
+                createEvent(
+                        eventId,
+                        0
+                );
 
         when(
                 lifecycleService
-                        .claimForPublication(eventId)
+                        .claimForPublication(
+                                eventId
+                        )
         ).thenReturn(
-                Optional.of(event)
+                Optional.of(
+                        event
+                )
         );
 
         when(
-                rabbitPublisher.publish(event)
+                rabbitPublisher.publish(
+                        event
+                )
         ).thenReturn(
                 CompletableFuture.failedFuture(
                         new IllegalStateException()
@@ -306,12 +345,14 @@ class OutboxEventPublicationServiceTest {
                 lifecycleService
         ).markFailed(
                 eventId,
+                0,
                 "IllegalStateException"
         );
     }
 
     private OutboxEvent createEvent(
-            UUID eventId) {
+            UUID eventId,
+            int attemptCount) {
 
         OutboxEvent event =
                 new OutboxEvent();
@@ -329,7 +370,7 @@ class OutboxEventPublicationServiceTest {
         );
 
         event.setAttemptCount(
-                0
+                attemptCount
         );
 
         return event;

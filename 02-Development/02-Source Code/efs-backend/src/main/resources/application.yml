@@ -63,6 +63,7 @@ efs:
   integration:
     outbox:
       publisher-confirm-timeout-ms: ${EFS_OUTBOX_PUBLISHER_CONFIRM_TIMEOUT_MS:5000}
+      stale-processing-threshold-ms: ${EFS_OUTBOX_STALE_PROCESSING_THRESHOLD_MS:30000}
       dispatch:
         enabled: ${EFS_OUTBOX_DISPATCH_ENABLED:false}
         interval-ms: ${EFS_OUTBOX_DISPATCH_INTERVAL_MS:1000}

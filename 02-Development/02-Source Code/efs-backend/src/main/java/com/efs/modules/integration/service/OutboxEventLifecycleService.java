@@ -24,10 +24,14 @@ public class OutboxEventLifecycleService {
     private static final String STATUS_FAILED =
             "FAILED";
 
+    private static final String STALE_PROCESSING_ERROR =
+            "OUTBOX_PROCESSING_LEASE_EXPIRED";
+
     private static final int MAX_FAILED_ATTEMPTS =
             4;
 
-    private final OutboxEventRepository outboxEventRepository;
+    private final OutboxEventRepository
+            outboxEventRepository;
 
     public OutboxEventLifecycleService(
             OutboxEventRepository outboxEventRepository) {
@@ -46,63 +50,66 @@ public class OutboxEventLifecycleService {
             );
         }
 
-        Optional<OutboxEvent> optionalEvent =
+        Optional<OutboxEvent> lockedEvent =
                 outboxEventRepository
-                        .findByIdForUpdate(eventId);
+                        .findByIdForUpdate(
+                                eventId
+                        );
 
-        if (optionalEvent.isEmpty()) {
+        if (lockedEvent.isEmpty()) {
             return Optional.empty();
         }
 
         OutboxEvent event =
-                optionalEvent.get();
+                lockedEvent.get();
 
         if (STATUS_PENDING.equals(
                 event.getStatus())) {
 
-            event.setStatus(
-                    STATUS_PROCESSING
+            transitionToProcessing(
+                    event
             );
 
-            event.setProcessingStartedAt(
-                    LocalDateTime.now()
+            return Optional.of(
+                    event
             );
-
-            event.setNextAttemptAt(null);
-
-            outboxEventRepository.save(event);
-
-            return Optional.of(event);
         }
 
-        if (isRetryableFailedEvent(event)) {
+        if (isRetryableFailedEvent(
+                event)) {
 
-            event.setStatus(
-                    STATUS_PROCESSING
+            transitionToProcessing(
+                    event
             );
 
-            event.setProcessingStartedAt(
-                    LocalDateTime.now()
+            return Optional.of(
+                    event
             );
-
-            event.setNextAttemptAt(null);
-
-            outboxEventRepository.save(event);
-
-            return Optional.of(event);
         }
 
         return Optional.empty();
     }
 
     @Transactional
-    public void markPublished(
-            UUID eventId) {
+    public boolean markPublished(
+            UUID eventId,
+            int expectedAttemptCount) {
+
+        requireExpectedAttemptCount(
+                expectedAttemptCount
+        );
 
         OutboxEvent event =
-                getLockedEvent(eventId);
+                getLockedEvent(
+                        eventId
+                );
 
-        requireProcessing(event);
+        if (!isCurrentProcessingAttempt(
+                event,
+                expectedAttemptCount)) {
+
+            return false;
+        }
 
         event.setStatus(
                 STATUS_PUBLISHED
@@ -112,16 +119,29 @@ public class OutboxEventLifecycleService {
                 LocalDateTime.now()
         );
 
-        event.setProcessingStartedAt(null);
-        event.setNextAttemptAt(null);
-        event.setLastError(null);
+        event.setProcessingStartedAt(
+                null
+        );
 
-        outboxEventRepository.save(event);
+        event.setNextAttemptAt(
+                null
+        );
+
+        event.setLastError(
+                null
+        );
+
+        outboxEventRepository.save(
+                event
+        );
+
+        return true;
     }
 
     @Transactional
-    public void markFailed(
+    public boolean markFailed(
             UUID eventId,
+            int expectedAttemptCount,
             String errorMessage) {
 
         if (errorMessage == null
@@ -132,13 +152,106 @@ public class OutboxEventLifecycleService {
             );
         }
 
-        OutboxEvent event =
-                getLockedEvent(eventId);
+        requireExpectedAttemptCount(
+                expectedAttemptCount
+        );
 
-        requireProcessing(event);
+        OutboxEvent event =
+                getLockedEvent(
+                        eventId
+                );
+
+        if (!isCurrentProcessingAttempt(
+                event,
+                expectedAttemptCount)) {
+
+            return false;
+        }
+
+        transitionToFailed(
+                event,
+                errorMessage
+        );
+
+        return true;
+    }
+
+    @Transactional
+    public boolean recoverStaleProcessing(
+            UUID eventId,
+            LocalDateTime staleCutoff) {
+
+        if (staleCutoff == null) {
+            throw new IllegalArgumentException(
+                    "Outbox stale processing cutoff is required"
+            );
+        }
+
+        OutboxEvent event =
+                getLockedEvent(
+                        eventId
+                );
+
+        if (!STATUS_PROCESSING.equals(
+                event.getStatus())) {
+
+            return false;
+        }
+
+        LocalDateTime processingStartedAt =
+                event.getProcessingStartedAt();
+
+        if (processingStartedAt == null
+                || processingStartedAt.isAfter(
+                        staleCutoff
+                )) {
+
+            return false;
+        }
+
+        transitionToFailed(
+                event,
+                STALE_PROCESSING_ERROR
+        );
+
+        return true;
+    }
+
+    private void transitionToProcessing(
+            OutboxEvent event) {
+
+        event.setStatus(
+                STATUS_PROCESSING
+        );
+
+        event.setProcessingStartedAt(
+                LocalDateTime.now()
+        );
+
+        event.setNextAttemptAt(
+                null
+        );
+
+        outboxEventRepository.save(
+                event
+        );
+    }
+
+    private void transitionToFailed(
+            OutboxEvent event,
+            String errorMessage) {
+
+        Integer currentAttemptCount =
+                event.getAttemptCount();
+
+        if (currentAttemptCount == null) {
+            throw new IllegalStateException(
+                    "Outbox event attempt count is required"
+            );
+        }
 
         int failedAttempts =
-                event.getAttemptCount() + 1;
+                currentAttemptCount + 1;
 
         event.setStatus(
                 STATUS_FAILED
@@ -148,8 +261,13 @@ public class OutboxEventLifecycleService {
                 failedAttempts
         );
 
-        event.setProcessingStartedAt(null);
-        event.setPublishedAt(null);
+        event.setProcessingStartedAt(
+                null
+        );
+
+        event.setPublishedAt(
+                null
+        );
 
         event.setLastError(
                 errorMessage
@@ -161,7 +279,9 @@ public class OutboxEventLifecycleService {
                 )
         );
 
-        outboxEventRepository.save(event);
+        outboxEventRepository.save(
+                event
+        );
     }
 
     private OutboxEvent getLockedEvent(
@@ -174,13 +294,34 @@ public class OutboxEventLifecycleService {
         }
 
         return outboxEventRepository
-                .findByIdForUpdate(eventId)
+                .findByIdForUpdate(
+                        eventId
+                )
                 .orElseThrow(
-                        () -> new IllegalArgumentException(
-                                "Outbox event not found: "
-                                        + eventId
-                        )
+                        () ->
+                                new IllegalArgumentException(
+                                        "Outbox event not found: "
+                                                + eventId
+                                )
                 );
+    }
+
+    private boolean isCurrentProcessingAttempt(
+            OutboxEvent event,
+            int expectedAttemptCount) {
+
+        if (!STATUS_PROCESSING.equals(
+                event.getStatus())) {
+
+            return false;
+        }
+
+        Integer actualAttemptCount =
+                event.getAttemptCount();
+
+        return actualAttemptCount != null
+                && actualAttemptCount
+                == expectedAttemptCount;
     }
 
     private boolean isRetryableFailedEvent(
@@ -210,14 +351,12 @@ public class OutboxEventLifecycleService {
                 );
     }
 
-    private void requireProcessing(
-            OutboxEvent event) {
+    private void requireExpectedAttemptCount(
+            int expectedAttemptCount) {
 
-        if (!STATUS_PROCESSING.equals(
-                event.getStatus())) {
-
-            throw new IllegalStateException(
-                    "Outbox event must be PROCESSING"
+        if (expectedAttemptCount < 0) {
+            throw new IllegalArgumentException(
+                    "Outbox expected attempt count must not be negative"
             );
         }
     }

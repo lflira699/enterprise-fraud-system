@@ -224,7 +224,8 @@ class OutboxEventLifecycleServiceIntegrationTest {
                 );
 
         lifecycleService.markPublished(
-                saved.getId()
+                saved.getId(),
+                2
         );
 
         entityManager.flush();
@@ -305,6 +306,7 @@ class OutboxEventLifecycleServiceIntegrationTest {
 
         lifecycleService.markFailed(
                 saved.getId(),
+                3,
                 "fourth-failure"
         );
 
@@ -378,6 +380,7 @@ class OutboxEventLifecycleServiceIntegrationTest {
 
         lifecycleService.markFailed(
                 saved.getId(),
+                currentAttemptCount,
                 "publication-failure"
         );
 

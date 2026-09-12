@@ -19,10 +19,17 @@ public interface OutboxEventRepository
             String status
     );
 
-    List<OutboxEvent> findByStatusAndNextAttemptAtLessThanEqualOrderByOccurredAtAsc(
-            String status,
-            LocalDateTime nextAttemptAt
-    );
+    List<OutboxEvent>
+            findByStatusAndNextAttemptAtLessThanEqualOrderByOccurredAtAsc(
+                    String status,
+                    LocalDateTime nextAttemptAt
+            );
+
+    List<OutboxEvent>
+            findByStatusAndProcessingStartedAtLessThanEqualOrderByOccurredAtAsc(
+                    String status,
+                    LocalDateTime processingStartedAt
+            );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
