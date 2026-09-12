@@ -1,5 +1,8 @@
 package com.efs.modules.notification.service;
 
+import com.efs.modules.integration.dto.ExternalNotificationDeliveryRequest;
+import com.efs.modules.integration.dto.ExternalNotificationDeliveryResult;
+import com.efs.modules.integration.service.ExternalNotificationDeliveryServiceInterface;
 import com.efs.modules.notification.dto.NotificationDeliveryPreflightResult;
 import com.efs.modules.notification.dto.PreparedNotificationDelivery;
 import com.efs.modules.notification.event.NotificationRequestedEventMessage;
@@ -8,6 +11,7 @@ import com.efs.modules.notification.event.NotificationRequestedProcessingResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +47,10 @@ class NotificationDeliveryOrchestratorTest {
     @Mock
     private NotificationDeliveryTerminalizationService
             notificationDeliveryTerminalizationService;
+
+    @Mock
+    private ExternalNotificationDeliveryServiceInterface
+            externalNotificationDeliveryService;
 
     private NotificationDeliveryOrchestrator orchestrator;
 
@@ -71,18 +82,30 @@ class NotificationDeliveryOrchestratorTest {
                 new NotificationDeliveryOrchestrator(
                         notificationRequestedEventProcessor,
                         notificationDeliveryPreparationService,
-                        notificationDeliveryTerminalizationService
+                        notificationDeliveryTerminalizationService,
+                        externalNotificationDeliveryService
                 );
     }
 
     @Test
-    void shouldPrepareReadyNotification() {
+    void shouldDeliverAndTerminalizeReadyNotification() {
 
         NotificationRequestedEventMessage message =
                 createMessage();
 
         NotificationDeliveryPreflightResult expected =
                 createPreflightResult();
+
+        PreparedNotificationDelivery delivery =
+                expected.deliveries()
+                        .get(
+                                0
+                        );
+
+        ExternalNotificationDeliveryResult deliveryResult =
+                createDeliveryResult(
+                        true
+                );
 
         when(
                 notificationRequestedEventProcessor
@@ -106,6 +129,17 @@ class NotificationDeliveryOrchestratorTest {
                 expected
         );
 
+        when(
+                externalNotificationDeliveryService
+                        .deliver(
+                                any(
+                                        ExternalNotificationDeliveryRequest.class
+                                )
+                        )
+        ).thenReturn(
+                deliveryResult
+        );
+
         Optional<NotificationDeliveryPreflightResult> result =
                 orchestrator.orchestrate(
                         message
@@ -120,13 +154,413 @@ class NotificationDeliveryOrchestratorTest {
                 result.orElseThrow()
         );
 
+        ArgumentCaptor<ExternalNotificationDeliveryRequest>
+                requestCaptor =
+                ArgumentCaptor.forClass(
+                        ExternalNotificationDeliveryRequest.class
+                );
+
+        verify(
+                externalNotificationDeliveryService
+        ).deliver(
+                requestCaptor.capture()
+        );
+
+        ExternalNotificationDeliveryRequest request =
+                requestCaptor.getValue();
+
+        assertEquals(
+                delivery.notificationDeliveryId(),
+                request.getNotificationDeliveryId()
+        );
+
+        assertEquals(
+                correlationId,
+                request.getCorrelationId()
+        );
+
+        assertEquals(
+                organizationId,
+                request.getOrganizationId()
+        );
+
+        assertEquals(
+                tenantId,
+                request.getTenantId()
+        );
+
+        assertEquals(
+                delivery.channel(),
+                request.getChannel()
+        );
+
+        assertEquals(
+                delivery.recipientUserId(),
+                request.getRecipientUserId()
+        );
+
+        assertEquals(
+                delivery.destination(),
+                request.getDestination()
+        );
+
+        assertEquals(
+                expected.subject(),
+                request.getSubject()
+        );
+
+        assertEquals(
+                expected.body(),
+                request.getBody()
+        );
+
+        verify(
+                notificationDeliveryTerminalizationService
+        ).completeConfirmedResults(
+                notificationId,
+                message,
+                Map.of(
+                        delivery.notificationDeliveryId(),
+                        deliveryResult
+                )
+        );
+
         verify(
                 notificationDeliveryTerminalizationService,
                 never()
-        ).rejectPreflight(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+        ).completeUnexpectedFailure(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void shouldContinueAfterConfirmedProviderFailure() {
+
+        NotificationRequestedEventMessage message =
+                createMessage();
+
+        PreparedNotificationDelivery firstDelivery =
+                new PreparedNotificationDelivery(
+                        UUID.randomUUID(),
+                        recipientUserId,
+                        "EMAIL",
+                        "first@example.com"
+                );
+
+        PreparedNotificationDelivery secondDelivery =
+                new PreparedNotificationDelivery(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "EMAIL",
+                        "second@example.com"
+                );
+
+        NotificationDeliveryPreflightResult preflightResult =
+                createPreflightResult(
+                        List.of(
+                                firstDelivery,
+                                secondDelivery
+                        )
+                );
+
+        ExternalNotificationDeliveryResult firstResult =
+                createDeliveryResult(
+                        false
+                );
+
+        ExternalNotificationDeliveryResult secondResult =
+                createDeliveryResult(
+                        true
+                );
+
+        when(
+                notificationRequestedEventProcessor
+                        .process(
+                                message
+                        )
+        ).thenReturn(
+                NotificationRequestedProcessingResult
+                        .ready(
+                                notificationId
+                        )
+        );
+
+        when(
+                notificationDeliveryPreparationService
+                        .prepare(
+                                notificationId,
+                                message
+                        )
+        ).thenReturn(
+                preflightResult
+        );
+
+        when(
+                externalNotificationDeliveryService
+                        .deliver(
+                                any(
+                                        ExternalNotificationDeliveryRequest.class
+                                )
+                        )
+        ).thenReturn(
+                firstResult,
+                secondResult
+        );
+
+        orchestrator.orchestrate(
+                message
+        );
+
+        verify(
+                externalNotificationDeliveryService,
+                times(
+                        2
+                )
+        ).deliver(
+                any(
+                        ExternalNotificationDeliveryRequest.class
+                )
+        );
+
+        verify(
+                notificationDeliveryTerminalizationService
+        ).completeConfirmedResults(
+                notificationId,
+                message,
+                Map.of(
+                        firstDelivery.notificationDeliveryId(),
+                        firstResult,
+                        secondDelivery.notificationDeliveryId(),
+                        secondResult
+                )
+        );
+
+        verify(
+                notificationDeliveryTerminalizationService,
+                never()
+        ).completeUnexpectedFailure(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void shouldStopAndTerminalizeUnexpectedDeliveryFailure() {
+
+        NotificationRequestedEventMessage message =
+                createMessage();
+
+        PreparedNotificationDelivery firstDelivery =
+                new PreparedNotificationDelivery(
+                        UUID.randomUUID(),
+                        recipientUserId,
+                        "EMAIL",
+                        "first@example.com"
+                );
+
+        PreparedNotificationDelivery failedDelivery =
+                new PreparedNotificationDelivery(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "EMAIL",
+                        "second@example.com"
+                );
+
+        PreparedNotificationDelivery remainingDelivery =
+                new PreparedNotificationDelivery(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "EMAIL",
+                        "third@example.com"
+                );
+
+        NotificationDeliveryPreflightResult preflightResult =
+                createPreflightResult(
+                        List.of(
+                                firstDelivery,
+                                failedDelivery,
+                                remainingDelivery
+                        )
+                );
+
+        ExternalNotificationDeliveryResult confirmedResult =
+                createDeliveryResult(
+                        true
+                );
+
+        when(
+                notificationRequestedEventProcessor
+                        .process(
+                                message
+                        )
+        ).thenReturn(
+                NotificationRequestedProcessingResult
+                        .ready(
+                                notificationId
+                        )
+        );
+
+        when(
+                notificationDeliveryPreparationService
+                        .prepare(
+                                notificationId,
+                                message
+                        )
+        ).thenReturn(
+                preflightResult
+        );
+
+        when(
+                externalNotificationDeliveryService
+                        .deliver(
+                                any(
+                                        ExternalNotificationDeliveryRequest.class
+                                )
+                        )
+        ).thenAnswer(
+                invocation -> {
+
+                    ExternalNotificationDeliveryRequest request =
+                            invocation.getArgument(
+                                    0
+                            );
+
+                    if (firstDelivery.notificationDeliveryId()
+                            .equals(
+                                    request.getNotificationDeliveryId()
+                            )) {
+
+                        return confirmedResult;
+                    }
+
+                    throw new IllegalStateException(
+                            "Unexpected provider failure"
+                    );
+                }
+        );
+
+        Optional<NotificationDeliveryPreflightResult> result =
+                orchestrator.orchestrate(
+                        message
+                );
+
+        assertTrue(
+                result.isPresent()
+        );
+
+        verify(
+                externalNotificationDeliveryService,
+                times(
+                        2
+                )
+        ).deliver(
+                any(
+                        ExternalNotificationDeliveryRequest.class
+                )
+        );
+
+        verify(
+                notificationDeliveryTerminalizationService
+        ).completeUnexpectedFailure(
+                notificationId,
+                message,
+                Map.of(
+                        firstDelivery.notificationDeliveryId(),
+                        confirmedResult
+                ),
+                failedDelivery.notificationDeliveryId()
+        );
+
+        verify(
+                notificationDeliveryTerminalizationService,
+                never()
+        ).completeConfirmedResults(
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void shouldPropagateConfirmedResultsTerminalizationFailure() {
+
+        NotificationRequestedEventMessage message =
+                createMessage();
+
+        NotificationDeliveryPreflightResult preflightResult =
+                createPreflightResult();
+
+        ExternalNotificationDeliveryResult deliveryResult =
+                createDeliveryResult(
+                        true
+                );
+
+        when(
+                notificationRequestedEventProcessor
+                        .process(
+                                message
+                        )
+        ).thenReturn(
+                NotificationRequestedProcessingResult
+                        .ready(
+                                notificationId
+                        )
+        );
+
+        when(
+                notificationDeliveryPreparationService
+                        .prepare(
+                                notificationId,
+                                message
+                        )
+        ).thenReturn(
+                preflightResult
+        );
+
+        when(
+                externalNotificationDeliveryService
+                        .deliver(
+                                any(
+                                        ExternalNotificationDeliveryRequest.class
+                                )
+                        )
+        ).thenReturn(
+                deliveryResult
+        );
+
+        doThrow(
+                new IllegalStateException(
+                        "Terminalization failure"
+                )
+        ).when(
+                notificationDeliveryTerminalizationService
+        ).completeConfirmedResults(
+                any(),
+                any(),
+                any()
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        orchestrator.orchestrate(
+                                message
+                        )
+        );
+
+        verify(
+                notificationDeliveryTerminalizationService,
+                never()
+        ).completeUnexpectedFailure(
+                any(),
+                any(),
+                any(),
+                any()
         );
     }
 
@@ -176,6 +610,13 @@ class NotificationDeliveryOrchestratorTest {
                 message,
                 "DELIVERY_CONFIGURATION_UNAVAILABLE"
         );
+
+        verify(
+                externalNotificationDeliveryService,
+                never()
+        ).deliver(
+                any()
+        );
     }
 
     @Test
@@ -209,17 +650,15 @@ class NotificationDeliveryOrchestratorTest {
                 notificationDeliveryPreparationService,
                 never()
         ).prepare(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+                any(),
+                any()
         );
 
         verify(
-                notificationDeliveryTerminalizationService,
+                externalNotificationDeliveryService,
                 never()
-        ).rejectPreflight(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+        ).deliver(
+                any()
         );
     }
 
@@ -252,17 +691,15 @@ class NotificationDeliveryOrchestratorTest {
                 notificationDeliveryPreparationService,
                 never()
         ).prepare(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+                any(),
+                any()
         );
 
         verify(
-                notificationDeliveryTerminalizationService,
+                externalNotificationDeliveryService,
                 never()
-        ).rejectPreflight(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+        ).deliver(
+                any()
         );
     }
 
@@ -308,9 +745,16 @@ class NotificationDeliveryOrchestratorTest {
                 notificationDeliveryTerminalizationService,
                 never()
         ).rejectPreflight(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+                any(),
+                any(),
+                any()
+        );
+
+        verify(
+                externalNotificationDeliveryService,
+                never()
+        ).deliver(
+                any()
         );
     }
 
@@ -329,7 +773,7 @@ class NotificationDeliveryOrchestratorTest {
                 notificationRequestedEventProcessor,
                 never()
         ).process(
-                org.mockito.ArgumentMatchers.any()
+                any()
         );
     }
 
@@ -385,13 +829,7 @@ class NotificationDeliveryOrchestratorTest {
     private NotificationDeliveryPreflightResult
             createPreflightResult() {
 
-        return new NotificationDeliveryPreflightResult(
-                notificationId,
-                organizationId,
-                tenantId,
-                correlationId,
-                "Case CASE-1 created",
-                "Case CASE-1 has been created.",
+        return createPreflightResult(
                 List.of(
                         new PreparedNotificationDelivery(
                                 UUID.randomUUID(),
@@ -401,5 +839,34 @@ class NotificationDeliveryOrchestratorTest {
                         )
                 )
         );
+    }
+
+    private NotificationDeliveryPreflightResult
+            createPreflightResult(
+                    List<PreparedNotificationDelivery> deliveries) {
+
+        return new NotificationDeliveryPreflightResult(
+                notificationId,
+                organizationId,
+                tenantId,
+                correlationId,
+                "Case CASE-1 created",
+                "Case CASE-1 has been created.",
+                deliveries
+        );
+    }
+
+    private ExternalNotificationDeliveryResult
+            createDeliveryResult(
+                    boolean delivered) {
+
+        ExternalNotificationDeliveryResult result =
+                new ExternalNotificationDeliveryResult();
+
+        result.setDelivered(
+                delivered
+        );
+
+        return result;
     }
 }
