@@ -29,10 +29,25 @@ spring:
     template:
       mandatory: true
 
+  mail:
+    host: ${EFS_SMTP_HOST:}
+    port: ${EFS_SMTP_PORT:25}
+    username: ${EFS_SMTP_USERNAME:}
+    password: ${EFS_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${EFS_SMTP_AUTH:false}
+          starttls:
+            enable: ${EFS_SMTP_STARTTLS_ENABLE:false}
+
 server:
   port: 8080
 
 management:
+  health:
+    mail:
+      enabled: ${EFS_SMTP_ENABLED:false}
   endpoints:
     web:
       exposure:
