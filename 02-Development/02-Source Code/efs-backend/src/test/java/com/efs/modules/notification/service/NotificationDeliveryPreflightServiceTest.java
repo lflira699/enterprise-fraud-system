@@ -4,6 +4,7 @@ import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.catalog.dto.NotificationTemplateResponse;
 import com.efs.modules.catalog.service.NotificationTemplateServiceInterface;
+import com.efs.modules.integration.service.ExternalNotificationDeliveryAvailabilityServiceInterface;
 import com.efs.modules.notification.dto.NotificationDeliveryPreflightResult;
 import com.efs.modules.notification.dto.RenderedNotificationContent;
 import com.efs.modules.notification.entity.Notification;
@@ -44,6 +45,10 @@ class NotificationDeliveryPreflightServiceTest {
     private NotificationDestinationResolver
             notificationDestinationResolver;
 
+    @Mock
+    private ExternalNotificationDeliveryAvailabilityServiceInterface
+            externalNotificationDeliveryAvailabilityService;
+
     private NotificationDeliveryPreflightService service;
 
     private UUID organizationId;
@@ -68,7 +73,8 @@ class NotificationDeliveryPreflightServiceTest {
                         notificationTemplateService,
                         userAccountLookupService,
                         notificationTemplateRenderer,
-                        notificationDestinationResolver
+                        notificationDestinationResolver,
+                        externalNotificationDeliveryAvailabilityService
                 );
     }
 
@@ -152,6 +158,17 @@ class NotificationDeliveryPreflightServiceTest {
                         )
         ).thenReturn(
                 "user@example.com"
+        );
+
+        when(
+                externalNotificationDeliveryAvailabilityService
+                        .isAvailable(
+                                organizationId,
+                                tenantId,
+                                "EMAIL"
+                        )
+        ).thenReturn(
+                true
         );
 
         NotificationDeliveryPreflightResult result =
@@ -557,6 +574,125 @@ class NotificationDeliveryPreflightServiceTest {
         );
     }
 
+    @Test
+    void shouldRejectWhenExternalDeliveryIsUnavailable() {
+
+        Notification notification =
+                createNotification();
+
+        NotificationRecipientDelivery delivery =
+                createDelivery(
+                        recipientUserId
+                );
+
+        NotificationRequestedEventMessage message =
+                createMessage(
+                        List.of(
+                                recipientUserId
+                        )
+                );
+
+        NotificationTemplateResponse template =
+                createTemplate(
+                        "ACTIVE"
+                );
+
+        UserAccountReference recipient =
+                new UserAccountReference(
+                        recipientUserId,
+                        organizationId,
+                        tenantId,
+                        "user@example.com"
+                );
+
+        when(
+                notificationTemplateService
+                        .getNotificationTemplateById(
+                                templateId
+                        )
+        ).thenReturn(
+                template
+        );
+
+        when(
+                userAccountLookupService
+                        .findAuthorizedUsers(
+                                organizationId,
+                                tenantId,
+                                List.of(
+                                        recipientUserId
+                                )
+                        )
+        ).thenReturn(
+                List.of(
+                        recipient
+                )
+        );
+
+        when(
+                notificationTemplateRenderer
+                        .render(
+                                "Case {{caseNumber}} created",
+                                "Case {{caseNumber}} has been created.",
+                                Map.of(
+                                        "caseNumber",
+                                        "CASE-1"
+                                )
+                        )
+        ).thenReturn(
+                new RenderedNotificationContent(
+                        "Case CASE-1 created",
+                        "Case CASE-1 has been created."
+                )
+        );
+
+        when(
+                notificationDestinationResolver
+                        .resolve(
+                                "EMAIL",
+                                recipient
+                        )
+        ).thenReturn(
+                "user@example.com"
+        );
+
+        when(
+                externalNotificationDeliveryAvailabilityService
+                        .isAvailable(
+                                organizationId,
+                                tenantId,
+                                "EMAIL"
+                        )
+        ).thenReturn(
+                false
+        );
+
+        NotificationDeliveryPreparationException exception =
+                assertThrows(
+                        NotificationDeliveryPreparationException.class,
+                        () ->
+                                service.prepare(
+                                        notification,
+                                        List.of(
+                                                delivery
+                                        ),
+                                        message
+                                )
+                );
+
+        assertEquals(
+                "DELIVERY_CONFIGURATION_UNAVAILABLE",
+                exception.getReason()
+        );
+
+        verify(
+                externalNotificationDeliveryAvailabilityService
+        ).isAvailable(
+                organizationId,
+                tenantId,
+                "EMAIL"
+        );
+    }
     private Notification createNotification() {
 
         Notification notification =

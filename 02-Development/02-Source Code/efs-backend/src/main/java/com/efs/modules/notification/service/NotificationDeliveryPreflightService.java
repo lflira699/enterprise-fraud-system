@@ -4,6 +4,7 @@ import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.catalog.dto.NotificationTemplateResponse;
 import com.efs.modules.catalog.service.NotificationTemplateServiceInterface;
+import com.efs.modules.integration.service.ExternalNotificationDeliveryAvailabilityServiceInterface;
 import com.efs.modules.notification.dto.NotificationDeliveryPreflightResult;
 import com.efs.modules.notification.dto.PreparedNotificationDelivery;
 import com.efs.modules.notification.dto.RenderedNotificationContent;
@@ -50,11 +51,16 @@ public class NotificationDeliveryPreflightService {
     private final NotificationDestinationResolver
             notificationDestinationResolver;
 
+    private final ExternalNotificationDeliveryAvailabilityServiceInterface
+            externalNotificationDeliveryAvailabilityService;
+
     public NotificationDeliveryPreflightService(
             NotificationTemplateServiceInterface notificationTemplateService,
             UserAccountLookupServiceInterface userAccountLookupService,
             NotificationTemplateRenderer notificationTemplateRenderer,
-            NotificationDestinationResolver notificationDestinationResolver) {
+            NotificationDestinationResolver notificationDestinationResolver,
+            ExternalNotificationDeliveryAvailabilityServiceInterface
+                    externalNotificationDeliveryAvailabilityService) {
 
         this.notificationTemplateService =
                 notificationTemplateService;
@@ -67,6 +73,9 @@ public class NotificationDeliveryPreflightService {
 
         this.notificationDestinationResolver =
                 notificationDestinationResolver;
+
+        this.externalNotificationDeliveryAvailabilityService =
+                externalNotificationDeliveryAvailabilityService;
     }
 
     public NotificationDeliveryPreflightResult prepare(
@@ -203,6 +212,20 @@ public class NotificationDeliveryPreflightService {
                             delivery.getChannel(),
                             destination
                     )
+            );
+        }
+
+        boolean deliveryAvailable =
+                externalNotificationDeliveryAvailabilityService
+                        .isAvailable(
+                                notification.getOrganizationId(),
+                                notification.getTenantId(),
+                                message.channel()
+                        );
+
+        if (!deliveryAvailable) {
+            throw controlledFailure(
+                    DELIVERY_CONFIGURATION_UNAVAILABLE
             );
         }
 
