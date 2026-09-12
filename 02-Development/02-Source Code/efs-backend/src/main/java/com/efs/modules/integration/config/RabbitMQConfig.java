@@ -41,6 +41,19 @@ public class RabbitMQConfig {
             DECISION_GENERATED_LISTENER_CONTAINER_FACTORY =
             "decisionGeneratedRabbitListenerContainerFactory";
 
+    public static final String NOTIFICATION_REQUESTED_QUEUE =
+            "notification-service.notification-requested";
+
+    public static final String NOTIFICATION_REQUESTED_DLQ =
+            "notification-service.notification-requested.dlq";
+
+    public static final String NOTIFICATION_REQUESTED_ROUTING_KEY =
+            "notification.requested.v1";
+
+    public static final String
+            NOTIFICATION_REQUESTED_LISTENER_CONTAINER_FACTORY =
+            "notificationRequestedRabbitListenerContainerFactory";
+
     @Bean
     public DirectExchange domainEventsExchange() {
         return new DirectExchange(
@@ -53,14 +66,18 @@ public class RabbitMQConfig {
     @Bean
     public Queue scenarioActivatedDlq() {
         return QueueBuilder
-                .durable(SCENARIO_ACTIVATED_DLQ)
+                .durable(
+                        SCENARIO_ACTIVATED_DLQ
+                )
                 .build();
     }
 
     @Bean
     public Queue scenarioActivatedQueue() {
         return QueueBuilder
-                .durable(SCENARIO_ACTIVATED_QUEUE)
+                .durable(
+                        SCENARIO_ACTIVATED_QUEUE
+                )
                 .withArgument(
                         "x-dead-letter-exchange",
                         ""
@@ -78,22 +95,32 @@ public class RabbitMQConfig {
             DirectExchange domainEventsExchange) {
 
         return BindingBuilder
-                .bind(scenarioActivatedQueue)
-                .to(domainEventsExchange)
-                .with(SCENARIO_ACTIVATED_ROUTING_KEY);
+                .bind(
+                        scenarioActivatedQueue
+                )
+                .to(
+                        domainEventsExchange
+                )
+                .with(
+                        SCENARIO_ACTIVATED_ROUTING_KEY
+                );
     }
 
     @Bean
     public Queue decisionGeneratedDlq() {
         return QueueBuilder
-                .durable(DECISION_GENERATED_DLQ)
+                .durable(
+                        DECISION_GENERATED_DLQ
+                )
                 .build();
     }
 
     @Bean
     public Queue decisionGeneratedQueue() {
         return QueueBuilder
-                .durable(DECISION_GENERATED_QUEUE)
+                .durable(
+                        DECISION_GENERATED_QUEUE
+                )
                 .withArgument(
                         "x-dead-letter-exchange",
                         ""
@@ -111,9 +138,58 @@ public class RabbitMQConfig {
             DirectExchange domainEventsExchange) {
 
         return BindingBuilder
-                .bind(decisionGeneratedQueue)
-                .to(domainEventsExchange)
-                .with(DECISION_GENERATED_ROUTING_KEY);
+                .bind(
+                        decisionGeneratedQueue
+                )
+                .to(
+                        domainEventsExchange
+                )
+                .with(
+                        DECISION_GENERATED_ROUTING_KEY
+                );
+    }
+
+    @Bean
+    public Queue notificationRequestedDlq() {
+        return QueueBuilder
+                .durable(
+                        NOTIFICATION_REQUESTED_DLQ
+                )
+                .build();
+    }
+
+    @Bean
+    public Queue notificationRequestedQueue() {
+        return QueueBuilder
+                .durable(
+                        NOTIFICATION_REQUESTED_QUEUE
+                )
+                .withArgument(
+                        "x-dead-letter-exchange",
+                        ""
+                )
+                .withArgument(
+                        "x-dead-letter-routing-key",
+                        NOTIFICATION_REQUESTED_DLQ
+                )
+                .build();
+    }
+
+    @Bean
+    public Binding notificationRequestedBinding(
+            Queue notificationRequestedQueue,
+            DirectExchange domainEventsExchange) {
+
+        return BindingBuilder
+                .bind(
+                        notificationRequestedQueue
+                )
+                .to(
+                        domainEventsExchange
+                )
+                .with(
+                        NOTIFICATION_REQUESTED_ROUTING_KEY
+                );
     }
 
     @Bean(
@@ -122,6 +198,41 @@ public class RabbitMQConfig {
     )
     public SimpleRabbitListenerContainerFactory
             decisionGeneratedRabbitListenerContainerFactory(
+                    SimpleRabbitListenerContainerFactoryConfigurer configurer,
+                    ConnectionFactory connectionFactory) {
+
+        SimpleRabbitListenerContainerFactory factory =
+                new SimpleRabbitListenerContainerFactory();
+
+        configurer.configure(
+                factory,
+                connectionFactory
+        );
+
+        factory.setAdviceChain(
+                RetryInterceptorBuilder
+                        .stateless()
+                        .maxAttempts(
+                                4
+                        )
+                        .backOffPolicy(
+                                new DecisionGeneratedRetryBackOffPolicy()
+                        )
+                        .recoverer(
+                                new RejectAndDontRequeueRecoverer()
+                        )
+                        .build()
+        );
+
+        return factory;
+    }
+
+    @Bean(
+            name =
+                    NOTIFICATION_REQUESTED_LISTENER_CONTAINER_FACTORY
+    )
+    public SimpleRabbitListenerContainerFactory
+            notificationRequestedRabbitListenerContainerFactory(
                     SimpleRabbitListenerContainerFactoryConfigurer configurer,
                     ConnectionFactory connectionFactory) {
 
