@@ -179,18 +179,32 @@ class ExternalNotificationDeliveryContractTest {
     }
 
     @Test
-    void shouldExposeChannelAwareAdapterContract() {
+    void shouldExposeScopedAdapterContract() {
+
+        java.util.UUID organizationId =
+                java.util.UUID.randomUUID();
+
+        java.util.UUID tenantId =
+                java.util.UUID.randomUUID();
 
         ExternalNotificationDeliveryAdapter adapter =
                 new ExternalNotificationDeliveryAdapter() {
 
                     @Override
                     public boolean supports(
+                            java.util.UUID candidateOrganizationId,
+                            java.util.UUID candidateTenantId,
                             String channel) {
 
-                        return "EMAIL".equals(
-                                channel
-                        );
+                        return organizationId.equals(
+                                candidateOrganizationId
+                        )
+                                && tenantId.equals(
+                                        candidateTenantId
+                                )
+                                && "EMAIL".equals(
+                                        channel
+                                );
                     }
 
                     @Override
@@ -210,13 +224,25 @@ class ExternalNotificationDeliveryContractTest {
 
         assertTrue(
                 adapter.supports(
+                        organizationId,
+                        tenantId,
                         "EMAIL"
                 )
         );
 
         assertFalse(
                 adapter.supports(
+                        organizationId,
+                        tenantId,
                         "SMS"
+                )
+        );
+
+        assertFalse(
+                adapter.supports(
+                        java.util.UUID.randomUUID(),
+                        tenantId,
+                        "EMAIL"
                 )
         );
 
