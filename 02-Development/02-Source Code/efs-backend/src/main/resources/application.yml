@@ -44,3 +44,9 @@ efs:
       issuer-uri: ${EFS_JWT_ISSUER_URI:https://unconfigured.invalid/efs}
       jwk-set-uri: ${EFS_JWT_JWK_SET_URI:https://unconfigured.invalid/efs/jwks}
       audience: ${EFS_JWT_AUDIENCE:UNCONFIGURED_EFS_AUDIENCE}
+
+  integration:
+    notification:
+      smtp:
+        enabled: ${EFS_SMTP_ENABLED:false}
+        from: ${EFS_SMTP_FROM:}
