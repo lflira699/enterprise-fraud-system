@@ -61,6 +61,11 @@ efs:
       audience: ${EFS_JWT_AUDIENCE:UNCONFIGURED_EFS_AUDIENCE}
 
   integration:
+    outbox:
+      dispatch:
+        enabled: ${EFS_OUTBOX_DISPATCH_ENABLED:false}
+        interval-ms: ${EFS_OUTBOX_DISPATCH_INTERVAL_MS:1000}
+
     notification:
       smtp:
         enabled: ${EFS_SMTP_ENABLED:false}
