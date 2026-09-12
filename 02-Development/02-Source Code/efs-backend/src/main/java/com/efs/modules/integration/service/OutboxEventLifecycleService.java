@@ -64,6 +64,12 @@ public class OutboxEventLifecycleService {
                     STATUS_PROCESSING
             );
 
+            event.setProcessingStartedAt(
+                    LocalDateTime.now()
+            );
+
+            event.setNextAttemptAt(null);
+
             outboxEventRepository.save(event);
 
             return Optional.of(event);
@@ -74,6 +80,12 @@ public class OutboxEventLifecycleService {
             event.setStatus(
                     STATUS_PROCESSING
             );
+
+            event.setProcessingStartedAt(
+                    LocalDateTime.now()
+            );
+
+            event.setNextAttemptAt(null);
 
             outboxEventRepository.save(event);
 
@@ -100,6 +112,7 @@ public class OutboxEventLifecycleService {
                 LocalDateTime.now()
         );
 
+        event.setProcessingStartedAt(null);
         event.setNextAttemptAt(null);
         event.setLastError(null);
 
@@ -135,6 +148,7 @@ public class OutboxEventLifecycleService {
                 failedAttempts
         );
 
+        event.setProcessingStartedAt(null);
         event.setPublishedAt(null);
 
         event.setLastError(

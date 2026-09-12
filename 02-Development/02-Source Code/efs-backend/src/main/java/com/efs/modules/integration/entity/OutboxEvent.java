@@ -51,6 +51,9 @@ public class OutboxEvent {
     @Column(name = "next_attempt_at")
     private LocalDateTime nextAttemptAt;
 
+    @Column(name = "processing_started_at")
+    private LocalDateTime processingStartedAt;
+
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
@@ -138,6 +141,17 @@ public class OutboxEvent {
 
     public void setNextAttemptAt(LocalDateTime nextAttemptAt) {
         this.nextAttemptAt = nextAttemptAt;
+    }
+
+    public LocalDateTime getProcessingStartedAt() {
+        return processingStartedAt;
+    }
+
+    public void setProcessingStartedAt(
+            LocalDateTime processingStartedAt) {
+
+        this.processingStartedAt =
+                processingStartedAt;
     }
 
     public LocalDateTime getPublishedAt() {

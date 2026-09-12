@@ -67,6 +67,14 @@ class OutboxEventLifecycleServiceIntegrationTest {
                 Integer.valueOf(0),
                 persisted.getAttemptCount()
         );
+
+        assertNotNull(
+                persisted.getProcessingStartedAt()
+        );
+
+        assertNull(
+                persisted.getNextAttemptAt()
+        );
     }
 
     @Test
@@ -111,6 +119,14 @@ class OutboxEventLifecycleServiceIntegrationTest {
         assertEquals(
                 Integer.valueOf(1),
                 persisted.getAttemptCount()
+        );
+
+        assertNotNull(
+                persisted.getProcessingStartedAt()
+        );
+
+        assertNull(
+                persisted.getNextAttemptAt()
         );
     }
 
@@ -240,6 +256,10 @@ class OutboxEventLifecycleServiceIntegrationTest {
         assertNull(
                 persisted.getLastError()
         );
+
+        assertNull(
+                persisted.getProcessingStartedAt()
+        );
     }
 
     @Test
@@ -318,6 +338,10 @@ class OutboxEventLifecycleServiceIntegrationTest {
         assertNull(
                 persisted.getPublishedAt()
         );
+
+        assertNull(
+                persisted.getProcessingStartedAt()
+        );
     }
 
     @Test
@@ -395,6 +419,10 @@ class OutboxEventLifecycleServiceIntegrationTest {
                 persisted.getPublishedAt()
         );
 
+        assertNull(
+                persisted.getProcessingStartedAt()
+        );
+
         assertNotNull(
                 persisted.getNextAttemptAt()
         );
@@ -453,6 +481,15 @@ class OutboxEventLifecycleServiceIntegrationTest {
         event.setAttemptCount(
                 attemptCount
         );
+
+        if ("PROCESSING".equals(
+                status)) {
+
+            event.setProcessingStartedAt(
+                    LocalDateTime.now()
+                            .minusSeconds(1)
+            );
+        }
 
         return event;
     }
