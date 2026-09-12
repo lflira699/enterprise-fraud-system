@@ -44,7 +44,8 @@ class OutboxEventRabbitPublisherTest {
                 new OutboxEventRabbitPublisher(
                         rabbitTemplate,
                         objectMapper,
-                        new DomainEventRoutingKeyResolver()
+                        new DomainEventRoutingKeyResolver(),
+                        5000L
                 );
     }
 
@@ -358,6 +359,85 @@ class OutboxEventRabbitPublisherTest {
         );
     }
 
+    @Test
+    void shouldFailWhenPublisherConfirmTimesOut() {
+
+        OutboxEventRabbitPublisher timeoutPublisher =
+                new OutboxEventRabbitPublisher(
+                        rabbitTemplate,
+                        objectMapper,
+                        new DomainEventRoutingKeyResolver(),
+                        50L
+                );
+
+        UUID messageId =
+                UUID.randomUUID();
+
+        OutboxEvent outboxEvent =
+                createOutboxEvent(
+                        messageId,
+                        "DecisionGenerated",
+                        Map.of(
+                                "messageId",
+                                messageId.toString(),
+                                "eventType",
+                                "DecisionGenerated"
+                        )
+                );
+
+        CompletableFuture<Void> result =
+                timeoutPublisher.publish(
+                        outboxEvent
+                );
+
+        CompletionException exception =
+                assertThrows(
+                        CompletionException.class,
+                        result::join
+                );
+
+        assertEquals(
+                "RabbitMQ publisher confirm timeout after 50 ms",
+                exception
+                        .getCause()
+                        .getMessage()
+        );
+
+        verify(
+                rabbitTemplate
+        ).send(
+                eq(
+                        RabbitMQConfig
+                                .DOMAIN_EVENTS_EXCHANGE
+                ),
+                eq("decision.generated.v1"),
+                org.mockito.ArgumentMatchers
+                        .any(Message.class),
+                org.mockito.ArgumentMatchers
+                        .any(CorrelationData.class)
+        );
+    }
+
+    @Test
+    void shouldRejectNonPositivePublisherConfirmTimeout() {
+
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                new OutboxEventRabbitPublisher(
+                                        rabbitTemplate,
+                                        objectMapper,
+                                        new DomainEventRoutingKeyResolver(),
+                                        0L
+                                )
+                );
+
+        assertEquals(
+                "Outbox publisher confirm timeout must be greater than zero",
+                exception.getMessage()
+        );
+    }
     private OutboxEvent createOutboxEvent(
             UUID messageId,
             String eventType,
