@@ -7,9 +7,8 @@ import com.efs.modules.integration.service.ProcessedDomainEventRegistry;
 import com.efs.modules.rules.entity.RuleAction;
 import com.efs.modules.rules.service.RuleAlertActionParameters;
 import com.efs.modules.rules.service.RuleAlertActionResolver;
-import com.efs.modules.transaction.entity.TransactionDecision;
-import com.efs.modules.transaction.repository.TransactionDecisionRepository;
-import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.modules.transaction.dto.TransactionDecisionResponse;
+import com.efs.modules.transaction.service.TransactionDecisionServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +27,8 @@ public class DecisionGeneratedEventProcessor {
     private final ProcessedDomainEventRegistry
             processedDomainEventRegistry;
 
-    private final TransactionDecisionRepository
-            transactionDecisionRepository;
+    private final TransactionDecisionServiceInterface
+            transactionDecisionService;
 
     private final RuleAlertActionResolver
             ruleAlertActionResolver;
@@ -42,7 +41,7 @@ public class DecisionGeneratedEventProcessor {
 
     public DecisionGeneratedEventProcessor(
             ProcessedDomainEventRegistry processedDomainEventRegistry,
-            TransactionDecisionRepository transactionDecisionRepository,
+            TransactionDecisionServiceInterface transactionDecisionService,
             RuleAlertActionResolver ruleAlertActionResolver,
             AlertRuleActionConsolidator alertRuleActionConsolidator,
             AlertServiceInterface alertService) {
@@ -50,8 +49,8 @@ public class DecisionGeneratedEventProcessor {
         this.processedDomainEventRegistry =
                 processedDomainEventRegistry;
 
-        this.transactionDecisionRepository =
-                transactionDecisionRepository;
+        this.transactionDecisionService =
+                transactionDecisionService;
 
         this.ruleAlertActionResolver =
                 ruleAlertActionResolver;
@@ -84,17 +83,10 @@ public class DecisionGeneratedEventProcessor {
             return;
         }
 
-        TransactionDecision decision =
-                transactionDecisionRepository
-                        .findByDecisionId(
-                                message.decisionId()
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Transaction decision not found: "
-                                                + message.decisionId()
-                                )
-                        );
+        TransactionDecisionResponse decision =
+                transactionDecisionService.getDecisionById(
+                        message.decisionId()
+                );
 
         List<RuleAction> ruleActions =
                 ruleAlertActionResolver

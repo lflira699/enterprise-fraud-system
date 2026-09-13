@@ -28,6 +28,12 @@ public class Alert {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
+    @Column(name = "tenant_id")
+    private UUID tenantId;
+
     @Column(name = "transaction_id")
     private UUID transactionId;
 
@@ -118,6 +124,22 @@ public class Alert {
 
     public void setAlertReference(String alertReference) {
         this.alertReference = alertReference;
+    }
+
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(UUID organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(UUID tenantId) {
+        this.tenantId = tenantId;
     }
 
     public UUID getCustomerId() {

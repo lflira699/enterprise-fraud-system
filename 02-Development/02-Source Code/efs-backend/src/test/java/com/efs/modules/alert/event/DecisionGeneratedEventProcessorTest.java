@@ -7,8 +7,8 @@ import com.efs.modules.integration.service.ProcessedDomainEventRegistry;
 import com.efs.modules.rules.entity.RuleAction;
 import com.efs.modules.rules.service.RuleAlertActionParameters;
 import com.efs.modules.rules.service.RuleAlertActionResolver;
-import com.efs.modules.transaction.entity.TransactionDecision;
-import com.efs.modules.transaction.repository.TransactionDecisionRepository;
+import com.efs.modules.transaction.dto.TransactionDecisionResponse;
+import com.efs.modules.transaction.service.TransactionDecisionServiceInterface;
 import com.efs.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,8 +32,8 @@ class DecisionGeneratedEventProcessorTest {
     private ProcessedDomainEventRegistry
             processedDomainEventRegistry;
 
-    private TransactionDecisionRepository
-            transactionDecisionRepository;
+    private TransactionDecisionServiceInterface
+            transactionDecisionService;
 
     private RuleAlertActionResolver
             ruleAlertActionResolver;
@@ -55,9 +55,9 @@ class DecisionGeneratedEventProcessorTest {
                         ProcessedDomainEventRegistry.class
                 );
 
-        transactionDecisionRepository =
+        transactionDecisionService =
                 mock(
-                        TransactionDecisionRepository.class
+                        TransactionDecisionServiceInterface.class
                 );
 
         ruleAlertActionResolver =
@@ -78,7 +78,7 @@ class DecisionGeneratedEventProcessorTest {
         processor =
                 new DecisionGeneratedEventProcessor(
                         processedDomainEventRegistry,
-                        transactionDecisionRepository,
+                        transactionDecisionService,
                         ruleAlertActionResolver,
                         alertRuleActionConsolidator,
                         alertService
@@ -110,7 +110,7 @@ class DecisionGeneratedEventProcessorTest {
                         decisionId
                 );
 
-        TransactionDecision decision =
+        TransactionDecisionResponse decision =
                 createDecision(
                         decisionId,
                         transactionId,
@@ -131,14 +131,12 @@ class DecisionGeneratedEventProcessorTest {
         );
 
         when(
-                transactionDecisionRepository
-                        .findByDecisionId(
+                transactionDecisionService
+                        .getDecisionById(
                                 decisionId
                         )
         ).thenReturn(
-                Optional.of(
-                        decision
-                )
+                decision
         );
 
         when(
@@ -249,7 +247,7 @@ class DecisionGeneratedEventProcessorTest {
         );
 
         verifyNoInteractions(
-                transactionDecisionRepository,
+                transactionDecisionService,
                 ruleAlertActionResolver,
                 alertRuleActionConsolidator,
                 alertService
@@ -275,7 +273,7 @@ class DecisionGeneratedEventProcessorTest {
                         decisionId
                 );
 
-        TransactionDecision decision =
+        TransactionDecisionResponse decision =
                 createDecision(
                         decisionId,
                         transactionId,
@@ -293,14 +291,12 @@ class DecisionGeneratedEventProcessorTest {
         );
 
         when(
-                transactionDecisionRepository
-                        .findByDecisionId(
+                transactionDecisionService
+                        .getDecisionById(
                                 decisionId
                         )
         ).thenReturn(
-                Optional.of(
-                        decision
-                )
+                decision
         );
 
         when(
@@ -352,7 +348,7 @@ class DecisionGeneratedEventProcessorTest {
 
         verifyNoInteractions(
                 processedDomainEventRegistry,
-                transactionDecisionRepository,
+                transactionDecisionService,
                 ruleAlertActionResolver,
                 alertRuleActionConsolidator,
                 alertService
@@ -386,12 +382,15 @@ class DecisionGeneratedEventProcessorTest {
         );
 
         when(
-                transactionDecisionRepository
-                        .findByDecisionId(
+                transactionDecisionService
+                        .getDecisionById(
                                 decisionId
                         )
-        ).thenReturn(
-                Optional.empty()
+        ).thenThrow(
+                new ResourceNotFoundException(
+                        "Transaction decision not found: "
+                                + decisionId
+                )
         );
 
         ResourceNotFoundException exception =
@@ -435,7 +434,7 @@ class DecisionGeneratedEventProcessorTest {
                         decisionId
                 );
 
-        TransactionDecision decision =
+        TransactionDecisionResponse decision =
                 createDecision(
                         decisionId,
                         transactionId,
@@ -465,14 +464,12 @@ class DecisionGeneratedEventProcessorTest {
         );
 
         when(
-                transactionDecisionRepository
-                        .findByDecisionId(
+                transactionDecisionService
+                        .getDecisionById(
                                 decisionId
                         )
         ).thenReturn(
-                Optional.of(
-                        decision
-                )
+                decision
         );
 
         when(
@@ -517,13 +514,13 @@ class DecisionGeneratedEventProcessorTest {
         );
     }
 
-    private TransactionDecision createDecision(
+    private TransactionDecisionResponse createDecision(
             UUID decisionId,
             UUID transactionId,
             UUID riskAssessmentId) {
 
-        TransactionDecision decision =
-                new TransactionDecision();
+        TransactionDecisionResponse decision =
+                new TransactionDecisionResponse();
 
         decision.setDecisionId(
                 decisionId

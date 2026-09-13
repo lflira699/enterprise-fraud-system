@@ -43,6 +43,11 @@ class AlertServiceIntegrationTest {
                     "30303030-3030-3030-3030-303030303030"
             );
 
+    private static final UUID TENANT_ID =
+            UUID.fromString(
+                    "31313131-3131-3131-3131-313131313131"
+            );
+
     private static final UUID CREATED_BY =
             UUID.fromString(
                     "40404040-4040-4040-4040-404040404040"
@@ -110,6 +115,26 @@ class AlertServiceIntegrationTest {
                 "GT",
                 "America/Guatemala",
                 "ACTIVE"
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.tenant (
+                    tenant_id,
+                    organization_id,
+                    tenant_code,
+                    tenant_name,
+                    status,
+                    environment
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                TENANT_ID,
+                ORGANIZATION_ID,
+                "EFS-ALERT-TEST-TENANT",
+                "EFS Alert Test Tenant",
+                "ACTIVE",
+                "TEST"
         );
 
         jdbcTemplate.update(
@@ -195,6 +220,7 @@ class AlertServiceIntegrationTest {
                     transaction_reference,
                     customer_id,
                     organization_id,
+                    tenant_id,
                     transaction_type,
                     amount,
                     currency_code,
@@ -204,12 +230,13 @@ class AlertServiceIntegrationTest {
                     created_by,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 TRANSACTION_ID,
                 "EFS-ALERT-TEST-TRANSACTION",
                 CUSTOMER_ID,
                 ORGANIZATION_ID,
+                TENANT_ID,
                 "TEST",
                 new BigDecimal("500.00"),
                 "GTQ",
@@ -295,6 +322,38 @@ class AlertServiceIntegrationTest {
         assertEquals("FRAUD", created.getAlertType());
         assertEquals("HIGH", created.getPriority());
         assertEquals("NEW", created.getStatus());
+
+        UUID persistedOrganizationId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT organization_id
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        UUID.class,
+                        created.getAlertId()
+                );
+
+        UUID persistedTenantId =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT tenant_id
+                        FROM alert.alert
+                        WHERE alert_id = ?
+                        """,
+                        UUID.class,
+                        created.getAlertId()
+                );
+
+        assertEquals(
+                ORGANIZATION_ID,
+                persistedOrganizationId
+        );
+
+        assertEquals(
+                TENANT_ID,
+                persistedTenantId
+        );
     }
 
     @Test

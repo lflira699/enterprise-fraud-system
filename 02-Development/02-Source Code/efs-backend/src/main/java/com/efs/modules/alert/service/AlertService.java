@@ -16,10 +16,10 @@ import com.efs.modules.alert.validator.AlertStatusValidator;
 import com.efs.modules.casemanagement.repository.CaseAlertRepository;
 import com.efs.modules.detection.repository.DetectionScenarioRepository;
 import com.efs.modules.risk.repository.RiskAssessmentRepository;
-import com.efs.modules.transaction.entity.Transaction;
-import com.efs.modules.transaction.entity.TransactionDecision;
-import com.efs.modules.transaction.repository.TransactionDecisionRepository;
-import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.dto.TransactionDecisionResponse;
+import com.efs.modules.transaction.dto.TransactionResponse;
+import com.efs.modules.transaction.service.TransactionDecisionServiceInterface;
+import com.efs.modules.transaction.service.TransactionServiceInterface;
 import com.efs.shared.exception.AlertConcurrentModificationException;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
@@ -73,11 +73,11 @@ public class AlertService
     private final AlertHistoryRepository
             alertHistoryRepository;
 
-    private final TransactionDecisionRepository
-            transactionDecisionRepository;
+    private final TransactionDecisionServiceInterface
+            transactionDecisionService;
 
-    private final TransactionRepository
-            transactionRepository;
+    private final TransactionServiceInterface
+            transactionService;
 
     private final RiskAssessmentRepository
             riskAssessmentRepository;
@@ -99,8 +99,8 @@ public class AlertService
     public AlertService(
             AlertRepository alertRepository,
             AlertHistoryRepository alertHistoryRepository,
-            TransactionDecisionRepository transactionDecisionRepository,
-            TransactionRepository transactionRepository,
+            TransactionDecisionServiceInterface transactionDecisionService,
+            TransactionServiceInterface transactionService,
             RiskAssessmentRepository riskAssessmentRepository,
             DetectionScenarioRepository detectionScenarioRepository,
             CaseAlertRepository caseAlertRepository,
@@ -114,11 +114,11 @@ public class AlertService
         this.alertHistoryRepository =
                 alertHistoryRepository;
 
-        this.transactionDecisionRepository =
-                transactionDecisionRepository;
+        this.transactionDecisionService =
+                transactionDecisionService;
 
-        this.transactionRepository =
-                transactionRepository;
+        this.transactionService =
+                transactionService;
 
         this.riskAssessmentRepository =
                 riskAssessmentRepository;
@@ -144,34 +144,31 @@ public class AlertService
     public AlertResponse createAlert(
             AlertRequest request) {
 
-        TransactionDecision decision =
-                transactionDecisionRepository
-                        .findByDecisionId(
-                                request.getDecisionId()
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Transaction decision not found: "
-                                                + request.getDecisionId()
-                                )
-                        );
+        TransactionDecisionResponse decision =
+                transactionDecisionService.getDecisionById(
+                        request.getDecisionId()
+                );
 
         validateDecisionContext(
                 request,
                 decision
         );
 
-        Transaction transaction =
-                transactionRepository
-                        .findByTransactionIdAndDeletedAtIsNull(
-                                decision.getTransactionId()
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Transaction not found: "
-                                                + decision.getTransactionId()
-                                )
-                        );
+        if (decision.getTransactionId() == null) {
+            throw new ValidationException(
+                    "Transaction decision must reference a transaction"
+            );
+        }
+
+        TransactionResponse transaction =
+                transactionService.getTransactionById(
+                        decision.getTransactionId()
+                );
+
+        validateTransactionContext(
+                decision,
+                transaction
+        );
 
         Alert alert =
                 alertMapper.toEntity(
@@ -184,6 +181,14 @@ public class AlertService
 
         alert.setRiskAssessmentId(
                 decision.getRiskAssessmentId()
+        );
+
+        alert.setOrganizationId(
+                transaction.getOrganizationId()
+        );
+
+        alert.setTenantId(
+                transaction.getTenantId()
         );
 
         if (alert.getCustomerId() == null) {
@@ -926,9 +931,33 @@ public class AlertService
         }
     }
 
+    private void validateTransactionContext(
+            TransactionDecisionResponse decision,
+            TransactionResponse transaction) {
+
+        if (transaction.getTransactionId() == null
+                || !decision.getTransactionId().equals(
+                        transaction.getTransactionId()
+                )) {
+
+            throw new ValidationException(
+                    "Transaction decision context does not match "
+                            + "the resolved transaction"
+            );
+        }
+
+        if (transaction.getOrganizationId() == null) {
+
+            throw new ValidationException(
+                    "Transaction organization is required "
+                            + "for alert creation"
+            );
+        }
+    }
+
     private void validateDecisionContext(
             AlertRequest request,
-            TransactionDecision decision) {
+            TransactionDecisionResponse decision) {
 
         if (request.getTransactionId() != null
                 && !request.getTransactionId().equals(

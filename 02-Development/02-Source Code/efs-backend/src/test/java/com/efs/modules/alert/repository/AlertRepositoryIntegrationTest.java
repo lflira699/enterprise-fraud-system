@@ -148,6 +148,7 @@ class AlertRepositoryIntegrationTest {
                 () -> jdbcTemplate.update(
                         """
                         INSERT INTO alert.alert (
+                            organization_id,
                             transaction_id,
                             decision_id,
                             alert_type,
@@ -158,8 +159,9 @@ class AlertRepositoryIntegrationTest {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                        ORGANIZATION_ID,
                         NON_EXISTENT_TRANSACTION_ID,
                         DECISION_ID,
                         "FRAUD",
@@ -181,6 +183,7 @@ class AlertRepositoryIntegrationTest {
                 () -> jdbcTemplate.update(
                         """
                         INSERT INTO alert.alert (
+                            organization_id,
                             transaction_id,
                             decision_id,
                             alert_type,
@@ -191,8 +194,9 @@ class AlertRepositoryIntegrationTest {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                        ORGANIZATION_ID,
                         TRANSACTION_ID,
                         NON_EXISTENT_DECISION_ID,
                         "FRAUD",

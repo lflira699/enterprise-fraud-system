@@ -852,6 +852,7 @@ class AlertSearchControllerIntegrationTest {
         jdbcTemplate.update(
                 """
                 INSERT INTO alert.alert (
+                    organization_id,
                     alert_id,
                     customer_id,
                     transaction_id,
@@ -867,8 +868,9 @@ class AlertSearchControllerIntegrationTest {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
+                ORGANIZATION_ID,
                 alertId,
                 CUSTOMER_ID,
                 TRANSACTION_ID,

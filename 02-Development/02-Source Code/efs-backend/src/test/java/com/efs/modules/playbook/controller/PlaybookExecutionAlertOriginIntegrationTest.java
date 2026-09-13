@@ -693,6 +693,7 @@ class PlaybookExecutionAlertOriginIntegrationTest {
         jdbcTemplate.update(
                 """
                 INSERT INTO alert.alert (
+                    organization_id,
                     alert_id,
                     customer_id,
                     transaction_id,
@@ -707,8 +708,9 @@ class PlaybookExecutionAlertOriginIntegrationTest {
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
+                ORGANIZATION_ID,
                 ALERT_ID,
                 CUSTOMER_ID,
                 TRANSACTION_ID,

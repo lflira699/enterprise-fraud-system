@@ -215,6 +215,7 @@ class AlertOptimisticLockingIntegrationTest {
         jdbcTemplate.update(
                 """
                 INSERT INTO alert.alert (
+                    organization_id,
                     alert_id,
                     customer_id,
                     transaction_id,
@@ -230,8 +231,9 @@ class AlertOptimisticLockingIntegrationTest {
                     updated_at,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
+                ORGANIZATION_ID,
                 ALERT_ID,
                 CUSTOMER_ID,
                 TRANSACTION_ID,
