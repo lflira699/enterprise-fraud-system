@@ -213,6 +213,7 @@ class AlertControllerIntegrationTest {
                 INSERT INTO transaction.risk_assessment (
                     risk_assessment_id,
                     transaction_id,
+                    organization_id,
                     assessment_type,
                     assessment_stage,
                     overall_risk_score,
@@ -224,10 +225,11 @@ class AlertControllerIntegrationTest {
                     updated_at,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 RISK_ASSESSMENT_ID,
                 TRANSACTION_ID,
+                ORGANIZATION_ID,
                 "TRANSACTION",
                 "DECISION",
                 new BigDecimal("91.00"),

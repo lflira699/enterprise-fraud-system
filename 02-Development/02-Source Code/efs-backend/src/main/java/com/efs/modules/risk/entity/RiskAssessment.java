@@ -28,6 +28,12 @@ public class RiskAssessment {
     @Column(name = "transaction_id", nullable = false)
     private UUID transactionId;
 
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
+    @Column(name = "tenant_id")
+    private UUID tenantId;
+
     @Column(name = "correlation_id")
     private UUID correlationId;
 
@@ -125,6 +131,22 @@ public class RiskAssessment {
 
     public void setTransactionId(UUID transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(UUID organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(UUID tenantId) {
+        this.tenantId = tenantId;
     }
 
     public UUID getCorrelationId() {

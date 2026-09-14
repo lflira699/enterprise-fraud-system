@@ -88,6 +88,26 @@ class RiskAssessmentServiceIntegrationTest {
 
         jdbcTemplate.update(
                 """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                ORGANIZATION_ID,
+                "EFS-RISK-SERVICE-ORG",
+                "EFS Risk Service Integration Test Organization",
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+
+        jdbcTemplate.update(
+                """
                 INSERT INTO transaction.transaction (
                     transaction_id,
                     transaction_reference,

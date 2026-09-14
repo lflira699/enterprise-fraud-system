@@ -81,6 +81,26 @@ class TransactionDecisionServiceIntegrationTest {
 
         jdbcTemplate.update(
                 """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                ORGANIZATION_ID,
+                "EFS-TRANSACTION-DECISION-ORG",
+                "EFS Transaction Decision Test Organization",
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+
+        jdbcTemplate.update(
+                """
                 INSERT INTO transaction.transaction (
                     transaction_id,
                     transaction_reference,
@@ -116,6 +136,7 @@ class TransactionDecisionServiceIntegrationTest {
                 INSERT INTO transaction.risk_assessment (
                     risk_assessment_id,
                     transaction_id,
+                    organization_id,
                     assessment_type,
                     assessment_stage,
                     overall_risk_score,
@@ -127,10 +148,11 @@ class TransactionDecisionServiceIntegrationTest {
                     updated_at,
                     record_version
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 RISK_ASSESSMENT_ID,
                 TRANSACTION_ID,
+                ORGANIZATION_ID,
                 "TRANSACTION",
                 "DECISION",
                 new BigDecimal("85.00"),

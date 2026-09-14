@@ -7,7 +7,7 @@ import com.efs.modules.risk.dto.RiskAssessmentResponse;
 import com.efs.modules.risk.entity.RiskAssessment;
 import com.efs.modules.risk.mapper.RiskAssessmentMapper;
 import com.efs.modules.risk.repository.RiskAssessmentRepository;
-import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.service.TransactionServiceInterface;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.security.SecurityContext;
 import org.junit.jupiter.api.Test;
@@ -60,8 +60,8 @@ class RiskAssessmentServiceAuthorizationTest {
             riskAssessmentMapper;
 
     @Mock
-    private TransactionRepository
-            transactionRepository;
+    private TransactionServiceInterface
+            transactionService;
 
     @Mock
     private RiskScoringModelResolver

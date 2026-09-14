@@ -6,8 +6,8 @@ import com.efs.modules.integration.service.DomainEventOutboxService;
 import com.efs.modules.risk.dto.RiskAssessmentRequest;
 import com.efs.modules.risk.mapper.RiskAssessmentMapper;
 import com.efs.modules.risk.repository.RiskAssessmentRepository;
-import com.efs.modules.transaction.entity.Transaction;
-import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.dto.TransactionResponse;
+import com.efs.modules.transaction.service.TransactionServiceInterface;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -49,7 +49,7 @@ class TransactionRiskAssessmentErrorAuditTest {
 
     private RiskAssessmentRepository repository;
     private RiskAssessmentMapper mapper;
-    private TransactionRepository transactionRepository;
+    private TransactionServiceInterface transactionService;
     private RiskScoringModelResolver modelResolver;
     private RiskCalculator riskCalculator;
     private DomainEventOutboxService outboxService;
@@ -67,8 +67,8 @@ class TransactionRiskAssessmentErrorAuditTest {
         mapper =
                 mock(RiskAssessmentMapper.class);
 
-        transactionRepository =
-                mock(TransactionRepository.class);
+        transactionService =
+                mock(TransactionServiceInterface.class);
 
         modelResolver =
                 mock(RiskScoringModelResolver.class);
@@ -89,7 +89,7 @@ class TransactionRiskAssessmentErrorAuditTest {
                 new RiskAssessmentService(
                         repository,
                         mapper,
-                        transactionRepository,
+                        transactionService,
                         modelResolver,
                         riskCalculator,
                         outboxService,
@@ -483,11 +483,17 @@ class TransactionRiskAssessmentErrorAuditTest {
     private void prepareTransaction(
             UUID correlationId) {
 
-        Transaction transaction =
-                new Transaction();
+        TransactionResponse transaction =
+                new TransactionResponse();
 
         transaction.setTransactionId(
                 TRANSACTION_ID
+        );
+
+        transaction.setOrganizationId(
+                UUID.fromString(
+                        "94949494-9494-9494-9494-949494949494"
+                )
         );
 
         transaction.setOrganizationId(
@@ -499,12 +505,11 @@ class TransactionRiskAssessmentErrorAuditTest {
         );
 
         when(
-                transactionRepository
-                        .findByTransactionIdAndDeletedAtIsNull(
-                                TRANSACTION_ID
-                        )
+                transactionService.getTransactionById(
+                        TRANSACTION_ID
+                )
         ).thenReturn(
-                Optional.of(transaction)
+                transaction
         );
     }
 

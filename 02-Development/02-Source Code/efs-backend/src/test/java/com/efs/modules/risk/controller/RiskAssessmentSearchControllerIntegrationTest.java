@@ -112,6 +112,26 @@ class RiskAssessmentSearchControllerIntegrationTest {
 
         jdbcTemplate.update(
                 """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                organizationId,
+                "EFS-RISK-SEARCH-" + organizationId.toString().substring(0, 8),
+                "EFS Risk Search " + organizationId,
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+
+        jdbcTemplate.update(
+                """
                 INSERT INTO transaction.transaction (
                     transaction_id,
                     transaction_reference,

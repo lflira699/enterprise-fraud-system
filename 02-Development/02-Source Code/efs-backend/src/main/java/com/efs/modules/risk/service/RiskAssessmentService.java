@@ -9,8 +9,8 @@ import com.efs.modules.risk.dto.RiskAssessmentResponse;
 import com.efs.modules.risk.entity.RiskAssessment;
 import com.efs.modules.risk.mapper.RiskAssessmentMapper;
 import com.efs.modules.risk.repository.RiskAssessmentRepository;
-import com.efs.modules.transaction.entity.Transaction;
-import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.dto.TransactionResponse;
+import com.efs.modules.transaction.service.TransactionServiceInterface;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.pagination.PageResponse;
@@ -86,8 +86,8 @@ public class RiskAssessmentService
     private final RiskAssessmentMapper
             riskAssessmentMapper;
 
-    private final TransactionRepository
-            transactionRepository;
+    private final TransactionServiceInterface
+            transactionService;
 
     private final RiskScoringModelResolver
             riskScoringModelResolver;
@@ -107,7 +107,7 @@ public class RiskAssessmentService
     public RiskAssessmentService(
             RiskAssessmentRepository riskAssessmentRepository,
             RiskAssessmentMapper riskAssessmentMapper,
-            TransactionRepository transactionRepository,
+            TransactionServiceInterface transactionService,
             RiskScoringModelResolver riskScoringModelResolver,
             RiskCalculator riskCalculator,
             DomainEventOutboxService domainEventOutboxService,
@@ -120,8 +120,8 @@ public class RiskAssessmentService
         this.riskAssessmentMapper =
                 riskAssessmentMapper;
 
-        this.transactionRepository =
-                transactionRepository;
+        this.transactionService =
+                transactionService;
 
         this.riskScoringModelResolver =
                 riskScoringModelResolver;
@@ -147,21 +147,21 @@ public class RiskAssessmentService
         long startedAtNanos =
                 System.nanoTime();
 
-        Transaction transaction = null;
+        TransactionResponse transaction = null;
 
         try {
 
             transaction =
-                transactionRepository
-                        .findByTransactionIdAndDeletedAtIsNull(
-                                request.getTransactionId()
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Transaction not found: "
-                                                + request.getTransactionId()
-                                )
-                        );
+                    transactionService.getTransactionById(
+                            request.getTransactionId()
+                    );
+
+        if (transaction.getOrganizationId() == null) {
+            throw new IllegalStateException(
+                    "Transaction organizationId is required "
+                            + "for RiskAssessment organizational scope"
+            );
+        }
 
         if (transaction.getCorrelationId() == null) {
             throw new IllegalStateException(
@@ -208,6 +208,14 @@ public class RiskAssessmentService
 
         RiskAssessment assessment =
                 riskAssessmentMapper.toEntity(request);
+
+        assessment.setOrganizationId(
+                transaction.getOrganizationId()
+        );
+
+        assessment.setTenantId(
+                transaction.getTenantId()
+        );
 
         assessment.setCorrelationId(
                 transaction.getCorrelationId()
@@ -338,7 +346,7 @@ public class RiskAssessmentService
     private void recordAssessmentSuccessAudit(
             RiskAssessment assessment,
             RiskCalculationResult calculation,
-            Transaction transaction,
+            TransactionResponse transaction,
             boolean reused) {
 
         Map<String, Object> factorScores =
@@ -450,7 +458,7 @@ public class RiskAssessmentService
     }
 
     private UUID auditCorrelationId(
-            Transaction transaction) {
+            TransactionResponse transaction) {
 
         return transaction == null
                 ? null
@@ -644,7 +652,7 @@ public class RiskAssessmentService
 
     private void publishRiskCalculated(
             RiskAssessment assessment,
-            Transaction transaction) {
+            TransactionResponse transaction) {
 
         DomainEventEnvelope envelope =
                 new DomainEventEnvelope();

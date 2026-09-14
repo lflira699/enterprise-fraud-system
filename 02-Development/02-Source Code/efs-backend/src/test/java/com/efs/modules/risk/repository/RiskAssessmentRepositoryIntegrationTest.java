@@ -21,6 +21,7 @@ class RiskAssessmentRepositoryIntegrationTest {
 
     private UUID transactionId;
 
+    private UUID organizationId;
     @Autowired
     private RiskAssessmentRepository repository;
 
@@ -31,7 +32,7 @@ class RiskAssessmentRepositoryIntegrationTest {
     void setUp() {
 
         UUID customerId = UUID.randomUUID();
-        UUID organizationId = UUID.randomUUID();
+        organizationId = UUID.randomUUID();
         UUID createdBy = UUID.randomUUID();
 
         transactionId = UUID.randomUUID();
@@ -133,6 +134,7 @@ class RiskAssessmentRepositoryIntegrationTest {
                 new RiskAssessment();
 
         assessment.setTransactionId(transactionId);
+        assessment.setOrganizationId(organizationId);
         assessment.setAssessmentType("TRANSACTION");
         assessment.setAssessmentStage("INITIAL");
         assessment.setOverallRiskScore(overallRiskScore);
