@@ -1,6 +1,8 @@
 package com.efs.modules.dashboard.controller;
 
 import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.SystemConfigurationServiceInterface;
+import com.efs.modules.administration.service.TenantOrganizationLookupServiceInterface;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.alert.dto.AlertDashboardMetricsResponse;
 import com.efs.modules.alert.service.AlertServiceInterface;
@@ -39,6 +41,14 @@ class DashboardEndToEndIsolationTest {
             userAccountLookupService;
 
     @Mock
+    private SystemConfigurationServiceInterface
+            systemConfigurationService;
+
+    @Mock
+    private TenantOrganizationLookupServiceInterface
+            tenantOrganizationLookupService;
+
+    @Mock
     private AlertServiceInterface
             alertService;
 
@@ -74,6 +84,8 @@ class DashboardEndToEndIsolationTest {
         DashboardService dashboardService =
                 new DashboardService(
                         userAccountLookupService,
+                        systemConfigurationService,
+                        tenantOrganizationLookupService,
                         alertService,
                         caseService,
                         riskAssessmentService,

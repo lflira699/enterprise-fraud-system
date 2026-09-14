@@ -1,6 +1,8 @@
 package com.efs.modules.dashboard.service;
 
 import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.SystemConfigurationServiceInterface;
+import com.efs.modules.administration.service.TenantOrganizationLookupServiceInterface;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.alert.dto.AlertDashboardMetricsResponse;
 import com.efs.modules.alert.service.AlertServiceInterface;
@@ -42,6 +44,14 @@ class DashboardServiceTest {
     @Mock
     private UserAccountLookupServiceInterface
             userAccountLookupService;
+
+    @Mock
+    private SystemConfigurationServiceInterface
+            systemConfigurationService;
+
+    @Mock
+    private TenantOrganizationLookupServiceInterface
+            tenantOrganizationLookupService;
 
     @Mock
     private AlertServiceInterface

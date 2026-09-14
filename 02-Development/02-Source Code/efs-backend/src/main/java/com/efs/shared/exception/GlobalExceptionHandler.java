@@ -364,4 +364,54 @@ public class GlobalExceptionHandler {
                 )
                 .body(body);
     }
+
+    @ExceptionHandler(
+            InvalidDashboardFilterException.class
+    )
+    public ResponseEntity<Map<String, Object>>
+    handleInvalidDashboardFilter(
+            InvalidDashboardFilterException exception,
+            HttpServletRequest request) {
+
+        Map<String, Object> body =
+                new LinkedHashMap<>();
+
+        body.put(
+                "timestamp",
+                LocalDateTime.now()
+        );
+
+        body.put(
+                "status",
+                HttpStatus.BAD_REQUEST.value()
+        );
+
+        body.put(
+                "errorCode",
+                "INVALID_DASHBOARD_FILTER"
+        );
+
+        body.put(
+                "message",
+                exception.getMessage()
+        );
+
+        body.put(
+                "correlationId",
+                request.getHeader(
+                        "X-Correlation-ID"
+                )
+        );
+
+        body.put(
+                "path",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(
+                        HttpStatus.BAD_REQUEST
+                )
+                .body(body);
+    }
 }

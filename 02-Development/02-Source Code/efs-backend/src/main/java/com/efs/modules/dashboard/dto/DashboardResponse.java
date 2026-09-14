@@ -14,8 +14,12 @@ public class DashboardResponse {
     private final Long closedCases;
     private final BigDecimal averageRiskScore;
     private final Long activatedDetectionScenarios;
+
     private final List<DashboardComponent>
             unavailableComponents;
+
+    private final DashboardEffectiveFilters
+            effectiveFilters;
 
     public DashboardResponse(
             LocalDateTime generatedAt,
@@ -27,6 +31,32 @@ public class DashboardResponse {
             BigDecimal averageRiskScore,
             Long activatedDetectionScenarios,
             List<DashboardComponent> unavailableComponents) {
+
+        this(
+                generatedAt,
+                dataStatus,
+                criticalAlerts,
+                openAlerts,
+                openCases,
+                closedCases,
+                averageRiskScore,
+                activatedDetectionScenarios,
+                unavailableComponents,
+                null
+        );
+    }
+
+    public DashboardResponse(
+            LocalDateTime generatedAt,
+            DashboardDataStatus dataStatus,
+            Long criticalAlerts,
+            Long openAlerts,
+            Long openCases,
+            Long closedCases,
+            BigDecimal averageRiskScore,
+            Long activatedDetectionScenarios,
+            List<DashboardComponent> unavailableComponents,
+            DashboardEffectiveFilters effectiveFilters) {
 
         this.generatedAt =
                 generatedAt;
@@ -56,6 +86,9 @@ public class DashboardResponse {
                 List.copyOf(
                         unavailableComponents
                 );
+
+        this.effectiveFilters =
+                effectiveFilters;
     }
 
     public LocalDateTime getGeneratedAt() {
@@ -94,5 +127,11 @@ public class DashboardResponse {
     getUnavailableComponents() {
 
         return unavailableComponents;
+    }
+
+    public DashboardEffectiveFilters
+    getEffectiveFilters() {
+
+        return effectiveFilters;
     }
 }
