@@ -88,4 +88,43 @@ public class UserAccountLookupService
                 userAccount.getEmail()
         );
     }
+
+    @Override
+    public UserAccountReference getAuthorizedUser(
+            UUID userId) {
+
+        if (userId == null) {
+            throw new IllegalArgumentException(
+                    "userId is required"
+            );
+        }
+
+        UserAccount userAccount =
+                userAccountRepository
+                        .findById(
+                                userId
+                        )
+                        .filter(
+                                account ->
+                                        ACTIVE_ACCOUNT_STATUS.equals(
+                                                account.getAccountStatus()
+                                        )
+                        )
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Authorized user account is not available: "
+                                                + userId
+                                )
+                        );
+
+        if (userAccount.getOrganizationId() == null) {
+            throw new IllegalStateException(
+                    "Authorized user organizationId is required"
+            );
+        }
+
+        return toReference(
+                userAccount
+        );
+    }
 }

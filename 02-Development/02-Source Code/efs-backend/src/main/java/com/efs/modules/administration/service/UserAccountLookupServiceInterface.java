@@ -12,4 +12,8 @@ public interface UserAccountLookupServiceInterface {
             UUID tenantId,
             List<UUID> userIds
     );
+
+    UserAccountReference getAuthorizedUser(
+            UUID userId
+    );
 }

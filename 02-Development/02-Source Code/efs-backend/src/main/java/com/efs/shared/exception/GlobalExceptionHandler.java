@@ -314,4 +314,54 @@ public class GlobalExceptionHandler {
                 )
                 .body(body);
     }
+
+    @ExceptionHandler(
+            DashboardDataUnavailableException.class
+    )
+    public ResponseEntity<Map<String, Object>>
+    handleDashboardDataUnavailable(
+            DashboardDataUnavailableException exception,
+            HttpServletRequest request) {
+
+        Map<String, Object> body =
+                new LinkedHashMap<>();
+
+        body.put(
+                "timestamp",
+                LocalDateTime.now()
+        );
+
+        body.put(
+                "status",
+                HttpStatus.SERVICE_UNAVAILABLE.value()
+        );
+
+        body.put(
+                "errorCode",
+                "DASHBOARD_DATA_UNAVAILABLE"
+        );
+
+        body.put(
+                "message",
+                exception.getMessage()
+        );
+
+        body.put(
+                "correlationId",
+                request.getHeader(
+                        "X-Correlation-ID"
+                )
+        );
+
+        body.put(
+                "path",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(
+                        HttpStatus.SERVICE_UNAVAILABLE
+                )
+                .body(body);
+    }
 }
