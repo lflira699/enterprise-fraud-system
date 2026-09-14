@@ -12,6 +12,7 @@ import com.efs.modules.detection.repository.ScenarioVersionRepository;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.ResourceNotFoundException;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,11 @@ class ScenarioActivationServiceIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID scenarioId;
     private UUID scenarioVersionId;
     private UUID transactionId;
@@ -59,6 +65,90 @@ class ScenarioActivationServiceIntegrationTest {
         LocalDateTime now =
                 LocalDateTime.now();
 
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String suffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SA-ORG-" + suffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Activation Test Organization " + suffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SA-TEN-" + suffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Activation Test Tenant " + suffix
+                )
+                .executeUpdate();
         Customer customer =
                 new Customer();
 
@@ -106,6 +196,10 @@ class ScenarioActivationServiceIntegrationTest {
                 0
         );
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -126,7 +220,11 @@ class ScenarioActivationServiceIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -392,7 +490,7 @@ class ScenarioActivationServiceIntegrationTest {
     }
 
     @Test
-    void createScenarioActivationShouldAllowOptionalTransactionAndCustomer() {
+    void createScenarioActivationShouldRejectWhenOwnershipCannotBeResolved() {
 
         ScenarioActivationRequest request =
                 buildRequest(
@@ -402,50 +500,12 @@ class ScenarioActivationServiceIntegrationTest {
                         "MEDIUM"
                 );
 
-        ScenarioActivationResponse response =
-                scenarioActivationService
+        assertThrows(
+                IllegalStateException.class,
+                () -> scenarioActivationService
                         .createScenarioActivation(
                                 request
-                        );
-
-        assertNotNull(
-                response.getActivationId()
-        );
-
-        assertEquals(
-                scenarioId,
-                response.getScenarioId()
-        );
-
-        assertEquals(
-                scenarioVersionId,
-                response.getScenarioVersionId()
-        );
-
-        assertNull(
-                response.getTransactionId()
-        );
-
-        assertNull(
-                response.getCustomerId()
-        );
-
-        assertEquals(
-                "TRIGGERED",
-                response.getActivationStatus()
-        );
-
-        assertEquals(
-                "MEDIUM",
-                response.getSeverity()
-        );
-
-        assertNotNull(
-                response.getTriggeredAt()
-        );
-
-        assertNotNull(
-                response.getCreatedAt()
+                        )
         );
     }
 
@@ -536,7 +596,7 @@ class ScenarioActivationServiceIntegrationTest {
                         .createScenarioActivation(
                                 buildRequest(
                                         null,
-                                        null,
+                                        customerId,
                                         "PENDING",
                                         "MEDIUM"
                                 )
@@ -596,7 +656,7 @@ class ScenarioActivationServiceIntegrationTest {
                         .createScenarioActivation(
                                 buildRequest(
                                         null,
-                                        null,
+                                        customerId,
                                         "TRIGGERED",
                                         "LOW"
                                 )
@@ -782,7 +842,7 @@ class ScenarioActivationServiceIntegrationTest {
                         .createScenarioActivation(
                                 buildRequest(
                                         null,
-                                        null,
+                                        customerId,
                                         status,
                                         "MEDIUM"
                                 )
@@ -848,7 +908,7 @@ class ScenarioActivationServiceIntegrationTest {
                         .createScenarioActivation(
                                 buildRequest(
                                         null,
-                                        null,
+                                        customerId,
                                         "PENDING",
                                         severity
                                 )

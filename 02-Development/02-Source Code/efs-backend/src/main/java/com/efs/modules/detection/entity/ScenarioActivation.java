@@ -36,6 +36,12 @@ public class ScenarioActivation {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
+    @Column(name = "tenant_id")
+    private UUID tenantId;
+
     @Column(name = "activation_status", nullable = false, length = 30)
     private String activationStatus;
 
@@ -105,6 +111,22 @@ public class ScenarioActivation {
 
     public void setCustomerId(UUID customerId) {
         this.customerId = customerId;
+    }
+
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(UUID organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(UUID tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getActivationStatus() {

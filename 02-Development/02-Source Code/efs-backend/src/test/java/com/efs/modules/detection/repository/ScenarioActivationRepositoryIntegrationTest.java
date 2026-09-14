@@ -7,6 +7,7 @@ import com.efs.modules.detection.entity.ScenarioActivation;
 import com.efs.modules.detection.entity.ScenarioVersion;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,11 @@ class ScenarioActivationRepositoryIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID scenarioId;
     private UUID scenarioVersionId;
     private UUID transactionId;
@@ -52,6 +58,92 @@ class ScenarioActivationRepositoryIntegrationTest {
         LocalDateTime now =
                 LocalDateTime.now();
 
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SA-REP-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Activation Repository Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SA-REP-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Activation Repository Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
         Customer customer =
                 new Customer();
 
@@ -92,6 +184,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         customer.setRecordVersion(0);
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -112,7 +208,11 @@ class ScenarioActivationRepositoryIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -707,6 +807,14 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         activation.setCustomerId(
                 customerId
+        );
+
+        activation.setOrganizationId(
+                organizationId
+        );
+
+        activation.setTenantId(
+                tenantId
         );
 
         activation.setActivationStatus(

@@ -10,6 +10,7 @@ import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +56,11 @@ class ScenarioActivationControllerIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID scenarioId;
     private UUID scenarioVersionId;
     private UUID transactionId;
@@ -66,6 +72,92 @@ class ScenarioActivationControllerIntegrationTest {
         LocalDateTime now =
                 LocalDateTime.now();
 
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SA-CTRL-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Activation Controller Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SA-CTRL-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Activation Controller Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
         Customer customer =
                 new Customer();
 
@@ -113,6 +205,10 @@ class ScenarioActivationControllerIntegrationTest {
                 0
         );
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -133,7 +229,11 @@ class ScenarioActivationControllerIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -372,7 +472,7 @@ class ScenarioActivationControllerIntegrationTest {
     }
 
     @Test
-    void shouldCreateScenarioActivationWithoutOptionalReferences()
+    void shouldCreateScenarioActivationWithoutTransactionReference()
             throws Exception {
 
         Map<String, Object> request =
@@ -380,6 +480,11 @@ class ScenarioActivationControllerIntegrationTest {
                         "TRIGGERED",
                         "MEDIUM"
                 );
+
+        request.put(
+                "customerId",
+                customerId
+        );
 
         mockMvc.perform(
                         post(
@@ -406,6 +511,10 @@ class ScenarioActivationControllerIntegrationTest {
                 .andExpect(
                         jsonPath("$.scenarioVersionId")
                                 .value(scenarioVersionId.toString())
+                )
+                .andExpect(
+                        jsonPath("$.customerId")
+                                .value(customerId.toString())
                 )
                 .andExpect(
                         jsonPath("$.activationStatus")
