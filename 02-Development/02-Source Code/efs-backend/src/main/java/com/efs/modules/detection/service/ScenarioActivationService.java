@@ -290,4 +290,30 @@ public class ScenarioActivationService
                 .map(scenarioActivationMapper::toResponse)
                 .toList();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countActivatedDetectionScenarios(
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (organizationId == null) {
+            throw new IllegalArgumentException(
+                    "organizationId is required"
+            );
+        }
+
+        if (tenantId == null) {
+            return scenarioActivationRepository
+                    .countDistinctScenariosByOrganizationIdAndTenantIdIsNull(
+                            organizationId
+                    );
+        }
+
+        return scenarioActivationRepository
+                .countDistinctScenariosByOrganizationIdAndTenantId(
+                        organizationId,
+                        tenantId
+                );
+    }
 }

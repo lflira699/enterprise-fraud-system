@@ -1,5 +1,6 @@
 package com.efs.modules.casemanagement.service;
 
+import com.efs.modules.casemanagement.dto.CaseDashboardMetricsResponse;
 import com.efs.modules.alert.entity.Alert;
 import com.efs.modules.alert.repository.AlertRepository;
 import com.efs.modules.audit.dto.AuditEntityChangeRequest;
@@ -3089,6 +3090,62 @@ public class CaseService
 
         caseEntity.setUpdatedAt(
                 now
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CaseDashboardMetricsResponse getDashboardMetrics(
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (organizationId == null) {
+            throw new IllegalArgumentException(
+                    "organizationId is required"
+            );
+        }
+
+        long openCases;
+        long closedCases;
+
+        if (tenantId == null) {
+
+            openCases =
+                    caseRepository
+                            .countByOrganizationIdAndTenantIdIsNullAndCurrentStatusNot(
+                                    organizationId,
+                                    "CLOSED"
+                            );
+
+            closedCases =
+                    caseRepository
+                            .countByOrganizationIdAndTenantIdIsNullAndCurrentStatus(
+                                    organizationId,
+                                    "CLOSED"
+                            );
+
+        } else {
+
+            openCases =
+                    caseRepository
+                            .countByOrganizationIdAndTenantIdAndCurrentStatusNot(
+                                    organizationId,
+                                    tenantId,
+                                    "CLOSED"
+                            );
+
+            closedCases =
+                    caseRepository
+                            .countByOrganizationIdAndTenantIdAndCurrentStatus(
+                                    organizationId,
+                                    tenantId,
+                                    "CLOSED"
+                            );
+        }
+
+        return new CaseDashboardMetricsResponse(
+                openCases,
+                closedCases
         );
     }
 }

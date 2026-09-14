@@ -1535,4 +1535,30 @@ public class RiskAssessmentService
         return value != null
                 && !value.isBlank();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal getAverageLatestRiskScore(
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (organizationId == null) {
+            throw new IllegalArgumentException(
+                    "organizationId is required"
+            );
+        }
+
+        if (tenantId == null) {
+            return riskAssessmentRepository
+                    .averageLatestRiskScoreByOrganizationIdAndTenantIdIsNull(
+                            organizationId
+                    );
+        }
+
+        return riskAssessmentRepository
+                .averageLatestRiskScoreByOrganizationIdAndTenantId(
+                        organizationId,
+                        tenantId
+                );
+    }
 }

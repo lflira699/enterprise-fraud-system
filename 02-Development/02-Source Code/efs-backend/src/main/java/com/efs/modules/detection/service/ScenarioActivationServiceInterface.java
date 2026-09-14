@@ -39,4 +39,9 @@ public interface ScenarioActivationServiceInterface {
     List<ScenarioActivationResponse> getActivationsBySeverity(
             String severity
     );
+
+    long countActivatedDetectionScenarios(
+            UUID organizationId,
+            UUID tenantId
+    );
 }

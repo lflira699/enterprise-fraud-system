@@ -45,4 +45,26 @@ public interface CaseRepository
     List<Case> findByAssignedTeamOrderByCreatedAtDesc(
             String assignedTeam
     );
+
+    long countByOrganizationIdAndTenantIdAndCurrentStatusNot(
+            UUID organizationId,
+            UUID tenantId,
+            String currentStatus
+    );
+
+    long countByOrganizationIdAndTenantIdIsNullAndCurrentStatusNot(
+            UUID organizationId,
+            String currentStatus
+    );
+
+    long countByOrganizationIdAndTenantIdAndCurrentStatus(
+            UUID organizationId,
+            UUID tenantId,
+            String currentStatus
+    );
+
+    long countByOrganizationIdAndTenantIdIsNullAndCurrentStatus(
+            UUID organizationId,
+            String currentStatus
+    );
 }

@@ -1,5 +1,6 @@
 package com.efs.modules.alert.service;
 
+import com.efs.modules.alert.dto.AlertDashboardMetricsResponse;
 import com.efs.modules.alert.dto.AlertAssignmentRequest;
 import com.efs.modules.alert.dto.AlertClosureRequest;
 import com.efs.modules.alert.dto.AlertHistoryResponse;
@@ -1077,6 +1078,62 @@ public class AlertService
                 0,
                 false,
                 false
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AlertDashboardMetricsResponse getDashboardMetrics(
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (organizationId == null) {
+            throw new IllegalArgumentException(
+                    "organizationId is required"
+            );
+        }
+
+        long criticalAlerts;
+        long openAlerts;
+
+        if (tenantId == null) {
+
+            criticalAlerts =
+                    alertRepository
+                            .countByOrganizationIdAndTenantIdIsNullAndPriority(
+                                    organizationId,
+                                    "CRITICAL"
+                            );
+
+            openAlerts =
+                    alertRepository
+                            .countByOrganizationIdAndTenantIdIsNullAndStatusNot(
+                                    organizationId,
+                                    CLOSED_STATUS
+                            );
+
+        } else {
+
+            criticalAlerts =
+                    alertRepository
+                            .countByOrganizationIdAndTenantIdAndPriority(
+                                    organizationId,
+                                    tenantId,
+                                    "CRITICAL"
+                            );
+
+            openAlerts =
+                    alertRepository
+                            .countByOrganizationIdAndTenantIdAndStatusNot(
+                                    organizationId,
+                                    tenantId,
+                                    CLOSED_STATUS
+                            );
+        }
+
+        return new AlertDashboardMetricsResponse(
+                criticalAlerts,
+                openAlerts
         );
     }
 }

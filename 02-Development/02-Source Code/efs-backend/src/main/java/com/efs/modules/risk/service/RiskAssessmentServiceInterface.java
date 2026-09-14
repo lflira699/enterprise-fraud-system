@@ -5,6 +5,7 @@ import com.efs.modules.risk.dto.RiskAssessmentResponse;
 import com.efs.shared.pagination.PageResponse;
 import com.efs.shared.security.SecurityContext;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -80,5 +81,10 @@ public interface RiskAssessmentServiceInterface {
             String sort,
             String direction,
             SecurityContext securityContext
+    );
+
+    BigDecimal getAverageLatestRiskScore(
+            UUID organizationId,
+            UUID tenantId
     );
 }

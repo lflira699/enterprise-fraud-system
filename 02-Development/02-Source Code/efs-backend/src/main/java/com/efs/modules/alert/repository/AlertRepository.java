@@ -37,4 +37,26 @@ public interface AlertRepository
     List<Alert> findByAlertTypeOrderByGeneratedAtDesc(
             String alertType
     );
+
+    long countByOrganizationIdAndTenantIdAndPriority(
+            UUID organizationId,
+            UUID tenantId,
+            String priority
+    );
+
+    long countByOrganizationIdAndTenantIdIsNullAndPriority(
+            UUID organizationId,
+            String priority
+    );
+
+    long countByOrganizationIdAndTenantIdAndStatusNot(
+            UUID organizationId,
+            UUID tenantId,
+            String status
+    );
+
+    long countByOrganizationIdAndTenantIdIsNullAndStatusNot(
+            UUID organizationId,
+            String status
+    );
 }

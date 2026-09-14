@@ -1,5 +1,6 @@
 package com.efs.modules.casemanagement.service;
 
+import com.efs.modules.casemanagement.dto.CaseDashboardMetricsResponse;
 import com.efs.modules.casemanagement.dto.CaseAssignmentRequest;
 import com.efs.modules.casemanagement.dto.CaseAssignmentResponse;
 import com.efs.modules.casemanagement.dto.CaseCommentRequest;
@@ -232,5 +233,10 @@ public interface CaseServiceInterface {
             String sort,
             String direction,
             SecurityContext securityContext
+    );
+
+    CaseDashboardMetricsResponse getDashboardMetrics(
+            UUID organizationId,
+            UUID tenantId
     );
 }

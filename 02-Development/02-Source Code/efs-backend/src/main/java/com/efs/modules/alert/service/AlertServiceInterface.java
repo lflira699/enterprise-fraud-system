@@ -1,5 +1,6 @@
 package com.efs.modules.alert.service;
 
+import com.efs.modules.alert.dto.AlertDashboardMetricsResponse;
 import com.efs.modules.alert.dto.AlertAssignmentRequest;
 import com.efs.modules.alert.dto.AlertClosureRequest;
 import com.efs.modules.alert.dto.AlertHistoryResponse;
@@ -75,5 +76,10 @@ public interface AlertServiceInterface {
             int size,
             String sort,
             String direction
+    );
+
+    AlertDashboardMetricsResponse getDashboardMetrics(
+            UUID organizationId,
+            UUID tenantId
     );
 }
