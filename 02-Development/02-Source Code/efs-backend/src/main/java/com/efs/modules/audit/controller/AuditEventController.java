@@ -3,6 +3,10 @@ package com.efs.modules.audit.controller;
 import com.efs.modules.audit.dto.AuditEventRequest;
 import com.efs.modules.audit.dto.AuditEventResponse;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
+import com.efs.modules.audit.service.AuditLogReviewServiceInterface;
+import com.efs.shared.pagination.PageResponse;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,11 +20,24 @@ import java.util.UUID;
 public class AuditEventController {
 
     private final AuditEventServiceInterface auditEventService;
+    private final AuditLogReviewServiceInterface
+            auditLogReviewService;
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public AuditEventController(
-            AuditEventServiceInterface auditEventService) {
+            AuditEventServiceInterface auditEventService,
+            AuditLogReviewServiceInterface auditLogReviewService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.auditEventService = auditEventService;
+        this.auditEventService =
+                auditEventService;
+
+        this.auditLogReviewService =
+                auditLogReviewService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -33,6 +50,46 @@ public class AuditEventController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<AuditEventResponse>>
+    searchAuditEvents(
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) UUID entityId,
+            @RequestParam(required = false) String action,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(
+                    defaultValue = "eventTimestamp"
+            ) String sort,
+            @RequestParam(
+                    defaultValue = "DESC"
+            ) String direction) {
+
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        return ResponseEntity.ok(
+                auditLogReviewService
+                        .searchAuditEvents(
+                                userId,
+                                from,
+                                to,
+                                entityType,
+                                entityId,
+                                action,
+                                page,
+                                size,
+                                sort,
+                                direction,
+                                securityContext
+                        )
+        );
     }
 
     @GetMapping("/{auditEventId}")
@@ -90,9 +147,10 @@ public class AuditEventController {
             @PathVariable UUID organizationId) {
 
         return ResponseEntity.ok(
-                auditEventService.getAuditEventsByOrganizationId(
-                        organizationId
-                )
+                auditEventService
+                        .getAuditEventsByOrganizationId(
+                                organizationId
+                        )
         );
     }
 
@@ -102,9 +160,10 @@ public class AuditEventController {
             @PathVariable UUID correlationId) {
 
         return ResponseEntity.ok(
-                auditEventService.getAuditEventsByCorrelationId(
-                        correlationId
-                )
+                auditEventService
+                        .getAuditEventsByCorrelationId(
+                                correlationId
+                        )
         );
     }
 }
