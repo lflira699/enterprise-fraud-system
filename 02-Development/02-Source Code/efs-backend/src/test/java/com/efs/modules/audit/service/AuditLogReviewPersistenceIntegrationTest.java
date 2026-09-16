@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.util.Set;
 import java.util.UUID;
 
@@ -20,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
-@Transactional
 class AuditLogReviewPersistenceIntegrationTest {
 
     private static final UUID ORGANIZATION_A =
@@ -60,8 +59,40 @@ class AuditLogReviewPersistenceIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private Timestamp testStartedAt;
+
     @BeforeEach
     void setUp() {
+
+        testStartedAt =
+                jdbcTemplate.queryForObject(
+                        "SELECT clock_timestamp()",
+                        Timestamp.class
+                );
+
+        insertOrganization(
+                ORGANIZATION_A,
+                "EFS-UC043-ORG-A"
+        );
+
+        insertOrganization(
+                ORGANIZATION_B,
+                "EFS-UC043-ORG-B"
+        );
+
+        insertUser(
+                USER_A,
+                ORGANIZATION_A,
+                "efs.uc043.user.a",
+                "efs.uc043.user.a@example.com"
+        );
+
+        insertUser(
+                USER_B,
+                ORGANIZATION_B,
+                "efs.uc043.user.b",
+                "efs.uc043.user.b@example.com"
+        );
 
         insertSourceAuditEvent(
                 SOURCE_EVENT_A,
@@ -118,6 +149,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         SELECT COUNT(*)
                         FROM audit.audit_event
                         WHERE user_id = ?
+                          AND event_timestamp >= ?
                           AND organization_id = ?
                           AND tenant_id IS NULL
                           AND event_type = 'AUDIT_LOG_REVIEW'
@@ -139,6 +171,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         """,
                         Integer.class,
                         USER_A,
+                        testStartedAt,
                         ORGANIZATION_A
                 );
 
@@ -182,6 +215,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         SELECT COUNT(*)
                         FROM audit.audit_event
                         WHERE user_id = ?
+                          AND event_timestamp >= ?
                           AND organization_id = ?
                           AND event_type = 'AUDIT_LOG_REVIEW'
                           AND action = 'REVIEW'
@@ -194,6 +228,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         """,
                         Integer.class,
                         USER_A,
+                        testStartedAt,
                         ORGANIZATION_A
                 );
 
@@ -241,6 +276,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         SELECT COUNT(*)
                         FROM audit.audit_event
                         WHERE user_id = ?
+                          AND event_timestamp >= ?
                           AND event_type = 'AUDIT_LOG_REVIEW'
                           AND entity_type = 'AUDIT_EVENT'
                           AND entity_id IS NULL
@@ -256,7 +292,8 @@ class AuditLogReviewPersistenceIntegrationTest {
                               'audit.view'
                         """,
                         Integer.class,
-                        USER_A
+                        USER_A,
+                        testStartedAt
                 );
 
         assertEquals(
@@ -293,6 +330,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         SELECT COUNT(*)
                         FROM audit.audit_event
                         WHERE user_id = ?
+                          AND event_timestamp >= ?
                           AND organization_id = ?
                           AND event_type = 'AUDIT_LOG_REVIEW'
                           AND entity_type = 'AUDIT_EVENT'
@@ -309,6 +347,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                         """,
                         Integer.class,
                         USER_A,
+                        testStartedAt,
                         ORGANIZATION_A
                 );
 
@@ -322,13 +361,73 @@ class AuditLogReviewPersistenceIntegrationTest {
 
         return new SecurityContext(
                 USER_A,
-                null,
-                null,
+                        null,
+                        null,
                 Set.of(),
                 Set.of(
                         "audit.view"
                 ),
                 Set.of()
+        );
+    }
+
+    private void insertOrganization(
+            UUID organizationId,
+            String organizationCode) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                """,
+                organizationId,
+                organizationCode,
+                organizationCode,
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+    }
+
+    private void insertUser(
+            UUID userId,
+            UUID organizationId,
+            String username,
+            String email) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status,
+                    failed_login_attempts
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                """,
+                userId,
+                organizationId,
+                username,
+                username,
+                email,
+                "LOCAL",
+                false,
+                "ACTIVE",
+                0
         );
     }
 
@@ -365,6 +464,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                     'SUCCESS',
                     CAST('{"source":"UC-043"}' AS jsonb)
                 )
+                ON CONFLICT DO NOTHING
                 """,
                 auditEventId,
                 organizationId,

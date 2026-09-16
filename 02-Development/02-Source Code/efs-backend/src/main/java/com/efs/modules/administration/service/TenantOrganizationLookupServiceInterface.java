@@ -7,4 +7,12 @@ public interface TenantOrganizationLookupServiceInterface {
     UUID getOrganizationIdByTenantId(
             UUID tenantId
     );
+
+    void lockOrganization(
+            UUID organizationId
+    );
+
+    void lockTenant(
+            UUID tenantId
+    );
 }
