@@ -1,8 +1,8 @@
 package com.efs.modules.casemanagement.service;
 
 import com.efs.modules.casemanagement.dto.CaseDashboardMetricsResponse;
-import com.efs.modules.alert.entity.Alert;
-import com.efs.modules.alert.repository.AlertRepository;
+import com.efs.modules.alert.dto.AlertResponse;
+import com.efs.modules.alert.service.AlertServiceInterface;
 import com.efs.modules.audit.dto.AuditEntityChangeRequest;
 import com.efs.modules.audit.dto.AuditEventRequest;
 import com.efs.modules.audit.dto.AuditEventResponse;
@@ -187,7 +187,7 @@ public class CaseService
     private final CaseSlaRepository caseSlaRepository;
     private final CaseNotificationRepository caseNotificationRepository;
     private final CaseHistoryRepository caseHistoryRepository;
-    private final AlertRepository alertRepository;
+    private final AlertServiceInterface alertService;
     private final AuditEventServiceInterface auditEventService;
     private final AuditEntityChangeServiceInterface auditEntityChangeService;
 
@@ -216,7 +216,7 @@ public class CaseService
             CaseSlaRepository caseSlaRepository,
             CaseNotificationRepository caseNotificationRepository,
             CaseHistoryRepository caseHistoryRepository,
-            AlertRepository alertRepository,
+            AlertServiceInterface alertService,
             CaseMapper caseMapper,
             CaseAssignmentMapper caseAssignmentMapper,
             CaseTaskMapper caseTaskMapper,
@@ -243,7 +243,7 @@ public class CaseService
         this.caseSlaRepository = caseSlaRepository;
         this.caseNotificationRepository = caseNotificationRepository;
         this.caseHistoryRepository = caseHistoryRepository;
-        this.alertRepository = alertRepository;
+        this.alertService = alertService;
 
         this.caseMapper = caseMapper;
         this.caseAssignmentMapper = caseAssignmentMapper;
@@ -298,17 +298,10 @@ public class CaseService
                 request.getCaseNumber()
         );
 
-        Alert alert =
-                alertRepository
-                        .findByAlertId(
-                                request.getAlertId()
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Alert not found: "
-                                                + request.getAlertId()
-                                )
-                        );
+        AlertResponse alert =
+                alertService.getAlertById(
+                        request.getAlertId()
+                );
 
         if (caseAlertRepository.existsBySourceAlertId(
                 alert.getAlertId())) {

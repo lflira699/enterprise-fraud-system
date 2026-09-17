@@ -14,9 +14,9 @@ import com.efs.modules.alert.mapper.AlertMapper;
 import com.efs.modules.alert.repository.AlertHistoryRepository;
 import com.efs.modules.alert.repository.AlertRepository;
 import com.efs.modules.alert.validator.AlertStatusValidator;
-import com.efs.modules.casemanagement.repository.CaseAlertRepository;
-import com.efs.modules.detection.repository.DetectionScenarioRepository;
-import com.efs.modules.risk.repository.RiskAssessmentRepository;
+import com.efs.modules.alert.port.out.CaseAlertLookupPort;
+import com.efs.modules.detection.service.DetectionScenarioServiceInterface;
+import com.efs.modules.risk.service.RiskAssessmentServiceInterface;
 import com.efs.modules.transaction.dto.TransactionDecisionResponse;
 import com.efs.modules.transaction.dto.TransactionResponse;
 import com.efs.modules.transaction.service.TransactionDecisionServiceInterface;
@@ -80,14 +80,14 @@ public class AlertService
     private final TransactionServiceInterface
             transactionService;
 
-    private final RiskAssessmentRepository
-            riskAssessmentRepository;
+    private final RiskAssessmentServiceInterface
+            riskAssessmentService;
 
-    private final DetectionScenarioRepository
-            detectionScenarioRepository;
+    private final DetectionScenarioServiceInterface
+            detectionScenarioService;
 
-    private final CaseAlertRepository
-            caseAlertRepository;
+    private final CaseAlertLookupPort
+            caseAlertLookupPort;
 
     private final AlertMapper alertMapper;
 
@@ -102,9 +102,9 @@ public class AlertService
             AlertHistoryRepository alertHistoryRepository,
             TransactionDecisionServiceInterface transactionDecisionService,
             TransactionServiceInterface transactionService,
-            RiskAssessmentRepository riskAssessmentRepository,
-            DetectionScenarioRepository detectionScenarioRepository,
-            CaseAlertRepository caseAlertRepository,
+            RiskAssessmentServiceInterface riskAssessmentService,
+            DetectionScenarioServiceInterface detectionScenarioService,
+            CaseAlertLookupPort caseAlertLookupPort,
             AlertMapper alertMapper,
             AlertHistoryMapper alertHistoryMapper,
             AlertStatusValidator alertStatusValidator) {
@@ -121,14 +121,14 @@ public class AlertService
         this.transactionService =
                 transactionService;
 
-        this.riskAssessmentRepository =
-                riskAssessmentRepository;
+        this.riskAssessmentService =
+                riskAssessmentService;
 
-        this.detectionScenarioRepository =
-                detectionScenarioRepository;
+        this.detectionScenarioService =
+                detectionScenarioService;
 
-        this.caseAlertRepository =
-                caseAlertRepository;
+        this.caseAlertLookupPort =
+                caseAlertLookupPort;
 
         this.alertMapper =
                 alertMapper;
@@ -655,8 +655,8 @@ public class AlertService
                 && !riskLevel.isBlank()) {
 
             riskAssessmentIds =
-                    riskAssessmentRepository
-                            .findByRiskLevelOrderByAssessmentTimestampDesc(
+                    riskAssessmentService
+                            .getAssessmentsByRiskLevel(
                                     riskLevel
                             )
                             .stream()
@@ -680,8 +680,8 @@ public class AlertService
                 && !scenarioCode.isBlank()) {
 
             scenarioIds =
-                    detectionScenarioRepository
-                            .findByScenarioCodeOrderByVersionDesc(
+                    detectionScenarioService
+                            .getScenariosByCode(
                                     scenarioCode
                             )
                             .stream()
@@ -704,18 +704,10 @@ public class AlertService
         if (caseId != null) {
 
             caseAlertIds =
-                    caseAlertRepository
-                            .findByCaseIdOrderByGeneratedAtDesc(
+                    caseAlertLookupPort
+                            .getSourceAlertIdsByCaseId(
                                     caseId
-                            )
-                            .stream()
-                            .map(caseAlert ->
-                                    caseAlert.getSourceAlertId()
-                            )
-                            .filter(sourceAlertId ->
-                                    sourceAlertId != null
-                            )
-                            .toList();
+                            );
 
             if (caseAlertIds.isEmpty()) {
                 return emptyPageResponse(
