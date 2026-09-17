@@ -1,6 +1,6 @@
 package com.efs.modules.transaction.service;
 
-import com.efs.modules.customer.repository.CustomerRepository;
+import com.efs.modules.transaction.port.out.CustomerExistencePort;
 import com.efs.modules.transaction.dto.TransactionRequest;
 import com.efs.modules.transaction.dto.TransactionResponse;
 import com.efs.modules.transaction.entity.Transaction;
@@ -21,16 +21,16 @@ public class TransactionService
         implements TransactionServiceInterface {
 
     private final TransactionRepository transactionRepository;
-    private final CustomerRepository customerRepository;
+    private final CustomerExistencePort customerExistencePort;
     private final TransactionMapper transactionMapper;
 
     public TransactionService(
             TransactionRepository transactionRepository,
-            CustomerRepository customerRepository,
+            CustomerExistencePort customerExistencePort,
             TransactionMapper transactionMapper) {
 
         this.transactionRepository = transactionRepository;
-        this.customerRepository = customerRepository;
+        this.customerExistencePort = customerExistencePort;
         this.transactionMapper = transactionMapper;
     }
 
@@ -39,7 +39,7 @@ public class TransactionService
     public TransactionResponse createTransaction(
             TransactionRequest request) {
 
-        if (!customerRepository.existsById(request.getCustomerId())) {
+        if (!customerExistencePort.exists(request.getCustomerId())) {
             throw new ResourceNotFoundException(
                     "Customer not found: " + request.getCustomerId()
             );
@@ -139,7 +139,7 @@ public class TransactionService
     public List<TransactionResponse> getTransactionsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
+        if (!customerExistencePort.exists(customerId)) {
             throw new ResourceNotFoundException(
                     "Customer not found: " + customerId
             );
@@ -172,7 +172,7 @@ public class TransactionService
                                 )
                         );
 
-        if (!customerRepository.existsById(request.getCustomerId())) {
+        if (!customerExistencePort.exists(request.getCustomerId())) {
             throw new ResourceNotFoundException(
                     "Customer not found: " + request.getCustomerId()
             );

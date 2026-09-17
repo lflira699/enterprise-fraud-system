@@ -1,7 +1,7 @@
 package com.efs.modules.rules.service;
 
-import com.efs.modules.transaction.entity.Transaction;
-import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.dto.TransactionResponse;
+import com.efs.modules.transaction.service.TransactionServiceInterface;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.exception.ValidationException;
 import org.junit.jupiter.api.Test;
@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,14 +25,14 @@ class TransactionRuleTestDatasetProviderTest {
     @Test
     void shouldRecognizeOnlyTransactionDatasetReferences() {
 
-        TransactionRepository repository =
+        TransactionServiceInterface transactionService =
                 mock(
-                        TransactionRepository.class
+                        TransactionServiceInterface.class
                 );
 
         TransactionRuleTestDatasetProvider provider =
                 new TransactionRuleTestDatasetProvider(
-                        repository
+                        transactionService
                 );
 
         assertTrue(
@@ -67,14 +66,14 @@ class TransactionRuleTestDatasetProviderTest {
     @Test
     void shouldLoadTransactionAsNormalizedRuleFacts() {
 
-        TransactionRepository repository =
+        TransactionServiceInterface transactionService =
                 mock(
-                        TransactionRepository.class
+                        TransactionServiceInterface.class
                 );
 
         TransactionRuleTestDatasetProvider provider =
                 new TransactionRuleTestDatasetProvider(
-                        repository
+                        transactionService
                 );
 
         UUID transactionId =
@@ -86,8 +85,8 @@ class TransactionRuleTestDatasetProviderTest {
         UUID correlationId =
                 UUID.randomUUID();
 
-        Transaction transaction =
-                new Transaction();
+        TransactionResponse transaction =
+                new TransactionResponse();
 
         transaction.setTransactionId(
                 transactionId
@@ -148,14 +147,12 @@ class TransactionRuleTestDatasetProviderTest {
         );
 
         when(
-                repository
-                        .findByTransactionIdAndDeletedAtIsNull(
+                transactionService
+                        .getTransactionById(
                                 transactionId
                         )
         ).thenReturn(
-                Optional.of(
-                        transaction
-                )
+                transaction
         );
 
         String reference =
@@ -258,8 +255,8 @@ class TransactionRuleTestDatasetProviderTest {
         );
 
         verify(
-                repository
-        ).findByTransactionIdAndDeletedAtIsNull(
+                transactionService
+        ).getTransactionById(
                 transactionId
         );
     }
@@ -267,14 +264,14 @@ class TransactionRuleTestDatasetProviderTest {
     @Test
     void shouldRejectMalformedTransactionDatasetReference() {
 
-        TransactionRepository repository =
+        TransactionServiceInterface transactionService =
                 mock(
-                        TransactionRepository.class
+                        TransactionServiceInterface.class
                 );
 
         TransactionRuleTestDatasetProvider provider =
                 new TransactionRuleTestDatasetProvider(
-                        repository
+                        transactionService
                 );
 
         assertThrows(
@@ -286,9 +283,9 @@ class TransactionRuleTestDatasetProviderTest {
         );
 
         verify(
-                repository,
+                transactionService,
                 never()
-        ).findByTransactionIdAndDeletedAtIsNull(
+        ).getTransactionById(
                 org.mockito.ArgumentMatchers.any()
         );
     }
@@ -296,26 +293,29 @@ class TransactionRuleTestDatasetProviderTest {
     @Test
     void shouldRejectUnknownTransaction() {
 
-        TransactionRepository repository =
+        TransactionServiceInterface transactionService =
                 mock(
-                        TransactionRepository.class
+                        TransactionServiceInterface.class
                 );
 
         TransactionRuleTestDatasetProvider provider =
                 new TransactionRuleTestDatasetProvider(
-                        repository
+                        transactionService
                 );
 
         UUID transactionId =
                 UUID.randomUUID();
 
         when(
-                repository
-                        .findByTransactionIdAndDeletedAtIsNull(
+                transactionService
+                        .getTransactionById(
                                 transactionId
                         )
-        ).thenReturn(
-                Optional.empty()
+        ).thenThrow(
+                new ResourceNotFoundException(
+                        "Transaction not found: "
+                                + transactionId
+                )
         );
 
         assertThrows(

@@ -1,7 +1,7 @@
 package com.efs.modules.rules.service;
 
-import com.efs.modules.transaction.entity.Transaction;
-import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.dto.TransactionResponse;
+import com.efs.modules.transaction.service.TransactionServiceInterface;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.exception.ValidationException;
 import org.springframework.stereotype.Service;
@@ -19,13 +19,13 @@ public class TransactionRuleTestDatasetProvider
     private static final String REFERENCE_PREFIX =
             "transaction://";
 
-    private final TransactionRepository transactionRepository;
+    private final TransactionServiceInterface transactionService;
 
     public TransactionRuleTestDatasetProvider(
-            TransactionRepository transactionRepository) {
+            TransactionServiceInterface transactionService) {
 
-        this.transactionRepository =
-                transactionRepository;
+        this.transactionService =
+                transactionService;
     }
 
     @Override
@@ -55,18 +55,20 @@ public class TransactionRuleTestDatasetProvider
                         normalizedReference
                 );
 
-        Transaction transaction =
-                transactionRepository
-                        .findByTransactionIdAndDeletedAtIsNull(
-                                transactionId
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Rule test transaction "
-                                                + "not found: "
-                                                + transactionId
-                                )
-                        );
+        TransactionResponse transaction;
+
+        try {
+            transaction =
+                    transactionService.getTransactionById(
+                            transactionId
+                    );
+        } catch (ResourceNotFoundException exception) {
+            throw new ResourceNotFoundException(
+                    "Rule test transaction "
+                            + "not found: "
+                            + transactionId
+            );
+        }
 
         Map<String, Object> transactionFacts =
                 buildTransactionFacts(
@@ -149,7 +151,7 @@ public class TransactionRuleTestDatasetProvider
     }
 
     private Map<String, Object> buildTransactionFacts(
-            Transaction transaction) {
+            TransactionResponse transaction) {
 
         Map<String, Object> facts =
                 new LinkedHashMap<>();

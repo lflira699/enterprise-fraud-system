@@ -3,9 +3,8 @@ package com.efs.modules.decision.service;
 import com.efs.modules.decision.dto.DecisionEvaluationRequest;
 import com.efs.modules.decision.dto.DecisionEvaluationResponse;
 import com.efs.modules.decision.validator.DecisionEvaluationValidator;
-import com.efs.modules.risk.entity.RiskAssessment;
-import com.efs.modules.risk.repository.RiskAssessmentRepository;
-import com.efs.shared.exception.ResourceNotFoundException;
+import com.efs.modules.risk.dto.RiskAssessmentResponse;
+import com.efs.modules.risk.service.RiskAssessmentServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,15 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class DecisionEvaluationService
         implements DecisionEvaluationServiceInterface {
 
-    private final RiskAssessmentRepository riskAssessmentRepository;
+    private final RiskAssessmentServiceInterface riskAssessmentService;
     private final DecisionEvaluationValidator decisionEvaluationValidator;
 
     public DecisionEvaluationService(
-            RiskAssessmentRepository riskAssessmentRepository,
+            RiskAssessmentServiceInterface riskAssessmentService,
             DecisionEvaluationValidator decisionEvaluationValidator) {
 
-        this.riskAssessmentRepository =
-                riskAssessmentRepository;
+        this.riskAssessmentService =
+                riskAssessmentService;
 
         this.decisionEvaluationValidator =
                 decisionEvaluationValidator;
@@ -32,14 +31,10 @@ public class DecisionEvaluationService
     public DecisionEvaluationResponse evaluateDecision(
             DecisionEvaluationRequest request) {
 
-        RiskAssessment assessment =
-                riskAssessmentRepository
-                        .findById(request.getRiskAssessmentId())
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Risk assessment not found: "
-                                                + request.getRiskAssessmentId()
-                                )
+        RiskAssessmentResponse assessment =
+                riskAssessmentService
+                        .getRiskAssessmentById(
+                                request.getRiskAssessmentId()
                         );
 
         String riskLevel =

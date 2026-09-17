@@ -1,6 +1,6 @@
 package com.efs.modules.transaction.service;
 
-import com.efs.modules.customer.repository.CustomerRepository;
+import com.efs.modules.transaction.port.out.CustomerExistencePort;
 import com.efs.modules.transaction.dto.TransactionParticipantRequest;
 import com.efs.modules.transaction.dto.TransactionParticipantResponse;
 import com.efs.modules.transaction.entity.TransactionParticipant;
@@ -21,13 +21,13 @@ public class TransactionParticipantService
 
     private final TransactionParticipantRepository transactionParticipantRepository;
     private final TransactionRepository transactionRepository;
-    private final CustomerRepository customerRepository;
+    private final CustomerExistencePort customerExistencePort;
     private final TransactionParticipantMapper transactionParticipantMapper;
 
     public TransactionParticipantService(
             TransactionParticipantRepository transactionParticipantRepository,
             TransactionRepository transactionRepository,
-            CustomerRepository customerRepository,
+            CustomerExistencePort customerExistencePort,
             TransactionParticipantMapper transactionParticipantMapper) {
 
         this.transactionParticipantRepository =
@@ -36,8 +36,8 @@ public class TransactionParticipantService
         this.transactionRepository =
                 transactionRepository;
 
-        this.customerRepository =
-                customerRepository;
+        this.customerExistencePort =
+                customerExistencePort;
 
         this.transactionParticipantMapper =
                 transactionParticipantMapper;
@@ -58,7 +58,7 @@ public class TransactionParticipantService
                 );
 
         if (request.getCustomerId() != null
-                && !customerRepository.existsById(
+                && !customerExistencePort.exists(
                         request.getCustomerId()
                 )) {
 
@@ -129,7 +129,7 @@ public class TransactionParticipantService
     getParticipantsByCustomerId(
             UUID customerId) {
 
-        if (!customerRepository.existsById(customerId)) {
+        if (!customerExistencePort.exists(customerId)) {
             throw new ResourceNotFoundException(
                     "Customer not found: " + customerId
             );
