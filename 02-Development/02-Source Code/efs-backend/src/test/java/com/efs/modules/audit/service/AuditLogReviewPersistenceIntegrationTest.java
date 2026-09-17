@@ -110,6 +110,38 @@ class AuditLogReviewPersistenceIntegrationTest {
     @Test
     void shouldRestrictReviewToAuthorizedOrganizationAndPersistSuccessAudit() {
 
+        Integer successAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'entityType' =
+                              'CASE'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'action' =
+                              'REVIEW'
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A
+                );
+
         PageResponse<AuditEventResponse> response =
                 auditLogReviewService
                         .searchAuditEvents(
@@ -143,7 +175,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                 response.getTotalElements()
         );
 
-        Integer successAuditCount =
+        Integer successAuditCountAfter =
                 jdbcTemplate.queryForObject(
                         """
                         SELECT COUNT(*)
@@ -176,13 +208,36 @@ class AuditLogReviewPersistenceIntegrationTest {
                 );
 
         assertEquals(
-                Integer.valueOf(1),
-                successAuditCount
+                Integer.valueOf(successAuditCountBefore + 1),
+                successAuditCountAfter
         );
     }
 
     @Test
     void shouldReturnEmptyPageAndPersistSuccessAudit() {
+
+        Integer successAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'entityType' =
+                              'NON_EXISTENT_ENTITY_TYPE'
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A
+                );
 
         PageResponse<AuditEventResponse> response =
                 auditLogReviewService
@@ -209,7 +264,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                 response.getTotalElements()
         );
 
-        Integer successAuditCount =
+        Integer successAuditCountAfter =
                 jdbcTemplate.queryForObject(
                         """
                         SELECT COUNT(*)
@@ -233,13 +288,39 @@ class AuditLogReviewPersistenceIntegrationTest {
                 );
 
         assertEquals(
-                Integer.valueOf(1),
-                successAuditCount
+                Integer.valueOf(successAuditCountBefore + 1),
+                successAuditCountAfter
         );
     }
 
     @Test
     void shouldPersistRejectedAuditWhenAuditViewPermissionIsMissing() {
+
+        Integer rejectedAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'REJECTED'
+                          AND organization_id IS NULL
+                          AND tenant_id IS NULL
+                          AND session_id IS NULL
+                          AND event_details ->> 'reason' =
+                              'MISSING_PERMISSION'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt
+                );
 
         SecurityContext securityContext =
                 new SecurityContext(
@@ -270,7 +351,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                                 )
         );
 
-        Integer rejectedAuditCount =
+        Integer rejectedAuditCountAfter =
                 jdbcTemplate.queryForObject(
                         """
                         SELECT COUNT(*)
@@ -297,13 +378,40 @@ class AuditLogReviewPersistenceIntegrationTest {
                 );
 
         assertEquals(
-                Integer.valueOf(1),
-                rejectedAuditCount
+                Integer.valueOf(rejectedAuditCountBefore + 1),
+                rejectedAuditCountAfter
         );
     }
 
     @Test
     void shouldPersistRejectedAuditForInvalidCriteria() {
+
+        Integer rejectedAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'REJECTED'
+                          AND event_details ->> 'reason' =
+                              'INVALID_AUDIT_LOG_SEARCH_CRITERIA'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'size' =
+                              '101'
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A
+                );
 
         assertThrows(
                 RequestValidationException.class,
@@ -324,7 +432,7 @@ class AuditLogReviewPersistenceIntegrationTest {
                                 )
         );
 
-        Integer rejectedAuditCount =
+        Integer rejectedAuditCountAfter =
                 jdbcTemplate.queryForObject(
                         """
                         SELECT COUNT(*)
@@ -352,8 +460,8 @@ class AuditLogReviewPersistenceIntegrationTest {
                 );
 
         assertEquals(
-                Integer.valueOf(1),
-                rejectedAuditCount
+                Integer.valueOf(rejectedAuditCountBefore + 1),
+                rejectedAuditCountAfter
         );
     }
 
