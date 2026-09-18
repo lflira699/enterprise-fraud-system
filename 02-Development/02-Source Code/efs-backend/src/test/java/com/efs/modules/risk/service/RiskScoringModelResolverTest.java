@@ -1,7 +1,7 @@
 package com.efs.modules.risk.service;
 
-import com.efs.modules.administration.entity.SystemConfiguration;
 import com.efs.modules.administration.service.SystemConfigurationServiceInterface;
+import com.efs.modules.administration.service.SystemConfigurationServiceInterface.ResolvedConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -242,7 +242,7 @@ class RiskScoringModelResolverTest {
 
         when(
                 systemConfigurationService
-                        .resolveConfiguration(
+                        .resolveConfigurationDetails(
                                 "EFS.RISK.ACTIVE_MODEL",
                                 organizationId,
                                 tenantId
@@ -273,7 +273,7 @@ class RiskScoringModelResolverTest {
 
         when(
                 systemConfigurationService
-                        .resolveConfiguration(
+                        .resolveConfigurationDetails(
                                 anyString(),
                                 eq(organizationId),
                                 eq(tenantId)
@@ -303,17 +303,14 @@ class RiskScoringModelResolverTest {
         );
     }
 
-    private SystemConfiguration configuration(
+    private ResolvedConfiguration configuration(
             String value,
             String type) {
 
-        SystemConfiguration configuration =
-                new SystemConfiguration();
-
-        configuration.setConfigurationValue(value);
-        configuration.setConfigurationType(type);
-
-        return configuration;
+        return new ResolvedConfiguration(
+                value,
+                type
+        );
     }
 
     private Map<String, String>

@@ -1,7 +1,7 @@
 package com.efs.modules.risk.service;
 
-import com.efs.modules.administration.entity.SystemConfiguration;
 import com.efs.modules.administration.service.SystemConfigurationServiceInterface;
+import com.efs.modules.administration.service.SystemConfigurationServiceInterface.ResolvedConfiguration;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -223,7 +223,7 @@ public class RiskScoringModelResolver {
             UUID organizationId,
             UUID tenantId) {
 
-        SystemConfiguration configuration =
+        ResolvedConfiguration configuration =
                 requiredConfiguration(
                         configurationKey,
                         organizationId,
@@ -236,7 +236,7 @@ public class RiskScoringModelResolver {
         );
 
         String value =
-                configuration.getConfigurationValue();
+                configuration.configurationValue();
 
         if (value == null
                 || value.isBlank()) {
@@ -298,13 +298,13 @@ public class RiskScoringModelResolver {
         );
     }
 
-    private SystemConfiguration requiredConfiguration(
+    private ResolvedConfiguration requiredConfiguration(
             String configurationKey,
             UUID organizationId,
             UUID tenantId) {
 
         return systemConfigurationService
-                .resolveConfiguration(
+                .resolveConfigurationDetails(
                         configurationKey,
                         organizationId,
                         tenantId
@@ -320,10 +320,10 @@ public class RiskScoringModelResolver {
 
     private void validateConfigurationType(
             String configurationKey,
-            SystemConfiguration configuration) {
+            ResolvedConfiguration configuration) {
 
         if (!"STRING".equals(
-                configuration.getConfigurationType())) {
+                configuration.configurationType())) {
             throw new IllegalStateException(
                     "Risk configuration must use STRING type: "
                             + configurationKey

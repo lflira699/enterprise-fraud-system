@@ -7,7 +7,18 @@ import java.util.UUID;
 
 public interface SystemConfigurationServiceInterface {
 
+    record ResolvedConfiguration(
+            String configurationValue,
+            String configurationType) {
+    }
+
     Optional<SystemConfiguration> resolveConfiguration(
+            String configurationKey,
+            UUID organizationId,
+            UUID tenantId
+    );
+
+    Optional<ResolvedConfiguration> resolveConfigurationDetails(
             String configurationKey,
             UUID organizationId,
             UUID tenantId

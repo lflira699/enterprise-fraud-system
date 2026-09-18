@@ -179,4 +179,26 @@ class SystemConfigurationServiceIntegrationTest {
                 result.get().getConfigurationValue()
         );
     }
+    @Test
+    void shouldResolveConfigurationDetailsForTenantScope() {
+
+        Optional<SystemConfigurationServiceInterface.ResolvedConfiguration> result =
+                service.resolveConfigurationDetails(
+                        CONFIGURATION_KEY,
+                        ORGANIZATION_ID,
+                        TENANT_ID
+                );
+
+        assertTrue(result.isPresent());
+
+        assertEquals(
+                "TENANT",
+                result.get().configurationValue()
+        );
+
+        assertEquals(
+                "STRING",
+                result.get().configurationType()
+        );
+    }
 }

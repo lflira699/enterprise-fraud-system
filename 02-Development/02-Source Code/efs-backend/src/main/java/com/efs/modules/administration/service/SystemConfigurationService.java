@@ -69,6 +69,26 @@ public class SystemConfigurationService
     }
 
     @Override
+    public Optional<SystemConfigurationServiceInterface.ResolvedConfiguration>
+    resolveConfigurationDetails(
+            String configurationKey,
+            UUID organizationId,
+            UUID tenantId
+    ) {
+        return resolveConfiguration(
+                configurationKey,
+                organizationId,
+                tenantId
+        ).map(
+                configuration ->
+                        new SystemConfigurationServiceInterface.ResolvedConfiguration(
+                                configuration.getConfigurationValue(),
+                                configuration.getConfigurationType()
+                        )
+        );
+    }
+
+    @Override
     public Optional<String> resolveConfigurationValue(
             String configurationKey,
             UUID organizationId,

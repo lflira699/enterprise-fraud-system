@@ -1,7 +1,7 @@
 package com.efs.modules.risk.service;
 
-import com.efs.modules.administration.entity.SystemConfiguration;
 import com.efs.modules.administration.service.SystemConfigurationServiceInterface;
+import com.efs.modules.administration.service.SystemConfigurationServiceInterface.ResolvedConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -115,7 +115,7 @@ class CustomerRiskScoringModelResolverTest {
 
         when(
                 systemConfigurationService
-                        .resolveConfiguration(
+                        .resolveConfigurationDetails(
                                 anyString(),
                                 isNull(),
                                 isNull()
@@ -132,13 +132,12 @@ class CustomerRiskScoringModelResolverTest {
                 return Optional.empty();
             }
 
-            SystemConfiguration configuration =
-                    new SystemConfiguration();
-
-            configuration.setConfigurationValue(value);
-            configuration.setConfigurationType("STRING");
-
-            return Optional.of(configuration);
+            return Optional.of(
+                    new ResolvedConfiguration(
+                            value,
+                            "STRING"
+                    )
+            );
         });
     }
 
