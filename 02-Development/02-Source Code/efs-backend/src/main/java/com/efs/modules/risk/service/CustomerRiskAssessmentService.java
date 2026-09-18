@@ -5,12 +5,7 @@ import com.efs.modules.audit.dto.AuditEventResponse;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.customer.dto.CustomerRiskProfileRequest;
 import com.efs.modules.customer.dto.CustomerRiskProfileResponse;
-import com.efs.modules.customer.entity.CustomerHistory;
-import com.efs.modules.customer.entity.CustomerRiskProfile;
-import com.efs.modules.customer.mapper.CustomerRiskProfileMapper;
-import com.efs.modules.customer.repository.CustomerHistoryRepository;
-import com.efs.modules.customer.repository.CustomerRepository;
-import com.efs.modules.customer.repository.CustomerRiskProfileRepository;
+import com.efs.modules.risk.port.out.CustomerRiskPersistencePort;
 import com.efs.modules.integration.event.DomainEventEnvelope;
 import com.efs.modules.integration.service.DomainEventOutboxService;
 import com.efs.shared.exception.DuplicateRecordException;
@@ -53,17 +48,8 @@ public class CustomerRiskAssessmentService
     private static final String DOMAIN_AGGREGATE_TYPE =
             "CustomerRiskProfile";
 
-    private final CustomerRepository customerRepository;
-
-    private final CustomerRiskProfileRepository
-            customerRiskProfileRepository;
-
-    private final CustomerHistoryRepository
-            customerHistoryRepository;
-
-    private final CustomerRiskProfileMapper
-            customerRiskProfileMapper;
-
+    private final CustomerRiskPersistencePort
+            customerRiskPersistencePort;
     private final RiskScoringModelResolver
             riskScoringModelResolver;
 
@@ -79,13 +65,8 @@ public class CustomerRiskAssessmentService
             customerRiskAssessmentAuditService;
 
     public CustomerRiskAssessmentService(
-            CustomerRepository customerRepository,
-            CustomerRiskProfileRepository
-                    customerRiskProfileRepository,
-            CustomerHistoryRepository
-                    customerHistoryRepository,
-            CustomerRiskProfileMapper
-                    customerRiskProfileMapper,
+            CustomerRiskPersistencePort
+                    customerRiskPersistencePort,
             RiskScoringModelResolver
                     riskScoringModelResolver,
             RiskCalculator riskCalculator,
@@ -95,17 +76,8 @@ public class CustomerRiskAssessmentService
             CustomerRiskAssessmentAuditService
                     customerRiskAssessmentAuditService) {
 
-        this.customerRepository =
-                customerRepository;
-
-        this.customerRiskProfileRepository =
-                customerRiskProfileRepository;
-
-        this.customerHistoryRepository =
-                customerHistoryRepository;
-
-        this.customerRiskProfileMapper =
-                customerRiskProfileMapper;
+        this.customerRiskPersistencePort =
+                customerRiskPersistencePort;
 
         this.riskScoringModelResolver =
                 riskScoringModelResolver;
@@ -122,7 +94,6 @@ public class CustomerRiskAssessmentService
         this.customerRiskAssessmentAuditService =
                 customerRiskAssessmentAuditService;
     }
-
     @Override
     @Transactional
     public CustomerRiskProfileResponse createRiskAssessment(
@@ -208,7 +179,9 @@ public class CustomerRiskAssessmentService
             UUID customerId,
             CustomerRiskProfileRequest request) {
 
-        validateActiveCustomer(customerId);
+        validateActiveCustomer(
+                customerId
+        );
 
         Optional<CustomerRiskProfileResponse> reusable =
                 findReusableAssessment(
@@ -230,8 +203,8 @@ public class CustomerRiskAssessmentService
             return response;
         }
 
-        if (customerRiskProfileRepository
-                .existsByCustomerIdAndDeletedAtIsNull(
+        if (customerRiskPersistencePort
+                .activeRiskProfileExists(
                         customerId
                 )) {
 
@@ -241,32 +214,22 @@ public class CustomerRiskAssessmentService
         }
 
         RiskCalculationResult calculation =
-                calculate(request);
+                calculate(
+                        request
+                );
 
         LocalDateTime now =
                 LocalDateTime.now();
 
-        CustomerRiskProfile profile =
-                new CustomerRiskProfile();
-
-        profile.setCustomerId(customerId);
-
-        applyCalculatedState(
-                profile,
-                request,
-                calculation
-        );
-
-        profile.setLastCalculation(now);
-        profile.setCreatedAt(now);
-        profile.setUpdatedAt(now);
-        profile.setCreatedBy(request.getCreatedBy());
-        profile.setUpdatedBy(request.getUpdatedBy());
-
-        CustomerRiskProfile savedProfile =
-                customerRiskProfileRepository.save(
-                        profile
-                );
+        CustomerRiskProfileResponse savedProfile =
+                customerRiskPersistencePort
+                        .createRiskProfile(
+                                customerId,
+                                request,
+                                calculation.overallRiskScore(),
+                                calculation.riskLevel(),
+                                now
+                        );
 
         createHistory(
                 customerId,
@@ -298,11 +261,8 @@ public class CustomerRiskAssessmentService
                 now
         );
 
-        return customerRiskProfileMapper.toResponse(
-                savedProfile
-        );
+        return savedProfile;
     }
-
     @Override
     @Transactional
     public CustomerRiskProfileResponse updateRiskAssessment(
@@ -387,11 +347,13 @@ public class CustomerRiskAssessmentService
             UUID customerId,
             CustomerRiskProfileRequest request) {
 
-        validateActiveCustomer(customerId);
+        validateActiveCustomer(
+                customerId
+        );
 
-        CustomerRiskProfile profile =
-                customerRiskProfileRepository
-                        .findByCustomerIdAndDeletedAtIsNull(
+        CustomerRiskProfileResponse profile =
+                customerRiskPersistencePort
+                        .findActiveRiskProfile(
                                 customerId
                         )
                         .orElseThrow(
@@ -429,25 +391,22 @@ public class CustomerRiskAssessmentService
                 profile.getRiskLevel();
 
         RiskCalculationResult calculation =
-                calculate(request);
+                calculate(
+                        request
+                );
 
         LocalDateTime now =
                 LocalDateTime.now();
 
-        applyCalculatedState(
-                profile,
-                request,
-                calculation
-        );
-
-        profile.setLastCalculation(now);
-        profile.setUpdatedAt(now);
-        profile.setUpdatedBy(request.getUpdatedBy());
-
-        CustomerRiskProfile savedProfile =
-                customerRiskProfileRepository.save(
-                        profile
-                );
+        CustomerRiskProfileResponse savedProfile =
+                customerRiskPersistencePort
+                        .updateRiskProfile(
+                                customerId,
+                                request,
+                                calculation.overallRiskScore(),
+                                calculation.riskLevel(),
+                                now
+                        );
 
         createHistory(
                 customerId,
@@ -479,11 +438,8 @@ public class CustomerRiskAssessmentService
                 now
         );
 
-        return customerRiskProfileMapper.toResponse(
-                savedProfile
-        );
+        return savedProfile;
     }
-
     private RiskCalculationResult calculate(
             CustomerRiskProfileRequest request) {
 
@@ -539,52 +495,6 @@ public class CustomerRiskAssessmentService
         );
     }
 
-    private void applyCalculatedState(
-            CustomerRiskProfile profile,
-            CustomerRiskProfileRequest request,
-            RiskCalculationResult calculation) {
-
-        profile.setCurrentRiskScore(
-                calculation.overallRiskScore()
-        );
-
-        profile.setRiskLevel(
-                calculation.riskLevel()
-        );
-
-        profile.setBehaviorScore(
-                request.getBehaviorScore()
-        );
-
-        profile.setFraudScore(
-                request.getFraudScore()
-        );
-
-        profile.setAmlScore(
-                request.getAmlScore()
-        );
-
-        profile.setKycScore(
-                request.getKycScore()
-        );
-
-        profile.setDeviceScore(
-                request.getDeviceScore()
-        );
-
-        profile.setSanctionsScore(
-                request.getSanctionsScore()
-        );
-
-        profile.setPepScore(
-                request.getPepScore()
-        );
-
-        profile.setWatchlistScore(
-                request.getWatchlistScore()
-        );
-    }
-
     private Optional<CustomerRiskProfileResponse>
     findReusableAssessment(
             UUID customerId,
@@ -594,37 +504,31 @@ public class CustomerRiskAssessmentService
             return Optional.empty();
         }
 
-        Optional<CustomerHistory> latestAssessment =
-                customerHistoryRepository
-                        .findFirstByCustomerIdAndEventTypeOrderByEventTimestampDesc(
+        Optional<String> latestSourceReference =
+                customerRiskPersistencePort
+                        .findLatestRiskAssessmentSourceReference(
                                 customerId,
                                 HISTORY_EVENT_TYPE
                         );
 
-        if (latestAssessment.isEmpty()) {
+        if (latestSourceReference.isEmpty()) {
             return Optional.empty();
         }
 
         if (!correlationId
                 .toString()
                 .equals(
-                        latestAssessment
-                                .get()
-                                .getSourceReference()
+                        latestSourceReference.get()
                 )) {
 
             return Optional.empty();
         }
 
-        return customerRiskProfileRepository
-                .findByCustomerIdAndDeletedAtIsNull(
+        return customerRiskPersistencePort
+                .findActiveRiskProfile(
                         customerId
-                )
-                .map(
-                        customerRiskProfileMapper::toResponse
                 );
     }
-
     private void createHistory(
             UUID customerId,
             BigDecimal previousRiskScore,
@@ -634,48 +538,17 @@ public class CustomerRiskAssessmentService
             UUID correlationId,
             LocalDateTime timestamp) {
 
-        CustomerHistory history =
-                new CustomerHistory();
-
-        history.setCustomerId(customerId);
-
-        history.setEventType(
-                HISTORY_EVENT_TYPE
-        );
-
-        history.setPreviousRiskScore(
-                previousRiskScore
-        );
-
-        history.setPreviousRiskLevel(
-                previousRiskLevel
-        );
-
-        history.setNewRiskScore(
-                newRiskScore
-        );
-
-        history.setNewRiskLevel(
-                newRiskLevel
-        );
-
-        history.setEventTimestamp(
-                timestamp
-        );
-
-        history.setSourceReference(
-                correlationId.toString()
-        );
-
-        history.setCreatedAt(
-                timestamp
-        );
-
-        customerHistoryRepository.save(
-                history
-        );
+        customerRiskPersistencePort
+                .createRiskAssessmentHistory(
+                        customerId,
+                        previousRiskScore,
+                        previousRiskLevel,
+                        newRiskScore,
+                        newRiskLevel,
+                        correlationId.toString(),
+                        timestamp
+                );
     }
-
     private void recordSuccessfulAssessmentAudit(
             UUID customerId,
             UUID profileId,
@@ -1003,16 +876,15 @@ public class CustomerRiskAssessmentService
     private void validateActiveCustomer(
             UUID customerId) {
 
-        customerRepository
-                .findByCustomerIdAndDeletedAtIsNull(
+        if (!customerRiskPersistencePort
+                .activeCustomerExists(
                         customerId
-                )
-                .orElseThrow(
-                        () ->
-                                new ResourceNotFoundException(
-                                        "Customer not found: "
-                                                + customerId
-                                )
-                );
+                )) {
+
+            throw new ResourceNotFoundException(
+                    "Customer not found: "
+                            + customerId
+            );
+        }
     }
 }

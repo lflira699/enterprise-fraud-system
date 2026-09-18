@@ -3,11 +3,7 @@ package com.efs.modules.risk.service;
 import com.efs.modules.audit.dto.AuditEventRequest;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.customer.dto.CustomerRiskProfileRequest;
-import com.efs.modules.customer.entity.Customer;
-import com.efs.modules.customer.mapper.CustomerRiskProfileMapper;
-import com.efs.modules.customer.repository.CustomerHistoryRepository;
-import com.efs.modules.customer.repository.CustomerRepository;
-import com.efs.modules.customer.repository.CustomerRiskProfileRepository;
+import com.efs.modules.risk.port.out.CustomerRiskPersistencePort;
 import com.efs.modules.integration.service.DomainEventOutboxService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,10 +32,8 @@ import static org.mockito.Mockito.when;
 
 class CustomerRiskAssessmentErrorAuditTest {
 
-    private CustomerRepository customerRepository;
-    private CustomerRiskProfileRepository profileRepository;
-    private CustomerHistoryRepository historyRepository;
-    private CustomerRiskProfileMapper mapper;
+    private CustomerRiskPersistencePort
+            customerRiskPersistencePort;
     private RiskScoringModelResolver modelResolver;
     private RiskCalculator riskCalculator;
     private AuditEventServiceInterface auditEventService;
@@ -51,18 +45,10 @@ class CustomerRiskAssessmentErrorAuditTest {
     @BeforeEach
     void setUp() {
 
-        customerRepository =
-                mock(CustomerRepository.class);
-
-        profileRepository =
-                mock(CustomerRiskProfileRepository.class);
-
-        historyRepository =
-                mock(CustomerHistoryRepository.class);
-
-        mapper =
-                mock(CustomerRiskProfileMapper.class);
-
+        customerRiskPersistencePort =
+                mock(
+                        CustomerRiskPersistencePort.class
+                );
         modelResolver =
                 mock(RiskScoringModelResolver.class);
 
@@ -80,17 +66,13 @@ class CustomerRiskAssessmentErrorAuditTest {
 
         service =
                 new CustomerRiskAssessmentService(
-                        customerRepository,
-                        profileRepository,
-                        historyRepository,
-                        mapper,
+                        customerRiskPersistencePort,
                         modelResolver,
                         riskCalculator,
                         auditEventService,
                         outboxService,
                         errorAuditService
-                );
-    }
+                );    }
 
     @Test
     void shouldAuditE1AsRejectedWhenEnabledFactorIsMissing() {
@@ -473,19 +455,17 @@ class CustomerRiskAssessmentErrorAuditTest {
             UUID customerId) {
 
         when(
-                customerRepository
-                        .findByCustomerIdAndDeletedAtIsNull(
+                customerRiskPersistencePort
+                        .activeCustomerExists(
                                 customerId
                         )
         ).thenReturn(
-                Optional.of(
-                        new Customer()
-                )
+                true
         );
 
         when(
-                historyRepository
-                        .findFirstByCustomerIdAndEventTypeOrderByEventTimestampDesc(
+                customerRiskPersistencePort
+                        .findLatestRiskAssessmentSourceReference(
                                 customerId,
                                 "CUSTOMER_RISK_ASSESSED"
                         )
@@ -494,13 +474,14 @@ class CustomerRiskAssessmentErrorAuditTest {
         );
 
         when(
-                profileRepository
-                        .existsByCustomerIdAndDeletedAtIsNull(
+                customerRiskPersistencePort
+                        .activeRiskProfileExists(
                                 customerId
                         )
-        ).thenReturn(false);
+        ).thenReturn(
+                false
+        );
     }
-
     private CustomerRiskProfileRequest request(
             UUID correlationId) {
 
