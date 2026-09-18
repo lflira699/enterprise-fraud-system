@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,7 +41,8 @@ class RuleAlertActionResolverTest {
         resolver =
                 new RuleAlertActionResolver(
                         ruleActionRepository,
-                        ruleExecutionRepository
+                        ruleExecutionRepository,
+                        new RuleAlertActionParameterResolver()
                 );
     }
 
@@ -87,7 +89,7 @@ class RuleAlertActionResolverTest {
                 )
         );
 
-        List<RuleAction> result =
+        List<RuleAlertActionParameters> result =
                 resolver.resolveCreateAlertActions(
                         execution
                 );
@@ -98,12 +100,18 @@ class RuleAlertActionResolverTest {
         );
 
         assertEquals(
-                firstCreateAlert,
+                new RuleAlertActionParameters(
+                        "FRAUD",
+                        "HIGH"
+                ),
                 result.get(0)
         );
 
         assertEquals(
-                secondCreateAlert,
+                new RuleAlertActionParameters(
+                        "FRAUD",
+                        "HIGH"
+                ),
                 result.get(1)
         );
     }
@@ -178,7 +186,7 @@ class RuleAlertActionResolverTest {
                 )
         );
 
-        List<RuleAction> result =
+        List<RuleAlertActionParameters> result =
                 resolver
                         .resolveCreateAlertActionsByTransactionId(
                                 transactionId
@@ -190,12 +198,18 @@ class RuleAlertActionResolverTest {
         );
 
         assertEquals(
-                firstAction,
+                new RuleAlertActionParameters(
+                        "FRAUD",
+                        "HIGH"
+                ),
                 result.get(0)
         );
 
         assertEquals(
-                secondAction,
+                new RuleAlertActionParameters(
+                        "FRAUD",
+                        "HIGH"
+                ),
                 result.get(1)
         );
     }
@@ -215,7 +229,7 @@ class RuleAlertActionResolverTest {
                 List.of()
         );
 
-        List<RuleAction> result =
+        List<RuleAlertActionParameters> result =
                 resolver
                         .resolveCreateAlertActionsByTransactionId(
                                 transactionId
@@ -268,7 +282,7 @@ class RuleAlertActionResolverTest {
                         UUID.randomUUID()
                 );
 
-        List<RuleAction> result =
+        List<RuleAlertActionParameters> result =
                 resolver.resolveCreateAlertActions(
                         execution
                 );
@@ -294,7 +308,7 @@ class RuleAlertActionResolverTest {
                         null
                 );
 
-        List<RuleAction> result =
+        List<RuleAlertActionParameters> result =
                 resolver.resolveCreateAlertActions(
                         execution
                 );
@@ -330,7 +344,7 @@ class RuleAlertActionResolverTest {
                 )
         );
 
-        List<RuleAction> result =
+        List<RuleAlertActionParameters> result =
                 resolver.resolveCreateAlertActions(
                         execution
                 );
@@ -390,6 +404,15 @@ class RuleAlertActionResolverTest {
 
         action.setExecutionOrder(
                 executionOrder
+        );
+
+        action.setParameterJson(
+                Map.of(
+                        "alertType",
+                        "FRAUD",
+                        "priority",
+                        "HIGH"
+                )
         );
 
         return action;

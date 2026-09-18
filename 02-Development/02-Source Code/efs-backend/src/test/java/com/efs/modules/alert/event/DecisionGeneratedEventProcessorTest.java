@@ -4,7 +4,6 @@ import com.efs.modules.alert.dto.AlertRequest;
 import com.efs.modules.alert.service.AlertRuleActionConsolidator;
 import com.efs.modules.alert.service.AlertServiceInterface;
 import com.efs.modules.integration.service.ProcessedDomainEventRegistry;
-import com.efs.modules.rules.entity.RuleAction;
 import com.efs.modules.rules.service.RuleAlertActionParameters;
 import com.efs.modules.rules.service.RuleAlertActionResolver;
 import com.efs.modules.transaction.dto.TransactionDecisionResponse;
@@ -117,8 +116,11 @@ class DecisionGeneratedEventProcessorTest {
                         riskAssessmentId
                 );
 
-        RuleAction action =
-                new RuleAction();
+        RuleAlertActionParameters action =
+                new RuleAlertActionParameters(
+                        "FRAUD",
+                        "HIGH"
+                );
 
         when(
                 processedDomainEventRegistry.register(
@@ -441,13 +443,19 @@ class DecisionGeneratedEventProcessorTest {
                         UUID.randomUUID()
                 );
 
-        RuleAction firstAction =
-                new RuleAction();
+        RuleAlertActionParameters firstAction =
+                new RuleAlertActionParameters(
+                        "FRAUD",
+                        "HIGH"
+                );
 
-        RuleAction secondAction =
-                new RuleAction();
+        RuleAlertActionParameters secondAction =
+                new RuleAlertActionParameters(
+                        "ACCOUNT_TAKEOVER",
+                        "HIGH"
+                );
 
-        List<RuleAction> actions =
+        List<RuleAlertActionParameters> actions =
                 List.of(
                         firstAction,
                         secondAction

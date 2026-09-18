@@ -1,13 +1,10 @@
 package com.efs.modules.alert.service;
 
-import com.efs.modules.rules.entity.RuleAction;
-import com.efs.modules.rules.service.RuleAlertActionParameterResolver;
 import com.efs.modules.rules.service.RuleAlertActionParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,13 +19,8 @@ class AlertRuleActionConsolidatorTest {
     @BeforeEach
     void setUp() {
 
-        RuleAlertActionParameterResolver parameterResolver =
-                new RuleAlertActionParameterResolver();
-
         consolidator =
-                new AlertRuleActionConsolidator(
-                        parameterResolver
-                );
+                new AlertRuleActionConsolidator();
     }
 
     @Test
@@ -47,7 +39,7 @@ class AlertRuleActionConsolidatorTest {
     @Test
     void shouldConsolidateSingleCreateAlertAction() {
 
-        RuleAction action =
+        RuleAlertActionParameters action =
                 createAction(
                         "FRAUD",
                         "HIGH"
@@ -78,13 +70,13 @@ class AlertRuleActionConsolidatorTest {
     @Test
     void shouldConsolidateEquivalentCreateAlertActions() {
 
-        RuleAction firstAction =
+        RuleAlertActionParameters firstAction =
                 createAction(
                         "FRAUD",
                         "HIGH"
                 );
 
-        RuleAction secondAction =
+        RuleAlertActionParameters secondAction =
                 createAction(
                         "FRAUD",
                         "HIGH"
@@ -114,13 +106,13 @@ class AlertRuleActionConsolidatorTest {
     @Test
     void shouldRejectConflictingAlertType() {
 
-        RuleAction firstAction =
+        RuleAlertActionParameters firstAction =
                 createAction(
                         "FRAUD",
                         "HIGH"
                 );
 
-        RuleAction secondAction =
+        RuleAlertActionParameters secondAction =
                 createAction(
                         "ACCOUNT_TAKEOVER",
                         "HIGH"
@@ -147,13 +139,13 @@ class AlertRuleActionConsolidatorTest {
     @Test
     void shouldRejectConflictingPriority() {
 
-        RuleAction firstAction =
+        RuleAlertActionParameters firstAction =
                 createAction(
                         "FRAUD",
                         "HIGH"
                 );
 
-        RuleAction secondAction =
+        RuleAlertActionParameters secondAction =
                 createAction(
                         "FRAUD",
                         "MEDIUM"
@@ -195,26 +187,13 @@ class AlertRuleActionConsolidatorTest {
         );
     }
 
-    private RuleAction createAction(
+    private RuleAlertActionParameters createAction(
             String alertType,
             String priority) {
 
-        RuleAction action =
-                new RuleAction();
-
-        action.setActionType(
-                "CREATE_ALERT"
+        return new RuleAlertActionParameters(
+                alertType,
+                priority
         );
-
-        action.setParameterJson(
-                Map.of(
-                        "alertType",
-                        alertType,
-                        "priority",
-                        priority
-                )
-        );
-
-        return action;
     }
 }

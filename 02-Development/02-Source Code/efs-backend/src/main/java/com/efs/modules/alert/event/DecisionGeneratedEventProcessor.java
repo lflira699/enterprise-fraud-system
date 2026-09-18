@@ -4,7 +4,6 @@ import com.efs.modules.alert.dto.AlertRequest;
 import com.efs.modules.alert.service.AlertRuleActionConsolidator;
 import com.efs.modules.alert.service.AlertServiceInterface;
 import com.efs.modules.integration.service.ProcessedDomainEventRegistry;
-import com.efs.modules.rules.entity.RuleAction;
 import com.efs.modules.rules.service.RuleAlertActionParameters;
 import com.efs.modules.rules.service.RuleAlertActionResolver;
 import com.efs.modules.transaction.dto.TransactionDecisionResponse;
@@ -88,7 +87,8 @@ public class DecisionGeneratedEventProcessor {
                         message.decisionId()
                 );
 
-        List<RuleAction> ruleActions =
+        List<RuleAlertActionParameters>
+                ruleAlertActionParameters =
                 ruleAlertActionResolver
                         .resolveCreateAlertActionsByTransactionId(
                                 decision.getTransactionId()
@@ -98,7 +98,7 @@ public class DecisionGeneratedEventProcessor {
                 consolidatedParameters =
                 alertRuleActionConsolidator
                         .consolidate(
-                                ruleActions
+                                ruleAlertActionParameters
                         );
 
         if (consolidatedParameters.isEmpty()) {

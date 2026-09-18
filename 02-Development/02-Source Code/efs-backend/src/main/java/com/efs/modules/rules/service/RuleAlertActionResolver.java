@@ -17,19 +17,24 @@ public class RuleAlertActionResolver {
 
     private final RuleActionRepository ruleActionRepository;
     private final RuleExecutionRepository ruleExecutionRepository;
+    private final RuleAlertActionParameterResolver parameterResolver;
 
     public RuleAlertActionResolver(
             RuleActionRepository ruleActionRepository,
-            RuleExecutionRepository ruleExecutionRepository) {
+            RuleExecutionRepository ruleExecutionRepository,
+            RuleAlertActionParameterResolver parameterResolver) {
 
         this.ruleActionRepository =
                 ruleActionRepository;
 
         this.ruleExecutionRepository =
                 ruleExecutionRepository;
+
+        this.parameterResolver =
+                parameterResolver;
     }
 
-    public List<RuleAction> resolveCreateAlertActions(
+    public List<RuleAlertActionParameters> resolveCreateAlertActions(
             RuleExecution ruleExecution) {
 
         if (ruleExecution == null) {
@@ -60,10 +65,13 @@ public class RuleAlertActionResolver {
                                         action.getActionType()
                                 )
                 )
+                .map(
+                        parameterResolver::resolve
+                )
                 .toList();
     }
 
-    public List<RuleAction> resolveCreateAlertActionsByTransactionId(
+    public List<RuleAlertActionParameters> resolveCreateAlertActionsByTransactionId(
             UUID transactionId) {
 
         if (transactionId == null) {

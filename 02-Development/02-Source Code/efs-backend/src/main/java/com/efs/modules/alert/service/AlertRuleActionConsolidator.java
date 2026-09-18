@@ -1,7 +1,5 @@
 package com.efs.modules.alert.service;
 
-import com.efs.modules.rules.entity.RuleAction;
-import com.efs.modules.rules.service.RuleAlertActionParameterResolver;
 import com.efs.modules.rules.service.RuleAlertActionParameters;
 import org.springframework.stereotype.Service;
 
@@ -11,42 +9,28 @@ import java.util.Optional;
 @Service
 public class AlertRuleActionConsolidator {
 
-    private final RuleAlertActionParameterResolver
-            parameterResolver;
-
-    public AlertRuleActionConsolidator(
-            RuleAlertActionParameterResolver parameterResolver) {
-
-        this.parameterResolver =
-                parameterResolver;
-    }
-
     public Optional<RuleAlertActionParameters> consolidate(
-            List<RuleAction> ruleActions) {
+            List<RuleAlertActionParameters> ruleActionParameters) {
 
-        if (ruleActions == null) {
+        if (ruleActionParameters == null) {
             throw new IllegalArgumentException(
                     "Rule actions are required"
             );
         }
 
-        if (ruleActions.isEmpty()) {
+        if (ruleActionParameters.isEmpty()) {
             return Optional.empty();
         }
 
         RuleAlertActionParameters consolidatedParameters =
-                parameterResolver.resolve(
-                        ruleActions.get(0)
-                );
+                ruleActionParameters.get(0);
 
         for (int index = 1;
-             index < ruleActions.size();
+             index < ruleActionParameters.size();
              index++) {
 
             RuleAlertActionParameters currentParameters =
-                    parameterResolver.resolve(
-                            ruleActions.get(index)
-                    );
+                    ruleActionParameters.get(index);
 
             if (!consolidatedParameters.equals(
                     currentParameters)) {
