@@ -37,6 +37,12 @@ type QueryParameter =
 export type QueryParameters =
   Record<string, QueryParameter>
 
+export type BinaryHttpResponse = {
+  blob: Blob
+  mediaType: string | null
+  fileName: string | null
+}
+
 function buildUrl(
   path: string,
   query?: QueryParameters,
@@ -90,11 +96,9 @@ async function parseResponseBody(
   }
 }
 
-async function request<T>(
-  path: string,
+function buildHeaders(
   init: RequestInit,
-  query?: QueryParameters,
-): Promise<T> {
+) {
   const headers =
     new Headers(init.headers)
 
@@ -121,6 +125,14 @@ async function request<T>(
     )
   }
 
+  return headers
+}
+
+async function executeRequest(
+  path: string,
+  init: RequestInit,
+  query?: QueryParameters,
+): Promise<Response> {
   const response =
     await fetch(
       buildUrl(
@@ -129,16 +141,17 @@ async function request<T>(
       ),
       {
         ...init,
-        headers,
+        headers:
+          buildHeaders(init),
       },
     )
 
-  const responseBody =
-    await parseResponseBody(
-      response,
-    )
-
   if (!response.ok) {
+    const responseBody =
+      await parseResponseBody(
+        response,
+      )
+
     const payload =
       typeof responseBody === 'object'
       && responseBody !== null
@@ -157,7 +170,82 @@ async function request<T>(
     )
   }
 
+  return response
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit,
+  query?: QueryParameters,
+): Promise<T> {
+  const response =
+    await executeRequest(
+      path,
+      init,
+      query,
+    )
+
+  const responseBody =
+    await parseResponseBody(
+      response,
+    )
+
   return responseBody as T
+}
+
+function serializeBody(
+  body: unknown,
+): BodyInit | undefined {
+  if (body === undefined) {
+    return undefined
+  }
+
+  return JSON.stringify(body)
+}
+
+function extractFileName(
+  contentDisposition: string | null,
+): string | null {
+  if (!contentDisposition) {
+    return null
+  }
+
+  const match =
+    /filename="?([^";]+)"?/i.exec(
+      contentDisposition,
+    )
+
+  return match?.[1] ?? null
+}
+
+async function requestBlob(
+  path: string,
+  init: RequestInit,
+  query?: QueryParameters,
+): Promise<BinaryHttpResponse> {
+  const response =
+    await executeRequest(
+      path,
+      init,
+      query,
+    )
+
+  const blob =
+    await response.blob()
+
+  return {
+    blob,
+    mediaType:
+      response.headers.get(
+        'Content-Type',
+      ),
+    fileName:
+      extractFileName(
+        response.headers.get(
+          'Content-Disposition',
+        ),
+      ),
+  }
 }
 
 export const httpClient = {
@@ -169,6 +257,38 @@ export const httpClient = {
       path,
       {
         method: 'GET',
+      },
+      query,
+    )
+  },
+
+  post<T>(
+    path: string,
+    body?: unknown,
+    query?: QueryParameters,
+  ): Promise<T> {
+    return request<T>(
+      path,
+      {
+        method: 'POST',
+        body:
+          serializeBody(body),
+      },
+      query,
+    )
+  },
+
+  postBlob(
+    path: string,
+    body?: unknown,
+    query?: QueryParameters,
+  ): Promise<BinaryHttpResponse> {
+    return requestBlob(
+      path,
+      {
+        method: 'POST',
+        body:
+          serializeBody(body),
       },
       query,
     )

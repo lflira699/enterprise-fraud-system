@@ -24,6 +24,75 @@ const resources = {
         audit: 'Auditoría',
       },
 
+      reports: {
+        generation: {
+          title:
+            'Generación de reportes',
+          definition:
+            'Tipo de reporte',
+          definitionsError:
+            'No fue posible cargar las definiciones de reportes.',
+          generate:
+            'Generar reporte',
+          error:
+            'No fue posible generar el reporte.',
+        },
+
+        criteria: {
+          tenantId:
+            'ID de tenant',
+          components:
+            'Componentes',
+          componentsHelp:
+            'Separar múltiples componentes con comas.',
+          status:
+            'Estado',
+          priority:
+            'Prioridad',
+          assignedUser:
+            'Usuario asignado',
+          assignedTeam:
+            'Equipo asignado',
+        },
+
+        lookup: {
+          title:
+            'Consultar reporte generado',
+          reportId:
+            'ID de reporte',
+          load:
+            'Cargar reporte',
+          error:
+            'No fue posible cargar el reporte.',
+        },
+
+        result: {
+          title:
+            'Reporte generado',
+          reportId:
+            'ID de reporte',
+          reportCode:
+            'Código de reporte',
+          generatedAt:
+            'Generado',
+          content:
+            'Contenido',
+        },
+
+        export: {
+          title:
+            'Exportación',
+          format:
+            'Formato',
+          download:
+            'Descargar',
+          optionsError:
+            'No fue posible cargar las opciones de exportación.',
+          error:
+            'No fue posible exportar el reporte.',
+        },
+      },
+
       dashboard: {
         metrics: {
           criticalAlerts: 'Alertas críticas',

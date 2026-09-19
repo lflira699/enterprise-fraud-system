@@ -5,6 +5,7 @@ import AlertsPage from '../modules/alerts/pages/AlertsPage'
 import CasesPage from '../modules/cases/pages/CasesPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
 import DetectionPage from '../modules/detection/pages/DetectionPage'
+import ReportsPage from '../modules/reports/pages/ReportsPage'
 import RiskPage from '../modules/risk/pages/RiskPage'
 import RulesPage from '../modules/rules/pages/RulesPage'
 import AppLayout from '../shared/layouts/AppLayout'
@@ -86,11 +87,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.reports}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.reports}
-            />
-          }
+          element={<ReportsPage />}
         />
 
         <Route
