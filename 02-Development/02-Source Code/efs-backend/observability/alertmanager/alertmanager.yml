@@ -1,0 +1,5 @@
+route:
+  receiver: local-only
+
+receivers:
+  - name: local-only

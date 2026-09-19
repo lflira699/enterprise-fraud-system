@@ -1,0 +1,54 @@
+extensions:
+
+  file_storage/efs_receiver:
+    directory: /var/lib/otelcol/file_storage/receiver
+    create_directory: true
+
+  file_storage/efs_exporter:
+    directory: /var/lib/otelcol/file_storage/exporter
+    create_directory: true
+
+receivers:
+
+  file_log/efs_backend:
+    include:
+      - /var/log/efs/efs-backend.json
+    start_at: beginning
+    storage: file_storage/efs_receiver
+
+processors:
+
+  resource/efs_backend:
+    attributes:
+      - key: service.name
+        value: efs-backend
+        action: upsert
+
+  batch: {}
+
+exporters:
+
+  otlp_http/loki:
+    logs_endpoint: http://loki:3100/otlp/v1/logs
+    retry_on_failure:
+      enabled: true
+    sending_queue:
+      enabled: true
+      storage: file_storage/efs_exporter
+
+service:
+
+  extensions:
+    - file_storage/efs_receiver
+    - file_storage/efs_exporter
+
+  pipelines:
+
+    logs:
+      receivers:
+        - file_log/efs_backend
+      processors:
+        - resource/efs_backend
+        - batch
+      exporters:
+        - otlp_http/loki

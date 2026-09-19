@@ -51,7 +51,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 efs:
   security:
     enabled: ${EFS_SECURITY_ENABLED:true}
@@ -72,3 +72,11 @@ efs:
       smtp:
         enabled: ${EFS_SMTP_ENABLED:false}
         from: ${EFS_SMTP_FROM:}
+
+logging:
+  file:
+    name: ${EFS_LOG_FILE:./runtime/logs/efs-backend.json}
+  structured:
+    format:
+      console: ecs
+      file: ecs

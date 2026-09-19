@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+
+  - name: EFS Observability
+    orgId: 1
+    folder: EFS Observability
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,13 @@
+groups:
+
+  - name: efs-observability-availability
+
+    rules:
+
+      - alert: EfsRequiredObservabilityTargetUnavailable
+        expr: up{job=~"prometheus|rabbitmq"} == 0
+        labels:
+          category: availability
+          component: observability
+        annotations:
+          summary: Required EFS observability target is unavailable.
