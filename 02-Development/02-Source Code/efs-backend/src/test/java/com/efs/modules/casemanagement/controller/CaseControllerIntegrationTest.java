@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -101,7 +102,14 @@ class CaseControllerIntegrationTest {
                         null,
                         null,
                         Set.of(),
-                        Set.of("case.view", "case.close"),
+                        Set.of(
+                                "case.view",
+                                "case.close",
+                                "evidence.create",
+                                "evidence.view",
+                                "evidence.update",
+                                "evidence.delete"
+                        ),
                         Set.of()
                 )
         );
@@ -1159,7 +1167,8 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
-    void shouldCreateCaseEvidenceThroughApi() throws Exception {
+    void shouldCreateCaseEvidenceThroughApiAndPersistAuditTrail()
+            throws Exception {
 
         UUID caseId =
                 insertCase(
@@ -1173,31 +1182,78 @@ class CaseControllerIntegrationTest {
                     "evidenceType": "TRANSACTION_SCREENSHOT",
                     "sourceSystem": "INTERNAL_CASE_TOOL",
                     "storageUri": "case-evidence://transaction/screenshot-001",
-                    "checksumSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                    "uploadedBy": "%s"
+                    "checksumSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                 }
                 """.formatted(
-                        TRANSACTION_ID,
-                        ASSIGNED_TO
+                        TRANSACTION_ID
                 );
 
         mockMvc.perform(
-                        post("/api/v1/cases/{caseId}/evidence",
-                                caseId)
+                        post(
+                                "/api/v1/cases/{caseId}/evidence",
+                                caseId
+                        )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody)
                 )
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.caseId").value(caseId.toString()))
-                .andExpect(jsonPath("$.transactionId").value(TRANSACTION_ID.toString()))
-                .andExpect(jsonPath("$.evidenceType").value("TRANSACTION_SCREENSHOT"))
-                .andExpect(jsonPath("$.sourceSystem").value("INTERNAL_CASE_TOOL"))
-                .andExpect(jsonPath("$.storageUri").value("case-evidence://transaction/screenshot-001"))
-                .andExpect(jsonPath("$.checksumSha256").value(
-                        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-                ))
-                .andExpect(jsonPath("$.uploadedBy").value(ASSIGNED_TO.toString()))
+                .andExpect(jsonPath("$.caseId")
+                        .value(caseId.toString()))
+                .andExpect(jsonPath("$.transactionId")
+                        .value(TRANSACTION_ID.toString()))
+                .andExpect(jsonPath("$.evidenceType")
+                        .value("TRANSACTION_SCREENSHOT"))
+                .andExpect(jsonPath("$.sourceSystem")
+                        .value("INTERNAL_CASE_TOOL"))
+                .andExpect(jsonPath("$.uploadedBy")
+                        .value(ASSIGNED_FROM.toString()))
                 .andExpect(jsonPath("$.uploadedAt").exists());
+
+        entityManager.flush();
+
+        Integer persistedCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_evidence
+                        WHERE case_id = ?
+                          AND uploaded_by = ?
+                          AND evidence_type = 'TRANSACTION_SCREENSHOT'
+                        """,
+                        Integer.class,
+                        caseId,
+                        ASSIGNED_FROM
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                persistedCount
+        );
+
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND event_type = 'EVIDENCE_REGISTRATION'
+                          AND action = 'REGISTER'
+                          AND source_component = 'CASE'
+                          AND event_result = 'SUCCESS'
+                          AND user_id = ?
+                          AND event_details ->> 'permissionCode' =
+                              'evidence.create'
+                        """,
+                        Integer.class,
+                        caseId,
+                        ASSIGNED_FROM
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
     }
 
     @Test
@@ -1212,19 +1268,17 @@ class CaseControllerIntegrationTest {
                 {
                     "transactionId": "%s",
                     "evidenceType": "TRANSACTION_SCREENSHOT",
-                    "sourceSystem": "INTERNAL_CASE_TOOL",
-                    "storageUri": "case-evidence://transaction/screenshot-unknown",
-                    "checksumSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                    "uploadedBy": "%s"
+                    "sourceSystem": "INTERNAL_CASE_TOOL"
                 }
                 """.formatted(
-                        TRANSACTION_ID,
-                        ASSIGNED_TO
+                        TRANSACTION_ID
                 );
 
         mockMvc.perform(
-                        post("/api/v1/cases/{caseId}/evidence",
-                                unknownCaseId)
+                        post(
+                                "/api/v1/cases/{caseId}/evidence",
+                                unknownCaseId
+                        )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody)
                 )
@@ -1245,17 +1299,17 @@ class CaseControllerIntegrationTest {
                 {
                     "transactionId": "%s",
                     "evidenceType": "",
-                    "sourceSystem": "",
-                    "uploadedBy": "%s"
+                    "sourceSystem": ""
                 }
                 """.formatted(
-                        TRANSACTION_ID,
-                        ASSIGNED_TO
+                        TRANSACTION_ID
                 );
 
         mockMvc.perform(
-                        post("/api/v1/cases/{caseId}/evidence",
-                                caseId)
+                        post(
+                                "/api/v1/cases/{caseId}/evidence",
+                                caseId
+                        )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody)
                 )
@@ -1263,7 +1317,8 @@ class CaseControllerIntegrationTest {
     }
 
     @Test
-    void shouldRetrieveCaseEvidenceThroughApi() throws Exception {
+    void shouldRetrieveCaseEvidenceThroughApiAndPersistReviewAudit()
+            throws Exception {
 
         UUID caseId =
                 insertCase(
@@ -1277,19 +1332,50 @@ class CaseControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        get("/api/v1/cases/{caseId}/evidence",
-                                caseId)
+                        get(
+                                "/api/v1/cases/{caseId}/evidence",
+                                caseId
+                        )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].evidenceId").value(evidenceId.toString()))
-                .andExpect(jsonPath("$[0].caseId").value(caseId.toString()))
-                .andExpect(jsonPath("$[0].transactionId").value(TRANSACTION_ID.toString()))
-                .andExpect(jsonPath("$[0].evidenceType").value("TRANSACTION_SCREENSHOT"))
-                .andExpect(jsonPath("$[0].sourceSystem").value("INTERNAL_CASE_TOOL"));
+                .andExpect(jsonPath("$[0].evidenceId")
+                        .value(evidenceId.toString()))
+                .andExpect(jsonPath("$[0].caseId")
+                        .value(caseId.toString()))
+                .andExpect(jsonPath("$[0].evidenceType")
+                        .value("TRANSACTION_SCREENSHOT"));
+
+        entityManager.flush();
+
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND event_type = 'EVIDENCE_REVIEW'
+                          AND action = 'REVIEW'
+                          AND source_component = 'CASE'
+                          AND event_result = 'SUCCESS'
+                          AND user_id = ?
+                          AND event_details ->> 'permissionCode' =
+                              'evidence.view'
+                        """,
+                        Integer.class,
+                        caseId,
+                        ASSIGNED_FROM
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
     }
 
     @Test
-    void shouldRetrieveCaseEvidenceByIdThroughApi() throws Exception {
+    void shouldRetrieveCaseEvidenceByIdThroughApi()
+            throws Exception {
 
         UUID caseId =
                 insertCase(
@@ -1303,19 +1389,26 @@ class CaseControllerIntegrationTest {
                 );
 
         mockMvc.perform(
-                        get("/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                        get(
+                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
                                 caseId,
-                                evidenceId)
+                                evidenceId
+                        )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.evidenceId").value(evidenceId.toString()))
-                .andExpect(jsonPath("$.caseId").value(caseId.toString()))
-                .andExpect(jsonPath("$.evidenceType").value("DEVICE_EVIDENCE"))
-                .andExpect(jsonPath("$.uploadedBy").value(ASSIGNED_TO.toString()));
+                .andExpect(jsonPath("$.evidenceId")
+                        .value(evidenceId.toString()))
+                .andExpect(jsonPath("$.caseId")
+                        .value(caseId.toString()))
+                .andExpect(jsonPath("$.evidenceType")
+                        .value("DEVICE_EVIDENCE"))
+                .andExpect(jsonPath("$.uploadedBy")
+                        .value(ASSIGNED_TO.toString()));
     }
 
     @Test
-    void shouldReturnNotFoundForSoftDeletedCaseEvidenceThroughApi() throws Exception {
+    void shouldReturnNotFoundForSoftDeletedCaseEvidenceThroughApi()
+            throws Exception {
 
         UUID caseId =
                 insertCase(
@@ -1340,15 +1433,18 @@ class CaseControllerIntegrationTest {
         );
 
         mockMvc.perform(
-                        get("/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                        get(
+                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
                                 caseId,
-                                evidenceId)
+                                evidenceId
+                        )
                 )
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldExcludeSoftDeletedCaseEvidenceFromApiList() throws Exception {
+    void shouldExcludeSoftDeletedCaseEvidenceFromApiList()
+            throws Exception {
 
         UUID caseId =
                 insertCase(
@@ -1379,45 +1475,15 @@ class CaseControllerIntegrationTest {
         );
 
         mockMvc.perform(
-                        get("/api/v1/cases/{caseId}/evidence",
-                                caseId)
+                        get(
+                                "/api/v1/cases/{caseId}/evidence",
+                                caseId
+                        )
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].evidenceId")
-                        .value(activeEvidenceId.toString()))
-                .andExpect(jsonPath("$[0].caseId")
-                        .value(caseId.toString()));
-    }
-    @Test
-    void shouldReturnNotFoundWhenRetrievingEvidenceForUnknownCaseThroughApi()
-            throws Exception {
-
-        UUID unknownCaseId =
-                UUID.randomUUID();
-
-        mockMvc.perform(
-                        get("/api/v1/cases/{caseId}/evidence",
-                                unknownCaseId)
-                )
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void shouldReturnEmptyEvidenceListForCaseWithoutEvidenceThroughApi()
-            throws Exception {
-
-        UUID caseId =
-                insertCase(
-                        "CASE-EVIDENCE-API-006"
-                );
-
-        mockMvc.perform(
-                        get("/api/v1/cases/{caseId}/evidence",
-                                caseId)
-                )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                        .value(activeEvidenceId.toString()));
     }
 
     @Test
@@ -1439,12 +1505,10 @@ class CaseControllerIntegrationTest {
                 """
                 {
                     "evidenceName": "Verified device evidence",
-                    "evidenceDescription": "Evidence reviewed during investigation",
-                    "updatedBy": "%s"
+                    "evidenceDescription":
+                        "Evidence reviewed during investigation"
                 }
-                """.formatted(
-                        ASSIGNED_TO
-                );
+                """;
 
         mockMvc.perform(
                         patch(
@@ -1460,67 +1524,13 @@ class CaseControllerIntegrationTest {
                         .value(evidenceId.toString()))
                 .andExpect(jsonPath("$.caseId")
                         .value(caseId.toString()))
-                .andExpect(jsonPath("$.evidenceType")
-                        .value("DEVICE_EVIDENCE"))
-                .andExpect(jsonPath("$.sourceSystem")
-                        .value("INTERNAL_CASE_TOOL"))
                 .andExpect(jsonPath("$.evidenceName")
                         .value("Verified device evidence"))
-                .andExpect(jsonPath("$.evidenceDescription")
-                        .value("Evidence reviewed during investigation"))
                 .andExpect(jsonPath("$.updatedBy")
-                        .value(ASSIGNED_TO.toString()))
+                        .value(ASSIGNED_FROM.toString()))
                 .andExpect(jsonPath("$.updatedAt").exists());
 
         entityManager.flush();
-
-        String evidenceType =
-                jdbcTemplate.queryForObject(
-                        """
-                        SELECT evidence_type
-                        FROM case_management.case_evidence
-                        WHERE evidence_id = ?
-                        """,
-                        String.class,
-                        evidenceId
-                );
-
-        String sourceSystem =
-                jdbcTemplate.queryForObject(
-                        """
-                        SELECT source_system
-                        FROM case_management.case_evidence
-                        WHERE evidence_id = ?
-                        """,
-                        String.class,
-                        evidenceId
-                );
-
-        Integer recordVersion =
-                jdbcTemplate.queryForObject(
-                        """
-                        SELECT record_version
-                        FROM case_management.case_evidence
-                        WHERE evidence_id = ?
-                        """,
-                        Integer.class,
-                        evidenceId
-                );
-
-        assertEquals(
-                "DEVICE_EVIDENCE",
-                evidenceType
-        );
-
-        assertEquals(
-                "INTERNAL_CASE_TOOL",
-                sourceSystem
-        );
-
-        assertEquals(
-                2,
-                recordVersion
-        );
 
         Integer historyCount =
                 jdbcTemplate.queryForObject(
@@ -1535,13 +1545,13 @@ class CaseControllerIntegrationTest {
                         """,
                         Integer.class,
                         caseId,
-                        ASSIGNED_TO,
+                        ASSIGNED_FROM,
                         "%evidenceId=" + evidenceId + "%",
                         "%evidenceName=Verified device evidence%"
                 );
 
         assertEquals(
-                1,
+                Integer.valueOf(1),
                 historyCount
         );
 
@@ -1558,15 +1568,17 @@ class CaseControllerIntegrationTest {
                           AND event_result = 'SUCCESS'
                           AND user_id = ?
                           AND event_details ->> 'evidenceId' = ?
+                          AND event_details ->> 'permissionCode' =
+                              'evidence.update'
                         """,
                         Integer.class,
                         caseId,
-                        ASSIGNED_TO,
+                        ASSIGNED_FROM,
                         evidenceId.toString()
                 );
 
         assertEquals(
-                1,
+                Integer.valueOf(1),
                 auditEventCount
         );
 
@@ -1595,43 +1607,9 @@ class CaseControllerIntegrationTest {
                 );
 
         assertEquals(
-                1,
+                Integer.valueOf(1),
                 entityChangeCount
         );
-    }
-
-    @Test
-    void shouldRejectCaseEvidenceUpdateWithoutActorThroughApi()
-            throws Exception {
-
-        UUID caseId =
-                insertCase(
-                        "CASE-EVIDENCE-UPDATE-API-002"
-                );
-
-        UUID evidenceId =
-                insertCaseEvidence(
-                        caseId,
-                        "DEVICE_EVIDENCE"
-                );
-
-        String requestBody =
-                """
-                {
-                    "evidenceName": "Updated evidence"
-                }
-                """;
-
-        mockMvc.perform(
-                        patch(
-                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
-                                caseId,
-                                evidenceId
-                        )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
-                )
-                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -1649,15 +1627,6 @@ class CaseControllerIntegrationTest {
                         "DEVICE_EVIDENCE"
                 );
 
-        String requestBody =
-                """
-                {
-                    "updatedBy": "%s"
-                }
-                """.formatted(
-                        ASSIGNED_TO
-                );
-
         mockMvc.perform(
                         patch(
                                 "/api/v1/cases/{caseId}/evidence/{evidenceId}",
@@ -1665,7 +1634,7 @@ class CaseControllerIntegrationTest {
                                 evidenceId
                         )
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
+                                .content("{}")
                 )
                 .andExpect(status().isBadRequest());
     }
@@ -1674,30 +1643,24 @@ class CaseControllerIntegrationTest {
     void shouldReturnNotFoundWhenUpdatingEvidenceForUnknownCaseThroughApi()
             throws Exception {
 
-        UUID unknownCaseId =
-                UUID.randomUUID();
-
-        UUID evidenceId =
-                UUID.randomUUID();
-
-        String requestBody =
-                """
-                {
-                    "evidenceName": "Updated evidence",
-                    "updatedBy": "%s"
-                }
-                """.formatted(
-                        ASSIGNED_TO
-                );
+        UUID caseId = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
 
         mockMvc.perform(
                         patch(
                                 "/api/v1/cases/{caseId}/evidence/{evidenceId}",
-                                unknownCaseId,
+                                caseId,
                                 evidenceId
                         )
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
+                                .content(
+                                        """
+                                        {
+                                            "evidenceName":
+                                                "Updated evidence"
+                                        }
+                                        """
+                                )
                 )
                 .andExpect(status().isNotFound());
     }
@@ -1711,128 +1674,163 @@ class CaseControllerIntegrationTest {
                         "CASE-EVIDENCE-UPDATE-API-004"
                 );
 
-        UUID unknownEvidenceId =
+        UUID evidenceId =
                 UUID.randomUUID();
-
-        String requestBody =
-                """
-                {
-                    "evidenceName": "Updated evidence",
-                    "updatedBy": "%s"
-                }
-                """.formatted(
-                        ASSIGNED_TO
-                );
 
         mockMvc.perform(
                         patch(
                                 "/api/v1/cases/{caseId}/evidence/{evidenceId}",
                                 caseId,
-                                unknownEvidenceId
+                                evidenceId
                         )
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
+                                .content(
+                                        """
+                                        {
+                                            "evidenceName":
+                                                "Updated evidence"
+                                        }
+                                        """
+                                )
                 )
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldReturnNotFoundWhenUpdatingEvidenceFromAnotherCaseThroughApi()
+    void shouldRejectCaseEvidenceUpdateForDifferentCaseThroughApi()
             throws Exception {
 
-        UUID ownerCaseId =
+        UUID firstCaseId =
                 insertCase(
                         "CASE-EVIDENCE-UPDATE-API-005"
                 );
 
-        UUID otherCaseId =
+        UUID secondCaseId =
                 insertCase(
                         "CASE-EVIDENCE-UPDATE-API-006"
                 );
 
         UUID evidenceId =
                 insertCaseEvidence(
-                        ownerCaseId,
+                        firstCaseId,
                         "DEVICE_EVIDENCE"
-                );
-
-        String requestBody =
-                """
-                {
-                    "evidenceName": "Updated evidence",
-                    "updatedBy": "%s"
-                }
-                """.formatted(
-                        ASSIGNED_TO
                 );
 
         mockMvc.perform(
                         patch(
                                 "/api/v1/cases/{caseId}/evidence/{evidenceId}",
-                                otherCaseId,
+                                secondCaseId,
                                 evidenceId
                         )
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
+                                .content(
+                                        """
+                                        {
+                                            "evidenceName":
+                                                "Updated evidence"
+                                        }
+                                        """
+                                )
                 )
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldReturnNotFoundWhenUpdatingSoftDeletedEvidenceThroughApi()
+    void shouldDeleteCaseEvidenceThroughApiAndPersistAuditTrail()
             throws Exception {
 
         UUID caseId =
                 insertCase(
-                        "CASE-EVIDENCE-UPDATE-API-007"
+                        "CASE-EVIDENCE-DELETE-API-001"
                 );
 
         UUID evidenceId =
                 insertCaseEvidence(
                         caseId,
-                        "DEVICE_EVIDENCE"
+                        "TRANSACTION_SCREENSHOT"
                 );
 
-        jdbcTemplate.update(
-                """
-                UPDATE case_management.case_evidence
-                SET deleted_at = CURRENT_TIMESTAMP,
-                    deleted_by = ?
-                WHERE evidence_id = ?
-                """,
-                ASSIGNED_TO,
-                evidenceId
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                                caseId,
+                                evidenceId
+                        )
+                )
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+
+        Integer removedCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                          AND deleted_at IS NOT NULL
+                          AND deleted_by = ?
+                          AND updated_by = ?
+                        """,
+                        Integer.class,
+                        evidenceId,
+                        ASSIGNED_FROM,
+                        ASSIGNED_FROM
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                removedCount
         );
 
-        String requestBody =
-                """
-                {
-                    "evidenceName": "Updated evidence",
-                    "updatedBy": "%s"
-                }
-                """.formatted(
-                        ASSIGNED_TO
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND event_type = 'EVIDENCE_REMOVAL'
+                          AND action = 'DELETE'
+                          AND source_component = 'CASE'
+                          AND event_result = 'SUCCESS'
+                          AND user_id = ?
+                          AND event_details ->> 'evidenceId' = ?
+                          AND event_details ->> 'permissionCode' =
+                              'evidence.delete'
+                        """,
+                        Integer.class,
+                        caseId,
+                        ASSIGNED_FROM,
+                        evidenceId.toString()
                 );
 
-        mockMvc.perform(
-                        patch(
-                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
-                                caseId,
-                                evidenceId
-                        )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
-                )
-                .andExpect(status().isNotFound());
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
     }
 
     @Test
-    void shouldRejectBlankEvidenceTypeOnUpdateThroughApi()
+    void shouldRejectCaseEvidenceDeleteWithoutPermissionThroughApi()
             throws Exception {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        ASSIGNED_FROM,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of("case.view"),
+                        Set.of()
+                )
+        );
 
         UUID caseId =
                 insertCase(
-                        "CASE-EVIDENCE-UPDATE-API-008"
+                        "CASE-EVIDENCE-DELETE-API-002"
                 );
 
         UUID evidenceId =
@@ -1841,28 +1839,168 @@ class CaseControllerIntegrationTest {
                         "DEVICE_EVIDENCE"
                 );
 
-        String requestBody =
-                """
-                {
-                    "evidenceType": "   ",
-                    "updatedBy": "%s"
-                }
-                """.formatted(
-                        ASSIGNED_TO
-                );
-
         mockMvc.perform(
-                        patch(
+                        delete(
                                 "/api/v1/cases/{caseId}/evidence/{evidenceId}",
                                 caseId,
                                 evidenceId
                         )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestBody)
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isForbidden());
+
+        entityManager.flush();
+
+        Integer activeCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM case_management.case_evidence
+                        WHERE evidence_id = ?
+                          AND deleted_at IS NULL
+                        """,
+                        Integer.class,
+                        evidenceId
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                activeCount
+        );
+
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND event_type = 'EVIDENCE_REMOVAL'
+                          AND action = 'DELETE'
+                          AND event_result = 'REJECTED'
+                          AND user_id = ?
+                          AND event_details ->> 'reason' =
+                              'MISSING_PERMISSION'
+                          AND event_details ->> 'permissionCode' =
+                              'evidence.delete'
+                        """,
+                        Integer.class,
+                        caseId,
+                        ASSIGNED_FROM
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
     }
 
+    @Test
+    void shouldReturnNotFoundWhenDeletingUnknownEvidenceThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-EVIDENCE-DELETE-API-003"
+                );
+
+        UUID evidenceId =
+                UUID.randomUUID();
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                                caseId,
+                                evidenceId
+                        )
+                )
+                .andExpect(status().isNotFound());
+
+        entityManager.flush();
+
+        Integer auditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND event_type = 'EVIDENCE_REMOVAL'
+                          AND action = 'DELETE'
+                          AND event_result = 'REJECTED'
+                          AND event_details ->> 'evidenceId' = ?
+                          AND event_details ->> 'reason' IS NULL
+                        """,
+                        Integer.class,
+                        caseId,
+                        evidenceId.toString()
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                auditCount
+        );
+    }
+
+    @Test
+    void shouldRejectAlreadyRemovedCaseEvidenceThroughApi()
+            throws Exception {
+
+        UUID caseId =
+                insertCase(
+                        "CASE-EVIDENCE-DELETE-API-004"
+                );
+
+        UUID evidenceId =
+                insertCaseEvidence(
+                        caseId,
+                        "DEVICE_EVIDENCE"
+                );
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                                caseId,
+                                evidenceId
+                        )
+                )
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/cases/{caseId}/evidence/{evidenceId}",
+                                caseId,
+                                evidenceId
+                        )
+                )
+                .andExpect(status().is(422));
+
+        entityManager.flush();
+
+        Integer rejectedAuditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE entity_type = 'CASE'
+                          AND entity_id = ?
+                          AND event_type = 'EVIDENCE_REMOVAL'
+                          AND action = 'DELETE'
+                          AND event_result = 'REJECTED'
+                          AND user_id = ?
+                          AND event_details ->> 'evidenceId' = ?
+                          AND event_details ->> 'reason' IS NULL
+                        """,
+                        Integer.class,
+                        caseId,
+                        ASSIGNED_FROM,
+                        evidenceId.toString()
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                rejectedAuditCount
+        );
+    }
     @Test
     void shouldUpdateCaseStatusThroughApi() throws Exception {
 

@@ -81,28 +81,32 @@ public interface CaseServiceInterface {
 
     CaseEvidenceResponse createCaseEvidence(
             UUID caseId,
-            CaseEvidenceRequest request
+            CaseEvidenceRequest request,
+            SecurityContext securityContext
     );
 
     CaseEvidenceResponse getCaseEvidenceById(
             UUID caseId,
-            UUID evidenceId
+            UUID evidenceId,
+            SecurityContext securityContext
     );
 
     List<CaseEvidenceResponse> getCaseEvidence(
-            UUID caseId
+            UUID caseId,
+            SecurityContext securityContext
     );
 
     CaseEvidenceResponse updateCaseEvidence(
             UUID caseId,
             UUID evidenceId,
-            CaseEvidenceUpdateRequest request
+            CaseEvidenceUpdateRequest request,
+            SecurityContext securityContext
     );
 
     void deleteCaseEvidence(
             UUID caseId,
             UUID evidenceId,
-            UUID deletedBy
+            SecurityContext securityContext
     );
 
     CaseResponse updateCaseStatus(

@@ -125,6 +125,48 @@ public class CaseService
     private static final String CASE_UPDATE_PERMISSION =
             "case.update";
 
+    private static final String EVIDENCE_CREATE_PERMISSION =
+            "evidence.create";
+
+    private static final String EVIDENCE_VIEW_PERMISSION =
+            "evidence.view";
+
+    private static final String EVIDENCE_UPDATE_PERMISSION =
+            "evidence.update";
+
+    private static final String EVIDENCE_DELETE_PERMISSION =
+            "evidence.delete";
+
+    private static final String EVIDENCE_REGISTRATION_EVENT_TYPE =
+            "EVIDENCE_REGISTRATION";
+
+    private static final String EVIDENCE_REVIEW_EVENT_TYPE =
+            "EVIDENCE_REVIEW";
+
+    private static final String EVIDENCE_UPDATE_EVENT_TYPE =
+            "EVIDENCE_UPDATED";
+
+    private static final String EVIDENCE_REMOVAL_EVENT_TYPE =
+            "EVIDENCE_REMOVAL";
+
+    private static final String EVIDENCE_AUDIT_ENTITY_TYPE =
+            "CASE";
+
+    private static final String EVIDENCE_AUDIT_SOURCE_COMPONENT =
+            "CASE";
+
+    private static final String EVIDENCE_REGISTER_ACTION =
+            "REGISTER";
+
+    private static final String EVIDENCE_REVIEW_ACTION =
+            "REVIEW";
+
+    private static final String EVIDENCE_UPDATE_ACTION =
+            "UPDATE";
+
+    private static final String EVIDENCE_DELETE_ACTION =
+            "DELETE";
+
     private static final String CASE_UPDATE_EVENT_TYPE =
             "CASE_UPDATE";
 
@@ -685,490 +727,795 @@ public class CaseService
     }
 
     @Override
-    @Transactional
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class,
+                    RequestValidationException.class
+            }
+    )
     public CaseEvidenceResponse createCaseEvidence(
             UUID caseId,
-            CaseEvidenceRequest request) {
+            CaseEvidenceRequest request,
+            SecurityContext securityContext) {
 
-        getExistingCase(
-                caseId
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
         );
 
-        CaseEvidence evidence =
-                caseEvidenceMapper.toEntity(
-                        request
+        requireEvidencePermission(
+                securityContext,
+                EVIDENCE_CREATE_PERMISSION,
+                EVIDENCE_REGISTRATION_EVENT_TYPE,
+                EVIDENCE_REGISTER_ACTION,
+                caseId,
+                null
+        );
+
+        Case caseEntity =
+                resolveEvidenceCase(
+                        securityContext,
+                        caseId,
+                        EVIDENCE_CREATE_PERMISSION,
+                        EVIDENCE_REGISTRATION_EVENT_TYPE,
+                        EVIDENCE_REGISTER_ACTION
                 );
 
-        evidence.setCaseId(
-                caseId
-        );
+        try {
 
-        LocalDateTime now =
-                LocalDateTime.now();
+            UUID actorId =
+                    securityContext.getUserId();
 
-        evidence.setUploadedAt(
-                now
-        );
+            CaseEvidence evidence =
+                    caseEvidenceMapper.toEntity(
+                            request
+                    );
 
-        evidence.setCreatedAt(
-                now
-        );
+            evidence.setCaseId(
+                    caseId
+            );
 
-        evidence.setCreatedBy(
-                evidence.getUploadedBy()
-        );
+            evidence.setUploadedBy(
+                    actorId
+            );
 
-        evidence.setUpdatedAt(
-                now
-        );
+            LocalDateTime now =
+                    LocalDateTime.now();
 
-        return caseEvidenceMapper.toResponse(
-                caseEvidenceRepository.save(
-                        evidence
-                )
-        );
+            evidence.setUploadedAt(
+                    now
+            );
+
+            evidence.setCreatedAt(
+                    now
+            );
+
+            evidence.setCreatedBy(
+                    actorId
+            );
+
+            evidence.setUpdatedAt(
+                    now
+            );
+
+            CaseEvidence savedEvidence =
+                    caseEvidenceRepository.save(
+                            evidence
+                    );
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    savedEvidence.getEvidenceId(),
+                    EVIDENCE_CREATE_PERMISSION,
+                    EVIDENCE_REGISTRATION_EVENT_TYPE,
+                    EVIDENCE_REGISTER_ACTION,
+                    "SUCCESS",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+            return caseEvidenceMapper.toResponse(
+                    savedEvidence
+            );
+
+        } catch (RequestValidationException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    null,
+                    EVIDENCE_CREATE_PERMISSION,
+                    EVIDENCE_REGISTRATION_EVENT_TYPE,
+                    EVIDENCE_REGISTER_ACTION,
+                    "REJECTED",
+                    null,
+                    null,
+                    exception,
+                    false
+            );
+
+            throw exception;
+
+        } catch (RuntimeException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    null,
+                    EVIDENCE_CREATE_PERMISSION,
+                    EVIDENCE_REGISTRATION_EVENT_TYPE,
+                    EVIDENCE_REGISTER_ACTION,
+                    "FAILURE",
+                    null,
+                    null,
+                    exception,
+                    true
+            );
+
+            throw exception;
+        }
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class
+            }
+    )
     public CaseEvidenceResponse getCaseEvidenceById(
             UUID caseId,
-            UUID evidenceId) {
+            UUID evidenceId,
+            SecurityContext securityContext) {
 
-        getExistingCase(
-                caseId
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
         );
+
+        requireEvidencePermission(
+                securityContext,
+                EVIDENCE_VIEW_PERMISSION,
+                EVIDENCE_REVIEW_EVENT_TYPE,
+                EVIDENCE_REVIEW_ACTION,
+                caseId,
+                evidenceId
+        );
+
+        Case caseEntity =
+                resolveEvidenceCase(
+                        securityContext,
+                        caseId,
+                        EVIDENCE_VIEW_PERMISSION,
+                        EVIDENCE_REVIEW_EVENT_TYPE,
+                        EVIDENCE_REVIEW_ACTION
+                );
 
         CaseEvidence evidence =
-                caseEvidenceRepository
-                        .findByEvidenceIdAndDeletedAtIsNull(
-                                evidenceId
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Case evidence not found: "
-                                                + evidenceId
-                                )
-                        );
+                resolveActiveEvidenceForCase(
+                        securityContext,
+                        caseEntity,
+                        caseId,
+                        evidenceId,
+                        EVIDENCE_VIEW_PERMISSION,
+                        EVIDENCE_REVIEW_EVENT_TYPE,
+                        EVIDENCE_REVIEW_ACTION
+                );
 
-        if (!caseId.equals(
-                evidence.getCaseId())) {
+        try {
 
-            throw new ResourceNotFoundException(
-                    "Case evidence not found for case: "
-                            + caseId
+            CaseEvidenceResponse response =
+                    caseEvidenceMapper.toResponse(
+                            evidence
+                    );
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_VIEW_PERMISSION,
+                    EVIDENCE_REVIEW_EVENT_TYPE,
+                    EVIDENCE_REVIEW_ACTION,
+                    "SUCCESS",
+                    null,
+                    null,
+                    null,
+                    false
             );
+
+            return response;
+
+        } catch (RuntimeException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_VIEW_PERMISSION,
+                    EVIDENCE_REVIEW_EVENT_TYPE,
+                    EVIDENCE_REVIEW_ACTION,
+                    "FAILURE",
+                    null,
+                    null,
+                    exception,
+                    true
+            );
+
+            throw exception;
         }
-
-        return caseEvidenceMapper.toResponse(
-                evidence
-        );
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class
+            }
+    )
     public List<CaseEvidenceResponse> getCaseEvidence(
-            UUID caseId) {
+            UUID caseId,
+            SecurityContext securityContext) {
 
-        getExistingCase(
-                caseId
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
         );
 
-        return caseEvidenceRepository
-                .findByCaseIdAndDeletedAtIsNullOrderByUploadedAtDesc(
-                        caseId
-                )
-                .stream()
-                .map(caseEvidenceMapper::toResponse)
-                .toList();
+        requireEvidencePermission(
+                securityContext,
+                EVIDENCE_VIEW_PERMISSION,
+                EVIDENCE_REVIEW_EVENT_TYPE,
+                EVIDENCE_REVIEW_ACTION,
+                caseId,
+                null
+        );
+
+        Case caseEntity =
+                resolveEvidenceCase(
+                        securityContext,
+                        caseId,
+                        EVIDENCE_VIEW_PERMISSION,
+                        EVIDENCE_REVIEW_EVENT_TYPE,
+                        EVIDENCE_REVIEW_ACTION
+                );
+
+        try {
+
+            List<CaseEvidenceResponse> response =
+                    caseEvidenceRepository
+                            .findByCaseIdAndDeletedAtIsNullOrderByUploadedAtDesc(
+                                    caseId
+                            )
+                            .stream()
+                            .map(
+                                    caseEvidenceMapper::toResponse
+                            )
+                            .toList();
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    null,
+                    EVIDENCE_VIEW_PERMISSION,
+                    EVIDENCE_REVIEW_EVENT_TYPE,
+                    EVIDENCE_REVIEW_ACTION,
+                    "SUCCESS",
+                    null,
+                    (long) response.size(),
+                    null,
+                    false
+            );
+
+            return response;
+
+        } catch (RuntimeException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    null,
+                    EVIDENCE_VIEW_PERMISSION,
+                    EVIDENCE_REVIEW_EVENT_TYPE,
+                    EVIDENCE_REVIEW_ACTION,
+                    "FAILURE",
+                    null,
+                    null,
+                    exception,
+                    true
+            );
+
+            throw exception;
+        }
     }
 
     @Override
-    @Transactional
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class,
+                    RequestValidationException.class
+            }
+    )
     public CaseEvidenceResponse updateCaseEvidence(
             UUID caseId,
             UUID evidenceId,
-            CaseEvidenceUpdateRequest request) {
+            CaseEvidenceUpdateRequest request,
+            SecurityContext securityContext) {
 
-        if (request.getUpdatedBy() == null) {
-            throw new RequestValidationException(
-                    "Evidence update actor is required"
-            );
-        }
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        requireEvidencePermission(
+                securityContext,
+                EVIDENCE_UPDATE_PERMISSION,
+                EVIDENCE_UPDATE_EVENT_TYPE,
+                EVIDENCE_UPDATE_ACTION,
+                caseId,
+                evidenceId
+        );
 
         Case caseEntity =
-                getExistingCase(
-                        caseId
+                resolveEvidenceCase(
+                        securityContext,
+                        caseId,
+                        EVIDENCE_UPDATE_PERMISSION,
+                        EVIDENCE_UPDATE_EVENT_TYPE,
+                        EVIDENCE_UPDATE_ACTION
                 );
 
         CaseEvidence evidence =
-                caseEvidenceRepository
-                        .findByEvidenceIdAndDeletedAtIsNull(
-                                evidenceId
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Case evidence not found: "
-                                                + evidenceId
-                                )
-                        );
+                resolveActiveEvidenceForCase(
+                        securityContext,
+                        caseEntity,
+                        caseId,
+                        evidenceId,
+                        EVIDENCE_UPDATE_PERMISSION,
+                        EVIDENCE_UPDATE_EVENT_TYPE,
+                        EVIDENCE_UPDATE_ACTION
+                );
 
-        if (!caseId.equals(
-                evidence.getCaseId())) {
+        try {
 
-            throw new ResourceNotFoundException(
-                    "Case evidence not found for case: "
-                            + caseId
+            UUID actorId =
+                    securityContext.getUserId();
+
+            Map<String, Object> previousValue =
+                    new LinkedHashMap<>();
+
+            Map<String, Object> currentValue =
+                    new LinkedHashMap<>();
+
+            previousValue.put(
+                    "evidenceId",
+                    evidenceId.toString()
             );
-        }
 
-        Map<String, Object> previousValue =
-                new LinkedHashMap<>();
+            currentValue.put(
+                    "evidenceId",
+                    evidenceId.toString()
+            );
 
-        Map<String, Object> currentValue =
-                new LinkedHashMap<>();
+            boolean hasUpdate =
+                    false;
 
-        previousValue.put(
-                "evidenceId",
-                evidenceId.toString()
-        );
+            if (request.getEvidenceType() != null) {
 
-        currentValue.put(
-                "evidenceId",
-                evidenceId.toString()
-        );
+                if (request.getEvidenceType().isBlank()) {
+                    throw new RequestValidationException(
+                            "Evidence type cannot be blank"
+                    );
+                }
 
-        boolean hasUpdate =
-                false;
+                previousValue.put(
+                        "evidenceType",
+                        evidence.getEvidenceType()
+                );
 
-        if (request.getEvidenceType() != null) {
+                evidence.setEvidenceType(
+                        request.getEvidenceType()
+                );
 
-            if (request.getEvidenceType().isBlank()) {
+                currentValue.put(
+                        "evidenceType",
+                        evidence.getEvidenceType()
+                );
+
+                hasUpdate =
+                        true;
+            }
+
+            if (request.getEvidenceCategory() != null) {
+
+                previousValue.put(
+                        "evidenceCategory",
+                        evidence.getEvidenceCategory()
+                );
+
+                evidence.setEvidenceCategory(
+                        request.getEvidenceCategory()
+                );
+
+                currentValue.put(
+                        "evidenceCategory",
+                        evidence.getEvidenceCategory()
+                );
+
+                hasUpdate =
+                        true;
+            }
+
+            if (request.getEvidenceName() != null) {
+
+                previousValue.put(
+                        "evidenceName",
+                        evidence.getEvidenceName()
+                );
+
+                evidence.setEvidenceName(
+                        request.getEvidenceName()
+                );
+
+                currentValue.put(
+                        "evidenceName",
+                        evidence.getEvidenceName()
+                );
+
+                hasUpdate =
+                        true;
+            }
+
+            if (request.getEvidenceDescription() != null) {
+
+                previousValue.put(
+                        "evidenceDescription",
+                        evidence.getEvidenceDescription()
+                );
+
+                evidence.setEvidenceDescription(
+                        request.getEvidenceDescription()
+                );
+
+                currentValue.put(
+                        "evidenceDescription",
+                        evidence.getEvidenceDescription()
+                );
+
+                hasUpdate =
+                        true;
+            }
+
+            if (request.getValidationStatus() != null) {
+
+                previousValue.put(
+                        "validationStatus",
+                        evidence.getValidationStatus()
+                );
+
+                evidence.setValidationStatus(
+                        request.getValidationStatus()
+                );
+
+                currentValue.put(
+                        "validationStatus",
+                        evidence.getValidationStatus()
+                );
+
+                hasUpdate =
+                        true;
+            }
+
+            if (request.getConfidentialityLevel() != null) {
+
+                previousValue.put(
+                        "confidentialityLevel",
+                        evidence.getConfidentialityLevel()
+                );
+
+                evidence.setConfidentialityLevel(
+                        request.getConfidentialityLevel()
+                );
+
+                currentValue.put(
+                        "confidentialityLevel",
+                        evidence.getConfidentialityLevel()
+                );
+
+                hasUpdate =
+                        true;
+            }
+
+            if (!hasUpdate) {
                 throw new RequestValidationException(
-                        "Evidence type cannot be blank"
+                        "At least one evidence field is required for update"
                 );
             }
 
-            previousValue.put(
-                    "evidenceType",
-                    evidence.getEvidenceType()
+            LocalDateTime now =
+                    LocalDateTime.now();
+
+            evidence.setUpdatedAt(
+                    now
             );
 
-            evidence.setEvidenceType(
-                    request.getEvidenceType()
+            evidence.setUpdatedBy(
+                    actorId
             );
 
-            currentValue.put(
-                    "evidenceType",
-                    evidence.getEvidenceType()
+            CaseEvidence savedEvidence =
+                    caseEvidenceRepository.save(
+                            evidence
+                    );
+
+            CaseHistory history =
+                    new CaseHistory();
+
+            history.setCaseId(
+                    caseId
             );
 
-            hasUpdate = true;
+            history.setEventType(
+                    "EVIDENCE_UPDATED"
+            );
+
+            history.setEventDescription(
+                    "Case evidence updated"
+            );
+
+            history.setPreviousValue(
+                    previousValue.toString()
+            );
+
+            history.setNewValue(
+                    currentValue.toString()
+            );
+
+            history.setChangedBy(
+                    actorId
+            );
+
+            history.setChangedAt(
+                    now
+            );
+
+            caseHistoryRepository.save(
+                    history
+            );
+
+            AuditEventResponse auditEvent =
+                    recordEvidenceAudit(
+                            securityContext,
+                            caseEntity,
+                            caseId,
+                            evidenceId,
+                            EVIDENCE_UPDATE_PERMISSION,
+                            EVIDENCE_UPDATE_EVENT_TYPE,
+                            EVIDENCE_UPDATE_ACTION,
+                            "SUCCESS",
+                            null,
+                            null,
+                            null,
+                            false
+                    );
+
+            AuditEntityChangeRequest entityChangeRequest =
+                    new AuditEntityChangeRequest();
+
+            entityChangeRequest.setAuditEventId(
+                    auditEvent.getAuditEventId()
+            );
+
+            entityChangeRequest.setEntityType(
+                    EVIDENCE_AUDIT_ENTITY_TYPE
+            );
+
+            entityChangeRequest.setEntityId(
+                    caseId
+            );
+
+            entityChangeRequest.setOperation(
+                    EVIDENCE_UPDATE_ACTION
+            );
+
+            entityChangeRequest.setPreviousValue(
+                    previousValue
+            );
+
+            entityChangeRequest.setCurrentValue(
+                    currentValue
+            );
+
+            auditEntityChangeService
+                    .createAuditEntityChange(
+                            entityChangeRequest
+                    );
+
+            return caseEvidenceMapper.toResponse(
+                    savedEvidence
+            );
+
+        } catch (RequestValidationException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_UPDATE_PERMISSION,
+                    EVIDENCE_UPDATE_EVENT_TYPE,
+                    EVIDENCE_UPDATE_ACTION,
+                    "REJECTED",
+                    null,
+                    null,
+                    exception,
+                    false
+            );
+
+            throw exception;
+
+        } catch (RuntimeException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_UPDATE_PERMISSION,
+                    EVIDENCE_UPDATE_EVENT_TYPE,
+                    EVIDENCE_UPDATE_ACTION,
+                    "FAILURE",
+                    null,
+                    null,
+                    exception,
+                    true
+            );
+
+            throw exception;
         }
-
-        if (request.getEvidenceCategory() != null) {
-
-            previousValue.put(
-                    "evidenceCategory",
-                    evidence.getEvidenceCategory()
-            );
-
-            evidence.setEvidenceCategory(
-                    request.getEvidenceCategory()
-            );
-
-            currentValue.put(
-                    "evidenceCategory",
-                    evidence.getEvidenceCategory()
-            );
-
-            hasUpdate = true;
-        }
-
-        if (request.getEvidenceName() != null) {
-
-            previousValue.put(
-                    "evidenceName",
-                    evidence.getEvidenceName()
-            );
-
-            evidence.setEvidenceName(
-                    request.getEvidenceName()
-            );
-
-            currentValue.put(
-                    "evidenceName",
-                    evidence.getEvidenceName()
-            );
-
-            hasUpdate = true;
-        }
-
-        if (request.getEvidenceDescription() != null) {
-
-            previousValue.put(
-                    "evidenceDescription",
-                    evidence.getEvidenceDescription()
-            );
-
-            evidence.setEvidenceDescription(
-                    request.getEvidenceDescription()
-            );
-
-            currentValue.put(
-                    "evidenceDescription",
-                    evidence.getEvidenceDescription()
-            );
-
-            hasUpdate = true;
-        }
-
-        if (request.getValidationStatus() != null) {
-
-            previousValue.put(
-                    "validationStatus",
-                    evidence.getValidationStatus()
-            );
-
-            evidence.setValidationStatus(
-                    request.getValidationStatus()
-            );
-
-            currentValue.put(
-                    "validationStatus",
-                    evidence.getValidationStatus()
-            );
-
-            hasUpdate = true;
-        }
-
-        if (request.getConfidentialityLevel() != null) {
-
-            previousValue.put(
-                    "confidentialityLevel",
-                    evidence.getConfidentialityLevel()
-            );
-
-            evidence.setConfidentialityLevel(
-                    request.getConfidentialityLevel()
-            );
-
-            currentValue.put(
-                    "confidentialityLevel",
-                    evidence.getConfidentialityLevel()
-            );
-
-            hasUpdate = true;
-        }
-
-        if (!hasUpdate) {
-            throw new RequestValidationException(
-                    "At least one evidence field is required for update"
-            );
-        }
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
-        evidence.setUpdatedAt(
-                now
-        );
-
-        evidence.setUpdatedBy(
-                request.getUpdatedBy()
-        );
-
-        CaseEvidence savedEvidence =
-                caseEvidenceRepository.save(
-                        evidence
-                );
-
-        CaseHistory history =
-                new CaseHistory();
-
-        history.setCaseId(
-                caseId
-        );
-
-        history.setEventType(
-                "EVIDENCE_UPDATED"
-        );
-
-        history.setEventDescription(
-                "Case evidence updated"
-        );
-
-        history.setPreviousValue(
-                previousValue.toString()
-        );
-
-        history.setNewValue(
-                currentValue.toString()
-        );
-
-        history.setChangedBy(
-                request.getUpdatedBy()
-        );
-
-        history.setChangedAt(
-                now
-        );
-
-        caseHistoryRepository.save(
-                history
-        );
-
-        AuditEventRequest auditEventRequest =
-                new AuditEventRequest();
-
-        auditEventRequest.setOrganizationId(
-                caseEntity.getOrganizationId()
-        );
-
-        auditEventRequest.setTenantId(
-                caseEntity.getTenantId()
-        );
-
-        auditEventRequest.setUserId(
-                request.getUpdatedBy()
-        );
-
-        auditEventRequest.setEventType(
-                "EVIDENCE_UPDATED"
-        );
-
-        auditEventRequest.setEntityType(
-                "CASE"
-        );
-
-        auditEventRequest.setEntityId(
-                caseId
-        );
-
-        auditEventRequest.setAction(
-                "UPDATE"
-        );
-
-        auditEventRequest.setSourceComponent(
-                "CASE"
-        );
-
-        auditEventRequest.setEventResult(
-                "SUCCESS"
-        );
-
-        auditEventRequest.setEventDetails(
-                Map.of(
-                        "caseId",
-                        caseId.toString(),
-                        "evidenceId",
-                        evidenceId.toString()
-                )
-        );
-
-        AuditEventResponse auditEvent =
-                auditEventService.createAuditEvent(
-                        auditEventRequest
-                );
-
-        AuditEntityChangeRequest entityChangeRequest =
-                new AuditEntityChangeRequest();
-
-        entityChangeRequest.setAuditEventId(
-                auditEvent.getAuditEventId()
-        );
-
-        entityChangeRequest.setEntityType(
-                "CASE"
-        );
-
-        entityChangeRequest.setEntityId(
-                caseId
-        );
-
-        entityChangeRequest.setOperation(
-                "UPDATE"
-        );
-
-        entityChangeRequest.setPreviousValue(
-                previousValue
-        );
-
-        entityChangeRequest.setCurrentValue(
-                currentValue
-        );
-
-        auditEntityChangeService.createAuditEntityChange(
-                entityChangeRequest
-        );
-
-        return caseEvidenceMapper.toResponse(
-                savedEvidence
-        );
     }
 
     @Override
-    @Transactional
+    @Transactional(
+            noRollbackFor = {
+                    AccessDeniedException.class,
+                    ResourceNotFoundException.class,
+                    ValidationException.class
+            }
+    )
     public void deleteCaseEvidence(
             UUID caseId,
             UUID evidenceId,
-            UUID deletedBy) {
+            SecurityContext securityContext) {
 
-        if (deletedBy == null) {
-            throw new RequestValidationException(
-                    "Evidence deletion actor is required"
-            );
-        }
-
-        getExistingCase(
-                caseId
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
         );
+
+        requireEvidencePermission(
+                securityContext,
+                EVIDENCE_DELETE_PERMISSION,
+                EVIDENCE_REMOVAL_EVENT_TYPE,
+                EVIDENCE_DELETE_ACTION,
+                caseId,
+                evidenceId
+        );
+
+        Case caseEntity =
+                resolveEvidenceCase(
+                        securityContext,
+                        caseId,
+                        EVIDENCE_DELETE_PERMISSION,
+                        EVIDENCE_REMOVAL_EVENT_TYPE,
+                        EVIDENCE_DELETE_ACTION
+                );
 
         CaseEvidence evidence =
-                caseEvidenceRepository
-                        .findByEvidenceIdAndDeletedAtIsNull(
-                                evidenceId
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Case evidence not found: "
-                                                + evidenceId
-                                )
-                        );
+                resolveEvidenceForRemoval(
+                        securityContext,
+                        caseEntity,
+                        caseId,
+                        evidenceId
+                );
 
-        if (!caseId.equals(
-                evidence.getCaseId())) {
+        if (evidence.getDeletedAt() != null) {
 
-            throw new ResourceNotFoundException(
-                    "Case evidence not found for case: "
-                            + caseId
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_DELETE_PERMISSION,
+                    EVIDENCE_REMOVAL_EVENT_TYPE,
+                    EVIDENCE_DELETE_ACTION,
+                    "REJECTED",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+            throw new ValidationException(
+                    "Case evidence already removed: "
+                            + evidenceId
             );
         }
 
-        LocalDateTime now =
-                LocalDateTime.now();
+        try {
 
-        evidence.setDeletedAt(
-                now
-        );
+            UUID actorId =
+                    securityContext.getUserId();
 
-        evidence.setDeletedBy(
-                deletedBy
-        );
+            LocalDateTime now =
+                    LocalDateTime.now();
 
-        evidence.setUpdatedAt(
-                now
-        );
+            evidence.setDeletedAt(
+                    now
+            );
 
-        evidence.setUpdatedBy(
-                deletedBy
-        );
+            evidence.setDeletedBy(
+                    actorId
+            );
 
-        caseEvidenceRepository.save(
-                evidence
-        );
+            evidence.setUpdatedAt(
+                    now
+            );
+
+            evidence.setUpdatedBy(
+                    actorId
+            );
+
+            caseEvidenceRepository.save(
+                    evidence
+            );
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_DELETE_PERMISSION,
+                    EVIDENCE_REMOVAL_EVENT_TYPE,
+                    EVIDENCE_DELETE_ACTION,
+                    "SUCCESS",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+        } catch (RuntimeException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_DELETE_PERMISSION,
+                    EVIDENCE_REMOVAL_EVENT_TYPE,
+                    EVIDENCE_DELETE_ACTION,
+                    "FAILURE",
+                    null,
+                    null,
+                    exception,
+                    true
+            );
+
+            throw exception;
+        }
     }
-
     @Override
     @Transactional
     public CaseResponse updateCaseStatus(
@@ -2856,6 +3203,340 @@ public class CaseService
         );
     }
 
+    private void requireEvidencePermission(
+            SecurityContext securityContext,
+            String permissionCode,
+            String eventType,
+            String action,
+            UUID caseId,
+            UUID evidenceId) {
+
+        if (!securityContext.hasPermission(
+                permissionCode
+        )) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    null,
+                    caseId,
+                    evidenceId,
+                    permissionCode,
+                    eventType,
+                    action,
+                    "REJECTED",
+                    "MISSING_PERMISSION",
+                    null,
+                    null,
+                    false
+            );
+
+            throw new AccessDeniedException(
+                    "Missing required permission: "
+                            + permissionCode
+            );
+        }
+    }
+
+    private Case resolveEvidenceCase(
+            SecurityContext securityContext,
+            UUID caseId,
+            String permissionCode,
+            String eventType,
+            String action) {
+
+        try {
+
+            return getExistingCase(
+                    caseId
+            );
+
+        } catch (ResourceNotFoundException exception) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    null,
+                    caseId,
+                    null,
+                    permissionCode,
+                    eventType,
+                    action,
+                    "REJECTED",
+                    null,
+                    null,
+                    exception,
+                    false
+            );
+
+            throw exception;
+        }
+    }
+
+    private CaseEvidence resolveActiveEvidenceForCase(
+            SecurityContext securityContext,
+            Case caseEntity,
+            UUID caseId,
+            UUID evidenceId,
+            String permissionCode,
+            String eventType,
+            String action) {
+
+        CaseEvidence evidence =
+                caseEvidenceRepository
+                        .findByEvidenceIdAndDeletedAtIsNull(
+                                evidenceId
+                        )
+                        .orElse(null);
+
+        if (evidence == null) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    permissionCode,
+                    eventType,
+                    action,
+                    "REJECTED",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+            throw new ResourceNotFoundException(
+                    "Case evidence not found: "
+                            + evidenceId
+            );
+        }
+
+        if (!caseId.equals(
+                evidence.getCaseId())) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    permissionCode,
+                    eventType,
+                    action,
+                    "REJECTED",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+            throw new ResourceNotFoundException(
+                    "Case evidence not found for case: "
+                            + caseId
+            );
+        }
+
+        return evidence;
+    }
+
+    private CaseEvidence resolveEvidenceForRemoval(
+            SecurityContext securityContext,
+            Case caseEntity,
+            UUID caseId,
+            UUID evidenceId) {
+
+        CaseEvidence evidence =
+                caseEvidenceRepository
+                        .findByEvidenceId(
+                                evidenceId
+                        )
+                        .orElse(null);
+
+        if (evidence == null) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_DELETE_PERMISSION,
+                    EVIDENCE_REMOVAL_EVENT_TYPE,
+                    EVIDENCE_DELETE_ACTION,
+                    "REJECTED",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+            throw new ResourceNotFoundException(
+                    "Case evidence not found: "
+                            + evidenceId
+            );
+        }
+
+        if (!caseId.equals(
+                evidence.getCaseId())) {
+
+            recordEvidenceAudit(
+                    securityContext,
+                    caseEntity,
+                    caseId,
+                    evidenceId,
+                    EVIDENCE_DELETE_PERMISSION,
+                    EVIDENCE_REMOVAL_EVENT_TYPE,
+                    EVIDENCE_DELETE_ACTION,
+                    "REJECTED",
+                    null,
+                    null,
+                    null,
+                    false
+            );
+
+            throw new ResourceNotFoundException(
+                    "Case evidence not found for case: "
+                            + caseId
+            );
+        }
+
+        return evidence;
+    }
+
+    private AuditEventResponse recordEvidenceAudit(
+            SecurityContext securityContext,
+            Case caseEntity,
+            UUID caseId,
+            UUID evidenceId,
+            String permissionCode,
+            String eventType,
+            String action,
+            String eventResult,
+            String reason,
+            Long resultCount,
+            RuntimeException exception,
+            boolean requiresNew) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        if (caseEntity != null) {
+
+            request.setOrganizationId(
+                    caseEntity.getOrganizationId()
+            );
+
+            request.setTenantId(
+                    caseEntity.getTenantId()
+            );
+
+        } else {
+
+            request.setTenantId(
+                    securityContext.getTenantId()
+            );
+        }
+
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                eventType
+        );
+
+        request.setEntityType(
+                EVIDENCE_AUDIT_ENTITY_TYPE
+        );
+
+        request.setEntityId(
+                caseId
+        );
+
+        request.setAction(
+                action
+        );
+
+        request.setSourceComponent(
+                EVIDENCE_AUDIT_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                permissionCode
+        );
+
+        if (caseId != null) {
+
+            details.put(
+                    "caseId",
+                    caseId.toString()
+            );
+        }
+
+        if (evidenceId != null) {
+
+            details.put(
+                    "evidenceId",
+                    evidenceId.toString()
+            );
+        }
+
+        if (resultCount != null) {
+
+            details.put(
+                    "resultCount",
+                    resultCount
+            );
+        }
+
+        if (reason != null) {
+
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
+
+        if (exception != null) {
+
+            details.put(
+                    "errorType",
+                    exception.getClass()
+                            .getName()
+            );
+
+            details.put(
+                    "errorMessage",
+                    exception.getMessage()
+            );
+        }
+
+        request.setEventDetails(
+                details
+        );
+
+        if (requiresNew) {
+
+            return auditEventService
+                    .createAuditEventRequiresNew(
+                            request
+                    );
+        }
+
+        return auditEventService
+                .createAuditEvent(
+                        request
+                );
+    }
     private void requireCaseViewPermission(
             SecurityContext securityContext,
             Map<String, Object> criteria) {

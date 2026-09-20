@@ -22,8 +22,6 @@ public class CaseEvidenceRequest {
     @Size(max = 64)
     private String checksumSha256;
 
-    private UUID uploadedBy;
-
     public UUID getTransactionId() {
         return transactionId;
     }
@@ -64,11 +62,5 @@ public class CaseEvidenceRequest {
         this.checksumSha256 = checksumSha256;
     }
 
-    public UUID getUploadedBy() {
-        return uploadedBy;
-    }
 
-    public void setUploadedBy(UUID uploadedBy) {
-        this.uploadedBy = uploadedBy;
-    }
 }

@@ -1,9 +1,6 @@
 package com.efs.modules.casemanagement.dto;
 
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-
-import java.util.UUID;
 
 public class CaseEvidenceUpdateRequest {
 
@@ -23,9 +20,6 @@ public class CaseEvidenceUpdateRequest {
 
     @Size(max = 20)
     private String confidentialityLevel;
-
-    @NotNull
-    private UUID updatedBy;
 
     public String getEvidenceType() {
         return evidenceType;
@@ -93,14 +87,5 @@ public class CaseEvidenceUpdateRequest {
                 confidentialityLevel;
     }
 
-    public UUID getUpdatedBy() {
-        return updatedBy;
-    }
 
-    public void setUpdatedBy(
-            UUID updatedBy) {
-
-        this.updatedBy =
-                updatedBy;
-    }
 }

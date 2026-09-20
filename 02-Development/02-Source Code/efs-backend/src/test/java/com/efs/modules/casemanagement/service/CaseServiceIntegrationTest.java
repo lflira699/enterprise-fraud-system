@@ -30,6 +30,7 @@ import com.efs.shared.exception.DuplicateRecordException;
 import com.efs.shared.exception.RequestValidationException;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.exception.ValidationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -114,6 +115,21 @@ class CaseServiceIntegrationTest {
                     null,
                     Set.of(),
                     Set.of("case.close"),
+                    Set.of()
+            );
+
+    private static final SecurityContext EVIDENCE_SECURITY_CONTEXT =
+            new SecurityContext(
+                    ASSIGNED_TO,
+                    null,
+                    null,
+                    Set.of(),
+                    Set.of(
+                            "evidence.create",
+                            "evidence.view",
+                            "evidence.update",
+                            "evidence.delete"
+                    ),
                     Set.of()
             );
 
@@ -1061,21 +1077,48 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
-        assertNotNull(evidence.getEvidenceId());
-        assertEquals(created.getCaseId(), evidence.getCaseId());
-        assertEquals(TRANSACTION_ID, evidence.getTransactionId());
-        assertEquals("TRANSACTION_SCREENSHOT", evidence.getEvidenceType());
-        assertEquals("INTERNAL_CASE_TOOL", evidence.getSourceSystem());
-        assertEquals(ASSIGNED_TO, evidence.getUploadedBy());
-        assertNotNull(evidence.getUploadedAt());
+        assertNotNull(
+                evidence.getEvidenceId()
+        );
+
+        assertEquals(
+                created.getCaseId(),
+                evidence.getCaseId()
+        );
+
+        assertEquals(
+                TRANSACTION_ID,
+                evidence.getTransactionId()
+        );
+
+        assertEquals(
+                "TRANSACTION_SCREENSHOT",
+                evidence.getEvidenceType()
+        );
+
+        assertEquals(
+                "INTERNAL_CASE_TOOL",
+                evidence.getSourceSystem()
+        );
+
+        assertEquals(
+                ASSIGNED_TO,
+                evidence.getUploadedBy()
+        );
+
+        assertNotNull(
+                evidence.getUploadedAt()
+        );
 
         CaseEvidenceResponse retrieved =
                 service.getCaseEvidenceById(
                         created.getCaseId(),
-                        evidence.getEvidenceId()
+                        evidence.getEvidenceId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         assertEquals(
@@ -1098,20 +1141,23 @@ class CaseServiceIntegrationTest {
                 created.getCaseId(),
                 buildEvidenceRequest(
                         "TRANSACTION_SCREENSHOT"
-                )
+                ),
+                EVIDENCE_SECURITY_CONTEXT
         );
 
         service.createCaseEvidence(
                 created.getCaseId(),
                 buildEvidenceRequest(
                         "DEVICE_EVIDENCE"
-                )
+                ),
+                EVIDENCE_SECURITY_CONTEXT
         );
 
         assertEquals(
                 2,
                 service.getCaseEvidence(
-                        created.getCaseId()
+                        created.getCaseId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 ).size()
         );
     }
@@ -1138,14 +1184,16 @@ class CaseServiceIntegrationTest {
                         firstCase.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         assertThrows(
                 ResourceNotFoundException.class,
                 () -> service.getCaseEvidenceById(
                         secondCase.getCaseId(),
-                        evidence.getEvidenceId()
+                        evidence.getEvidenceId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
     }
@@ -1165,13 +1213,14 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         service.deleteCaseEvidence(
                 created.getCaseId(),
                 evidence.getEvidenceId(),
-                ASSIGNED_TO
+                EVIDENCE_SECURITY_CONTEXT
         );
 
         entityManager.flush();
@@ -1258,7 +1307,8 @@ class CaseServiceIntegrationTest {
                 ResourceNotFoundException.class,
                 () -> service.getCaseEvidenceById(
                         created.getCaseId(),
-                        evidence.getEvidenceId()
+                        evidence.getEvidenceId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
     }
@@ -1285,7 +1335,8 @@ class CaseServiceIntegrationTest {
                         firstCase.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         assertThrows(
@@ -1293,20 +1344,21 @@ class CaseServiceIntegrationTest {
                 () -> service.deleteCaseEvidence(
                         secondCase.getCaseId(),
                         evidence.getEvidenceId(),
-                        ASSIGNED_TO
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
 
         assertNotNull(
                 service.getCaseEvidenceById(
                         firstCase.getCaseId(),
-                        evidence.getEvidenceId()
+                        evidence.getEvidenceId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
     }
 
     @Test
-    void shouldRejectCaseEvidenceDeleteWithoutActor() {
+    void shouldRejectCaseEvidenceDeleteWithoutPermission() {
 
         CaseResponse created =
                 service.createCase(
@@ -1320,25 +1372,28 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         assertThrows(
-                RequestValidationException.class,
+                AccessDeniedException.class,
                 () -> service.deleteCaseEvidence(
                         created.getCaseId(),
                         evidence.getEvidenceId(),
-                        null
+                        CASE_VIEW_SECURITY_CONTEXT
                 )
         );
 
         assertNotNull(
                 service.getCaseEvidenceById(
                         created.getCaseId(),
-                        evidence.getEvidenceId()
+                        evidence.getEvidenceId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
     }
+
     @Test
     void shouldRejectAlreadyDeletedCaseEvidence() {
 
@@ -1354,23 +1409,24 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "DEVICE_EVIDENCE"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         service.deleteCaseEvidence(
                 created.getCaseId(),
                 evidence.getEvidenceId(),
-                ASSIGNED_TO
+                EVIDENCE_SECURITY_CONTEXT
         );
 
         entityManager.flush();
 
         assertThrows(
-                ResourceNotFoundException.class,
+                ValidationException.class,
                 () -> service.deleteCaseEvidence(
                         created.getCaseId(),
                         evidence.getEvidenceId(),
-                        ASSIGNED_TO
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
     }
@@ -1390,7 +1446,8 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         jdbcTemplate.update(
@@ -1408,7 +1465,8 @@ class CaseServiceIntegrationTest {
                 ResourceNotFoundException.class,
                 () -> service.getCaseEvidenceById(
                         created.getCaseId(),
-                        evidence.getEvidenceId()
+                        evidence.getEvidenceId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 )
         );
     }
@@ -1428,7 +1486,8 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "TRANSACTION_SCREENSHOT"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         CaseEvidenceResponse deletedEvidence =
@@ -1436,7 +1495,8 @@ class CaseServiceIntegrationTest {
                         created.getCaseId(),
                         buildEvidenceRequest(
                                 "DEVICE_EVIDENCE"
-                        )
+                        ),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         jdbcTemplate.update(
@@ -1452,7 +1512,8 @@ class CaseServiceIntegrationTest {
 
         List<CaseEvidenceResponse> evidence =
                 service.getCaseEvidence(
-                        created.getCaseId()
+                        created.getCaseId(),
+                        EVIDENCE_SECURITY_CONTEXT
                 );
 
         assertEquals(
@@ -1476,7 +1537,6 @@ class CaseServiceIntegrationTest {
                         )
         );
     }
-
     @Test
     void shouldUpdateCaseStatusAndCreateHistory() {
 
@@ -2350,9 +2410,6 @@ class CaseServiceIntegrationTest {
         );
         request.setChecksumSha256(
                 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-        );
-        request.setUploadedBy(
-                ASSIGNED_TO
         );
 
         return request;

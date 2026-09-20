@@ -32,6 +32,7 @@ import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -204,10 +205,15 @@ public class CaseController {
             @PathVariable UUID caseId,
             @Valid @RequestBody CaseEvidenceRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         CaseEvidenceResponse response =
                 caseService.createCaseEvidence(
                         caseId,
-                        request
+                        request,
+                        securityContext
                 );
 
         return ResponseEntity
@@ -219,9 +225,14 @@ public class CaseController {
     public ResponseEntity<List<CaseEvidenceResponse>> getCaseEvidence(
             @PathVariable UUID caseId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
                 caseService.getCaseEvidence(
-                        caseId
+                        caseId,
+                        securityContext
                 )
         );
     }
@@ -231,10 +242,15 @@ public class CaseController {
             @PathVariable UUID caseId,
             @PathVariable UUID evidenceId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
                 caseService.getCaseEvidenceById(
                         caseId,
-                        evidenceId
+                        evidenceId,
+                        securityContext
                 )
         );
     }
@@ -245,13 +261,38 @@ public class CaseController {
             @PathVariable UUID evidenceId,
             @Valid @RequestBody CaseEvidenceUpdateRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
                 caseService.updateCaseEvidence(
                         caseId,
                         evidenceId,
-                        request
+                        request,
+                        securityContext
                 )
         );
+    }
+
+    @DeleteMapping("/{caseId}/evidence/{evidenceId}")
+    public ResponseEntity<Void> deleteCaseEvidence(
+            @PathVariable UUID caseId,
+            @PathVariable UUID evidenceId) {
+
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        caseService.deleteCaseEvidence(
+                caseId,
+                evidenceId,
+                securityContext
+        );
+
+        return ResponseEntity
+                .noContent()
+                .build();
     }
 
     @PatchMapping("/{caseId}/status")

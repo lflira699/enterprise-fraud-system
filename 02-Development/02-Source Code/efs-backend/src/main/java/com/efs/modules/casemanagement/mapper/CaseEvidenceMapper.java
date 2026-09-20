@@ -34,10 +34,6 @@ public class CaseEvidenceMapper {
                 request.getChecksumSha256()
         );
 
-        evidence.setUploadedBy(
-                request.getUploadedBy()
-        );
-
         return evidence;
     }
 
