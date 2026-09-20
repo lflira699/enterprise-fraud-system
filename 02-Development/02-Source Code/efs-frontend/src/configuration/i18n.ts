@@ -268,8 +268,150 @@ const resources = {
           dueDate:
             'Vencimiento',
         },
+
+        detail: {
+          title:
+            'Detalle del caso',
+          back:
+            'Volver al listado',
+          loading:
+            'Cargando detalle del caso.',
+          error:
+            'No fue posible cargar el detalle del caso.',
+
+          fields: {
+            caseId:
+              'ID de caso',
+            caseNumber:
+              'Número de caso',
+            caseType:
+              'Tipo de caso',
+            category:
+              'Categoría',
+            status:
+              'Estado',
+            priority:
+              'Prioridad',
+            severity:
+              'Severidad',
+            assignedTeam:
+              'Equipo asignado',
+            assignedUser:
+              'Usuario asignado',
+            transactionId:
+              'ID de transacción',
+            customerId:
+              'ID de cliente',
+            organizationId:
+              'ID de organización',
+            tenantId:
+              'ID de tenant',
+            createdAt:
+              'Creado',
+            updatedAt:
+              'Actualizado',
+            dueDate:
+              'Vencimiento',
+            closedAt:
+              'Cerrado',
+          },
+        },
       },
 
+      evidence: {
+        create: {
+          open:
+            'Registrar evidencia',
+          title:
+            'Registrar evidencia',
+          submit:
+            'Registrar evidencia',
+          cancel:
+            'Cancelar',
+          error:
+            'No fue posible registrar la evidencia.',
+        },
+
+        edit: {
+          title:
+            'Actualizar evidencia',
+          save:
+            'Guardar cambios',
+          cancel:
+            'Cancelar',
+          error:
+            'No fue posible actualizar la evidencia.',
+        },
+
+        delete: {
+          title:
+            'Eliminar evidencia',
+          message:
+            'Confirme la eliminación de la evidencia seleccionada.',
+          confirm:
+            'Confirmar eliminación',
+          cancel:
+            'Cancelar',
+          error:
+            'No fue posible eliminar la evidencia.',
+        },
+
+        list: {
+          title:
+            'Evidencia del caso',
+          error:
+            'No fue posible cargar la evidencia del caso.',
+          noRows:
+            'No hay evidencia disponible para el caso.',
+        },
+
+        fields: {
+          transactionId:
+            'ID de transacción',
+          evidenceType:
+            'Tipo de evidencia',
+          sourceSystem:
+            'Sistema de origen',
+          storageUri:
+            'Referencia de almacenamiento',
+          checksumSha256:
+            'Checksum SHA-256',
+          evidenceCategory:
+            'Categoría',
+          evidenceName:
+            'Nombre',
+          evidenceDescription:
+            'Descripción',
+          validationStatus:
+            'Estado de validación',
+          confidentialityLevel:
+            'Nivel de confidencialidad',
+        },
+
+        columns: {
+          evidenceType:
+            'Tipo',
+          evidenceCategory:
+            'Categoría',
+          evidenceName:
+            'Nombre',
+          sourceSystem:
+            'Sistema de origen',
+          validationStatus:
+            'Estado de validación',
+          uploadedAt:
+            'Registrada',
+          actions:
+            'Acciones',
+        },
+
+        actions: {
+          edit:
+            'Editar',
+          delete:
+            'Eliminar',
+        },
+      },
       risk: {
         filters: {
           title: 'Filtros',

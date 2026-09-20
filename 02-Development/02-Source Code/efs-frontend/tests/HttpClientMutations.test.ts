@@ -146,4 +146,108 @@ describe('httpClient mutation methods', () => {
       )
     },
   )
+  it(
+    'patches JSON through the canonical API base path',
+    async () => {
+      const fetchMock =
+        vi.fn()
+          .mockResolvedValue(
+            new Response(
+              JSON.stringify({
+                evidenceId:
+                  'evidence-1',
+              }),
+              {
+                status: 200,
+                headers: {
+                  'Content-Type':
+                    'application/json',
+                },
+              },
+            ),
+          )
+
+      vi.stubGlobal(
+        'fetch',
+        fetchMock,
+      )
+
+      const payload = {
+        evidenceType:
+          'DOCUMENT',
+      }
+
+      await httpClient.patch(
+        '/cases/case-1/evidence/evidence-1',
+        payload,
+      )
+
+      const [
+        url,
+        init,
+      ] =
+        fetchMock.mock.calls[0] as [
+          string,
+          RequestInit,
+        ]
+
+      expect(url)
+        .toBe(
+          '/api/v1/cases/case-1/evidence/evidence-1',
+        )
+
+      expect(init.method)
+        .toBe('PATCH')
+
+      expect(init.body)
+        .toBe(
+          JSON.stringify(payload),
+        )
+    },
+  )
+
+  it(
+    'deletes through the canonical API base path without a request body',
+    async () => {
+      const fetchMock =
+        vi.fn()
+          .mockResolvedValue(
+            new Response(
+              null,
+              {
+                status: 204,
+              },
+            ),
+          )
+
+      vi.stubGlobal(
+        'fetch',
+        fetchMock,
+      )
+
+      await httpClient.delete(
+        '/cases/case-1/evidence/evidence-1',
+      )
+
+      const [
+        url,
+        init,
+      ] =
+        fetchMock.mock.calls[0] as [
+          string,
+          RequestInit,
+        ]
+
+      expect(url)
+        .toBe(
+          '/api/v1/cases/case-1/evidence/evidence-1',
+        )
+
+      expect(init.method)
+        .toBe('DELETE')
+
+      expect(init.body)
+        .toBeUndefined()
+    },
+  )
 })

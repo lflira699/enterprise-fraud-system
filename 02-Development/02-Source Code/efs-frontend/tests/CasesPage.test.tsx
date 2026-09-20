@@ -26,10 +26,37 @@ vi.mock(
 )
 
 vi.mock(
+  '../src/modules/cases/components/CaseDetail',
+  () => ({
+    default: ({
+      caseId,
+      onBack,
+    }: {
+      caseId: string
+      onBack: () => void
+    }) => (
+      <div data-testid="case-detail">
+        <span>{caseId}</span>
+
+        <button
+          type="button"
+          onClick={onBack}
+        >
+          Volver desde detalle
+        </button>
+      </div>
+    ),
+  }),
+)
+
+vi.mock(
   '@mui/x-data-grid',
   () => ({
     DataGrid: (
       props: {
+        rows?: Array<{
+          caseId: string
+        }>
         onPaginationModelChange?: (
           model: {
             page: number
@@ -41,6 +68,13 @@ vi.mock(
             field: string
             sort: 'asc' | 'desc' | null
           }>,
+        ) => void
+        onRowClick?: (
+          params: {
+            row: {
+              caseId: string
+            }
+          },
         ) => void
       },
     ) => (
@@ -70,6 +104,20 @@ vi.mock(
         >
           Ordenar por creación
         </button>
+
+        {props.rows?.[0] && (
+          <button
+            type="button"
+            onClick={() =>
+              props.onRowClick?.({
+                row:
+                  props.rows[0],
+              })
+            }
+          >
+            Abrir caso
+          </button>
+        )}
       </div>
     ),
   }),
@@ -80,6 +128,16 @@ const useCasesQueryMock =
     useCasesQuery,
   )
 
+const emptyResponse = {
+  content: [],
+  page: 0,
+  size: 25,
+  totalElements: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrevious: false,
+}
+
 beforeEach(() => {
   useCasesQueryMock
     .mockReset()
@@ -87,15 +145,7 @@ beforeEach(() => {
   useCasesQueryMock
     .mockReturnValue(
       {
-        data: {
-          content: [],
-          page: 0,
-          size: 25,
-          totalElements: 0,
-          totalPages: 0,
-          hasNext: false,
-          hasPrevious: false,
-        },
+        data: emptyResponse,
         isError: false,
         isFetching: false,
       } as unknown as ReturnType<
@@ -264,6 +314,84 @@ describe('CasesPage', () => {
           })
         },
       )
+    },
+  )
+
+  it(
+    'opens Case Detail from the selected Case and returns to the preserved list',
+    () => {
+      const caseId =
+        '33333333-3333-3333-3333-333333333333'
+
+      useCasesQueryMock
+        .mockReturnValue(
+          {
+            data: {
+              ...emptyResponse,
+              content: [
+                {
+                  caseId,
+                  caseNumber:
+                    'CASE-003',
+                },
+              ],
+            },
+            isError: false,
+            isFetching: false,
+          } as unknown as ReturnType<
+            typeof useCasesQuery
+          >,
+        )
+
+      render(
+        <CasesPage />,
+      )
+
+      fireEvent.click(
+        screen.getByRole(
+          'button',
+          {
+            name: 'Abrir caso',
+          },
+        ),
+      )
+
+      expect(
+        screen.getByTestId(
+          'case-detail',
+        ),
+      ).toBeTruthy()
+
+      expect(
+        screen.getByText(
+          caseId,
+        ),
+      ).toBeTruthy()
+
+      fireEvent.click(
+        screen.getByRole(
+          'button',
+          {
+            name:
+              'Volver desde detalle',
+          },
+        ),
+      )
+
+      expect(
+        screen.queryByTestId(
+          'case-detail',
+        ),
+      ).toBeNull()
+
+      expect(
+        screen.getByRole(
+          'button',
+          {
+            name: 'Abrir caso',
+          },
+        ),
+      ).toBeTruthy()
     },
   )
 })

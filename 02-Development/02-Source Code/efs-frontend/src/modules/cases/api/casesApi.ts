@@ -30,3 +30,11 @@ export function getCases(
     query,
   )
 }
+
+export function getCaseById(
+  caseId: string,
+): Promise<Case> {
+  return httpClient.get<Case>(
+    `${CASES_PATH}/${caseId}`,
+  )
+}

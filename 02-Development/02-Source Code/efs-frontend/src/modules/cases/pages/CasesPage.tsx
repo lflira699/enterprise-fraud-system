@@ -18,6 +18,7 @@ import {
 } from '@mui/x-data-grid'
 import { useTranslation } from 'react-i18next'
 
+import CaseDetail from '../components/CaseDetail'
 import { useCasesQuery } from '../hooks/useCasesQuery'
 import type {
   Case as CaseRecord,
@@ -123,6 +124,13 @@ function CasesPage() {
     setSortModel,
   ] = useState<GridSortModel>(
     DEFAULT_SORT_MODEL,
+  )
+
+  const [
+    selectedCaseId,
+    setSelectedCaseId,
+  ] = useState<string | null>(
+    null,
   )
 
   const activeSort =
@@ -358,6 +366,17 @@ function CasesPage() {
     )
   }
 
+  if (selectedCaseId) {
+    return (
+      <CaseDetail
+        caseId={selectedCaseId}
+        onBack={() =>
+          setSelectedCaseId(null)
+        }
+      />
+    )
+  }
+
   return (
     <Box>
       <Typography
@@ -565,6 +584,11 @@ function CasesPage() {
               }
               onSortModelChange={
                 handleSortModelChange
+              }
+              onRowClick={(params) =>
+                setSelectedCaseId(
+                  params.row.caseId,
+                )
               }
               disableRowSelectionOnClick
               localeText={{

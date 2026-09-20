@@ -278,6 +278,35 @@ export const httpClient = {
     )
   },
 
+  patch<T>(
+    path: string,
+    body?: unknown,
+    query?: QueryParameters,
+  ): Promise<T> {
+    return request<T>(
+      path,
+      {
+        method: 'PATCH',
+        body:
+          serializeBody(body),
+      },
+      query,
+    )
+  },
+
+  delete<T>(
+    path: string,
+    query?: QueryParameters,
+  ): Promise<T> {
+    return request<T>(
+      path,
+      {
+        method: 'DELETE',
+      },
+      query,
+    )
+  },
+
   postBlob(
     path: string,
     body?: unknown,

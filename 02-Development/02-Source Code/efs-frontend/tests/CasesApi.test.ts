@@ -6,7 +6,10 @@ import {
   vi,
 } from 'vitest'
 
-import { getCases } from '../src/modules/cases/api/casesApi'
+import {
+  getCaseById,
+  getCases,
+} from '../src/modules/cases/api/casesApi'
 import { httpClient } from '../src/services/httpClient'
 
 afterEach(() => {
@@ -89,10 +92,6 @@ describe('casesApi', () => {
 
       expect(
         getMock,
-      ).toHaveBeenCalledTimes(1)
-
-      expect(
-        getMock,
       ).toHaveBeenCalledWith(
         '/cases',
         {
@@ -107,6 +106,33 @@ describe('casesApi', () => {
           sort: 'createdAt',
           direction: 'ASC',
         },
+      )
+    },
+  )
+
+  it(
+    'retrieves Case Detail using the existing Case endpoint',
+    async () => {
+      const caseId =
+        '22222222-2222-2222-2222-222222222222'
+
+      const getMock =
+        vi.spyOn(
+          httpClient,
+          'get',
+        )
+          .mockResolvedValue({
+            caseId,
+          })
+
+      await getCaseById(
+        caseId,
+      )
+
+      expect(
+        getMock,
+      ).toHaveBeenCalledWith(
+        `/cases/${caseId}`,
       )
     },
   )

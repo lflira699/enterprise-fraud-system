@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { getCases } from '../api/casesApi'
+import {
+  getCaseById,
+  getCases,
+} from '../api/casesApi'
 import type { CaseSearchParams } from '../types/case'
 
 export const casesQueryKeys = {
@@ -13,6 +16,16 @@ export const casesQueryKeys = {
       ...casesQueryKeys.all,
       'list',
       params,
+    ] as const
+  },
+
+  detail(
+    caseId: string,
+  ) {
+    return [
+      ...casesQueryKeys.all,
+      'detail',
+      caseId,
     ] as const
   },
 }
@@ -30,5 +43,25 @@ export function useCasesQuery(
       () => getCases(
         params,
       ),
+  })
+}
+
+export function useCaseQuery(
+  caseId: string | null,
+) {
+  return useQuery({
+    queryKey:
+      casesQueryKeys.detail(
+        caseId ?? '',
+      ),
+
+    queryFn:
+      () => getCaseById(
+        caseId ?? '',
+      ),
+
+    enabled:
+      caseId !== null
+      && caseId !== '',
   })
 }
