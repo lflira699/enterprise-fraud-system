@@ -641,6 +641,136 @@ class TransactionChannelServiceIntegrationTest {
         );
     }
 
+    @Test
+    void createChannelShouldRejectNegativeSessionDuration() {
+
+        TransactionChannelRequest request =
+                buildRequest(
+                        "WEB"
+                );
+
+        request.setSessionDuration(-1);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionChannelService
+                        .createChannel(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void getChannelByIdShouldHideSoftDeletedParent() {
+
+        TransactionChannelResponse created =
+                transactionChannelService
+                        .createChannel(
+                                transactionId,
+                                buildRequest(
+                                        "MOBILE"
+                                )
+                        );
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionChannelService
+                        .getChannelById(
+                                created.getChannelTransactionId()
+                        )
+        );
+    }
+
+    @Test
+    void getChannelsByTransactionIdShouldHideSoftDeletedParent() {
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionChannelService
+                        .getChannelsByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    @Test
+    void getChannelsByTypeShouldExcludeSoftDeletedParent() {
+
+        String channelType =
+                "TYPE_SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        transactionChannelService
+                .createChannel(
+                        transactionId,
+                        buildRequest(channelType)
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionChannelService
+                        .getChannelsByType(channelType)
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void getChannelsByApplicationNameShouldExcludeSoftDeletedParent() {
+
+        String applicationName =
+                "APP-SOFT-" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        TransactionChannelRequest request =
+                buildRequest(
+                        "WEB"
+                );
+
+        request.setApplicationName(applicationName);
+
+        transactionChannelService
+                .createChannel(
+                        transactionId,
+                        request
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionChannelService
+                        .getChannelsByApplicationName(
+                                applicationName
+                        )
+                        .isEmpty()
+        );
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private TransactionChannelRequest buildRequest(
             String channelType) {
 

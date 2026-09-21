@@ -2,17 +2,21 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionChannelRequest;
 import com.efs.modules.transaction.dto.TransactionChannelResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionChannel;
 import com.efs.modules.transaction.mapper.TransactionChannelMapper;
 import com.efs.modules.transaction.repository.TransactionChannelRepository;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.validator.TransactionChannelValueValidator;
 import com.efs.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionChannelService
@@ -21,11 +25,15 @@ public class TransactionChannelService
     private final TransactionChannelRepository transactionChannelRepository;
     private final TransactionRepository transactionRepository;
     private final TransactionChannelMapper transactionChannelMapper;
+    private final TransactionChannelValueValidator
+            transactionChannelValueValidator;
 
     public TransactionChannelService(
             TransactionChannelRepository transactionChannelRepository,
             TransactionRepository transactionRepository,
-            TransactionChannelMapper transactionChannelMapper) {
+            TransactionChannelMapper transactionChannelMapper,
+            TransactionChannelValueValidator
+                    transactionChannelValueValidator) {
 
         this.transactionChannelRepository =
                 transactionChannelRepository;
@@ -35,6 +43,8 @@ public class TransactionChannelService
 
         this.transactionChannelMapper =
                 transactionChannelMapper;
+        this.transactionChannelValueValidator =
+                transactionChannelValueValidator;
     }
 
     @Override
@@ -50,6 +60,9 @@ public class TransactionChannelService
                                 "Transaction not found: " + transactionId
                         )
                 );
+
+        transactionChannelValueValidator
+                .validate(request);
 
         TransactionChannel channel =
                 transactionChannelMapper.toEntity(request);
@@ -77,6 +90,18 @@ public class TransactionChannelService
                                                 + channelTransactionId
                                 )
                         );
+
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        channel.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction channel not found: "
+                            + channelTransactionId
+            );
+        }
 
         return transactionChannelMapper.toResponse(channel);
     }
@@ -106,11 +131,10 @@ public class TransactionChannelService
     public List<TransactionChannelResponse> getChannelsByType(
             String channelType) {
 
-        return transactionChannelRepository
-                .findByChannelType(channelType)
-                .stream()
-                .map(transactionChannelMapper::toResponse)
-                .toList();
+        return toActiveChannelResponses(
+                transactionChannelRepository
+                        .findByChannelType(channelType)
+        );
     }
 
     @Override
@@ -118,9 +142,41 @@ public class TransactionChannelService
     public List<TransactionChannelResponse> getChannelsByApplicationName(
             String applicationName) {
 
-        return transactionChannelRepository
-                .findByApplicationName(applicationName)
-                .stream()
+        return toActiveChannelResponses(
+                transactionChannelRepository
+                        .findByApplicationName(applicationName)
+        );
+    }
+
+    private List<TransactionChannelResponse>
+    toActiveChannelResponses(
+            List<TransactionChannel> channels) {
+
+        if (channels.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                channels.stream()
+                        .map(TransactionChannel::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return channels.stream()
+                .filter(channel ->
+                        activeTransactionIds.contains(
+                                channel.getTransactionId()
+                        )
+                )
                 .map(transactionChannelMapper::toResponse)
                 .toList();
     }

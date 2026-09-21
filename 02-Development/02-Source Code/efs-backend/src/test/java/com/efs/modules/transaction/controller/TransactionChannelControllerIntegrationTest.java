@@ -521,6 +521,172 @@ class TransactionChannelControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldRejectNegativeSessionDuration()
+            throws Exception {
+
+        TransactionChannelRequest request =
+                buildRequest(
+                        "WEB"
+                );
+
+        request.setSessionDuration(-1);
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/channels",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCreatingChannelForSoftDeletedTransaction()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/channels",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest(
+                                                        "WEB"
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForChannelWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createChannel(
+                        "MOBILE",
+                        null
+                );
+
+        UUID channelTransactionId =
+                UUID.fromString(
+                        created.get(
+                                "channelTransactionId"
+                        ).asText()
+                );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/channels/{channelTransactionId}",
+                                channelTransactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForChannelListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/channels",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingChannelsByType()
+            throws Exception {
+
+        String channelType =
+                "TYPE_SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createChannel(
+                channelType,
+                null
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/channels/type/{channelType}",
+                                channelType
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingChannelsByApplicationName()
+            throws Exception {
+
+        String applicationName =
+                "APP-SOFT-" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createChannel(
+                "WEB",
+                applicationName
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/channels/application/{applicationName}",
+                                applicationName
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private JsonNode createChannel(
             String channelType,
             String applicationName)

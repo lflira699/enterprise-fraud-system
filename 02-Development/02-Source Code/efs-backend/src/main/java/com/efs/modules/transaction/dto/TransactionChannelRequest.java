@@ -1,6 +1,7 @@
 package com.efs.modules.transaction.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 public class TransactionChannelRequest {
@@ -24,6 +25,7 @@ public class TransactionChannelRequest {
     @Size(max = 60)
     private String authenticationMethod;
 
+    @PositiveOrZero
     private Integer sessionDuration;
 
     public String getChannelType() {
