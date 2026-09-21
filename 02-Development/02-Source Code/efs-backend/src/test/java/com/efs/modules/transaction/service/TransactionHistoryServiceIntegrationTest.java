@@ -3,6 +3,8 @@ package com.efs.modules.transaction.service;
 import com.efs.modules.transaction.dto.TransactionHistoryRequest;
 import com.efs.modules.transaction.dto.TransactionHistoryResponse;
 import com.efs.shared.exception.ResourceNotFoundException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +48,9 @@ class TransactionHistoryServiceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @BeforeEach
     void setUp() {
@@ -496,6 +501,147 @@ class TransactionHistoryServiceIntegrationTest {
                                         + missingTransactionId
                         )
         );
+    }
+
+    @Test
+    void shouldRejectCreateWhenTransactionIsSoftDeleted() {
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.createHistory(
+                        TRANSACTION_ID,
+                        createRequest(
+                                10,
+                                "Deleted transaction",
+                                CHANGED_BY,
+                                "REVIEW",
+                                "PENDING",
+                                new BigDecimal("100.00")
+                        )
+                )
+        );
+    }
+
+    @Test
+    void shouldHideHistoryByIdWhenTransactionIsSoftDeleted() {
+
+        TransactionHistoryResponse created =
+                service.createHistory(
+                        TRANSACTION_ID,
+                        createRequest(
+                                11,
+                                "Hidden by deleted parent",
+                                CHANGED_BY,
+                                "REVIEW",
+                                "PENDING",
+                                new BigDecimal("100.00")
+                        )
+                );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getHistoryById(
+                        created.getHistoryId()
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectVersionLookupWhenTransactionIsSoftDeleted() {
+
+        service.createHistory(
+                TRANSACTION_ID,
+                createRequest(
+                        12,
+                        "Deleted parent version",
+                        CHANGED_BY,
+                        "REVIEW",
+                        "PENDING",
+                        new BigDecimal("100.00")
+                )
+        );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () ->
+                        service.getHistoryByTransactionIdAndVersionNumber(
+                                TRANSACTION_ID,
+                                12
+                        )
+        );
+    }
+
+    @Test
+    void shouldRejectHistoryListWhenTransactionIsSoftDeleted() {
+
+        service.createHistory(
+                TRANSACTION_ID,
+                createRequest(
+                        13,
+                        "Deleted parent list",
+                        CHANGED_BY,
+                        "REVIEW",
+                        "PENDING",
+                        new BigDecimal("100.00")
+                )
+        );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getHistoryByTransactionId(
+                        TRANSACTION_ID
+                )
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedTransactionFromChangedByFilter() {
+
+        service.createHistory(
+                TRANSACTION_ID,
+                createRequest(
+                        14,
+                        "Deleted parent global filter",
+                        CHANGED_BY,
+                        "REVIEW",
+                        "PENDING",
+                        new BigDecimal("100.00")
+                )
+        );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        assertEquals(
+                0,
+                service.getHistoryByChangedBy(
+                        CHANGED_BY
+                ).size()
+        );
+    }
+
+    private void softDeleteTransaction(
+            UUID targetTransactionId) {
+
+        entityManager.flush();
+
+        jdbcTemplate.update(
+                """
+                UPDATE transaction.transaction
+                SET deleted_at = CURRENT_TIMESTAMP
+                WHERE transaction_id = ?
+                """,
+                targetTransactionId
+        );
+
+        entityManager.clear();
     }
 
     private TransactionHistoryRequest createRequest(

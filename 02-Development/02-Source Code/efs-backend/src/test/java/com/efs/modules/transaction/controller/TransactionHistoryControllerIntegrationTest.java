@@ -1,6 +1,8 @@
 package com.efs.modules.transaction.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,9 @@ class TransactionHistoryControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @BeforeEach
     void setUp() {
@@ -441,6 +446,145 @@ class TransactionHistoryControllerIntegrationTest {
                         jsonPath("$[1].changedBy")
                                 .value(CHANGED_BY.toString())
                 );
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCreatingForSoftDeletedTransaction()
+            throws Exception {
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/history",
+                                TRANSACTION_ID
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                createRequest(
+                                                        10,
+                                                        "Deleted transaction",
+                                                        CHANGED_BY,
+                                                        "REVIEW",
+                                                        "PENDING"
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideHistoryByIdForSoftDeletedTransaction()
+            throws Exception {
+
+        UUID historyId =
+                insertHistory(
+                        11,
+                        "Hidden by deleted parent",
+                        CHANGED_BY,
+                        "REVIEW",
+                        "PENDING"
+                );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/history/{historyId}",
+                                historyId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectVersionLookupForSoftDeletedTransaction()
+            throws Exception {
+
+        insertHistory(
+                12,
+                "Deleted parent version",
+                CHANGED_BY,
+                "REVIEW",
+                "PENDING"
+        );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/history/version/{versionNumber}",
+                                TRANSACTION_ID,
+                                12
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectHistoryListForSoftDeletedTransaction()
+            throws Exception {
+
+        insertHistory(
+                13,
+                "Deleted parent list",
+                CHANGED_BY,
+                "REVIEW",
+                "PENDING"
+        );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/history",
+                                TRANSACTION_ID
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedTransactionFromChangedByFilter()
+            throws Exception {
+
+        insertHistory(
+                14,
+                "Deleted parent global filter",
+                CHANGED_BY,
+                "REVIEW",
+                "PENDING"
+        );
+
+        softDeleteTransaction(TRANSACTION_ID);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/history/changed-by/{changedBy}",
+                                CHANGED_BY
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    private void softDeleteTransaction(
+            UUID targetTransactionId) {
+
+        entityManager.flush();
+
+        jdbcTemplate.update(
+                """
+                UPDATE transaction.transaction
+                SET deleted_at = CURRENT_TIMESTAMP
+                WHERE transaction_id = ?
+                """,
+                targetTransactionId
+        );
+
+        entityManager.clear();
     }
 
     private Map<String, Object> createRequest(

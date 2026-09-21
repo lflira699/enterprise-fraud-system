@@ -2,6 +2,7 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionHistoryRequest;
 import com.efs.modules.transaction.dto.TransactionHistoryResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionHistory;
 import com.efs.modules.transaction.mapper.TransactionHistoryMapper;
 import com.efs.modules.transaction.repository.TransactionHistoryRepository;
@@ -12,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionHistoryService
@@ -73,6 +76,19 @@ public class TransactionHistoryService
                                 )
                         );
 
+        if (
+                transactionRepository
+                        .findByTransactionIdAndDeletedAtIsNull(
+                                history.getTransactionId()
+                        )
+                        .isEmpty()
+        ) {
+            throw new ResourceNotFoundException(
+                    "Transaction history not found: "
+                            + historyId
+            );
+        }
+
         return transactionHistoryMapper.toResponse(history);
     }
 
@@ -81,6 +97,14 @@ public class TransactionHistoryService
     public TransactionHistoryResponse getHistoryByTransactionIdAndVersionNumber(
             UUID transactionId,
             Integer versionNumber) {
+
+        transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(transactionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Transaction not found: " + transactionId
+                        )
+                );
 
         TransactionHistory history =
                 transactionHistoryRepository
@@ -125,9 +149,41 @@ public class TransactionHistoryService
     public List<TransactionHistoryResponse> getHistoryByChangedBy(
             UUID changedBy) {
 
-        return transactionHistoryRepository
-                .findByChangedByOrderByChangedAtDesc(changedBy)
-                .stream()
+        return toActiveHistoryResponses(
+                transactionHistoryRepository
+                        .findByChangedByOrderByChangedAtDesc(changedBy)
+        );
+    }
+
+    private List<TransactionHistoryResponse>
+    toActiveHistoryResponses(
+            List<TransactionHistory> histories) {
+
+        if (histories.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                histories.stream()
+                        .map(TransactionHistory::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return histories.stream()
+                .filter(history ->
+                        activeTransactionIds.contains(
+                                history.getTransactionId()
+                        )
+                )
                 .map(transactionHistoryMapper::toResponse)
                 .toList();
     }
