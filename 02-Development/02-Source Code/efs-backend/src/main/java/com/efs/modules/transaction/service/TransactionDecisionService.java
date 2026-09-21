@@ -2,6 +2,7 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionDecisionRequest;
 import com.efs.modules.transaction.dto.TransactionDecisionResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionDecision;
 import com.efs.modules.transaction.mapper.TransactionDecisionMapper;
 import com.efs.modules.transaction.repository.TransactionDecisionRepository;
@@ -11,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionDecisionService
@@ -55,6 +58,11 @@ public class TransactionDecisionService
                         )
                 );
 
+        validateRiskAssessmentOwnership(
+                transactionId,
+                request.getRiskAssessmentId()
+        );
+
         TransactionDecision decision =
                 transactionDecisionMapper.toEntity(request);
 
@@ -82,6 +90,19 @@ public class TransactionDecisionService
                                                 + decisionId
                                 )
                         );
+
+        if (
+                transactionRepository
+                        .findByTransactionIdAndDeletedAtIsNull(
+                                decision.getTransactionId()
+                        )
+                        .isEmpty()
+        ) {
+            throw new ResourceNotFoundException(
+                    "Transaction decision not found: "
+                            + decisionId
+            );
+        }
 
         return transactionDecisionMapper.toResponse(
                 decision
@@ -117,13 +138,12 @@ public class TransactionDecisionService
     getDecisionsByType(
             String decisionType) {
 
-        return transactionDecisionRepository
-                .findByDecisionTypeOrderByDecisionTimestampDesc(
-                        decisionType
-                )
-                .stream()
-                .map(transactionDecisionMapper::toResponse)
-                .toList();
+        return toActiveDecisionResponses(
+                transactionDecisionRepository
+                        .findByDecisionTypeOrderByDecisionTimestampDesc(
+                                decisionType
+                        )
+        );
     }
 
     @Override
@@ -132,13 +152,12 @@ public class TransactionDecisionService
     getDecisionsBySource(
             String decisionSource) {
 
-        return transactionDecisionRepository
-                .findByDecisionSourceOrderByDecisionTimestampDesc(
-                        decisionSource
-                )
-                .stream()
-                .map(transactionDecisionMapper::toResponse)
-                .toList();
+        return toActiveDecisionResponses(
+                transactionDecisionRepository
+                        .findByDecisionSourceOrderByDecisionTimestampDesc(
+                                decisionSource
+                        )
+        );
     }
 
     @Override
@@ -147,11 +166,65 @@ public class TransactionDecisionService
     getDecisionsByFinalStatus(
             Boolean finalDecision) {
 
-        return transactionDecisionRepository
-                .findByFinalDecisionOrderByDecisionTimestampDesc(
-                        finalDecision
+        return toActiveDecisionResponses(
+                transactionDecisionRepository
+                        .findByFinalDecisionOrderByDecisionTimestampDesc(
+                                finalDecision
+                        )
+        );
+    }
+
+    private void validateRiskAssessmentOwnership(
+            UUID transactionId,
+            UUID riskAssessmentId) {
+
+        if (riskAssessmentId == null) {
+            return;
+        }
+
+        if (
+                !transactionDecisionRepository
+                        .existsActiveRiskAssessmentForTransaction(
+                                riskAssessmentId,
+                                transactionId
+                        )
+        ) {
+            throw new ResourceNotFoundException(
+                    "Risk assessment not found for transaction: "
+                            + riskAssessmentId
+            );
+        }
+    }
+
+    private List<TransactionDecisionResponse>
+    toActiveDecisionResponses(
+            List<TransactionDecision> decisions) {
+
+        if (decisions.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                decisions.stream()
+                        .map(TransactionDecision::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return decisions.stream()
+                .filter(decision ->
+                        activeTransactionIds.contains(
+                                decision.getTransactionId()
+                        )
                 )
-                .stream()
                 .map(transactionDecisionMapper::toResponse)
                 .toList();
     }
