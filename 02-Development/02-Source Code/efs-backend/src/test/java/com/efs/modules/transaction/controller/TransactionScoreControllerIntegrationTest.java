@@ -576,6 +576,148 @@ class TransactionScoreControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldReturnNotFoundWhenCreatingScoreForSoftDeletedTransaction()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/scores",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest(
+                                                        "RULES",
+                                                        new BigDecimal("25.00")
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForScoreWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createScore(
+                        "RULES",
+                        new BigDecimal("30.00"),
+                        "EFS-RISK"
+                );
+
+        UUID scoreId =
+                UUID.fromString(
+                        created.get(
+                                "scoreId"
+                        ).asText()
+                );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/scores/{scoreId}",
+                                scoreId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForScoreListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/scores",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingScoresByType()
+            throws Exception {
+
+        String scoreType =
+                "SOFT_TYPE_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createScore(
+                scoreType,
+                new BigDecimal("25.00"),
+                "EFS-RISK"
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/scores/type/{scoreType}",
+                                scoreType
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingScoresByModel()
+            throws Exception {
+
+        String scoringModel =
+                "SOFT_MODEL_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createScore(
+                "RULES",
+                new BigDecimal("25.00"),
+                scoringModel
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/scores/model/{scoringModel}",
+                                scoringModel
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private JsonNode createScore(
             String scoreType,
             BigDecimal scoreValue,

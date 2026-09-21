@@ -2,6 +2,8 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionScoreRequest;
 import com.efs.modules.transaction.dto.TransactionScoreResponse;
+import com.efs.shared.exception.ResourceNotFoundException;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Transactional
@@ -45,6 +49,9 @@ class TransactionScoreServiceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @BeforeEach
     void setUp() {
@@ -241,6 +248,136 @@ class TransactionScoreServiceIntegrationTest {
                 2,
                 byModel.size()
         );
+    }
+
+    @Test
+    void createScoreShouldThrowWhenTransactionIsSoftDeleted() {
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.createScore(
+                        TRANSACTION_ID,
+                        buildRequest(
+                                "RULES",
+                                new BigDecimal("25.00"),
+                                new BigDecimal("40.00"),
+                                "EFS-RISK",
+                                "1.0"
+                        )
+                )
+        );
+    }
+
+    @Test
+    void getScoreByIdShouldHideSoftDeletedParent() {
+
+        TransactionScoreResponse created =
+                service.createScore(
+                        TRANSACTION_ID,
+                        buildRequest(
+                                "RULES",
+                                new BigDecimal("25.00"),
+                                new BigDecimal("40.00"),
+                                "EFS-RISK",
+                                "1.0"
+                        )
+                );
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getScoreById(
+                        created.getScoreId()
+                )
+        );
+    }
+
+    @Test
+    void getScoresByTransactionIdShouldRejectSoftDeletedParent() {
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getScoresByTransactionId(
+                        TRANSACTION_ID
+                )
+        );
+    }
+
+    @Test
+    void getScoresByTypeShouldExcludeSoftDeletedParent() {
+
+        String scoreType =
+                "SOFT_TYPE_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        service.createScore(
+                TRANSACTION_ID,
+                buildRequest(
+                        scoreType,
+                        new BigDecimal("25.00"),
+                        new BigDecimal("40.00"),
+                        "EFS-RISK",
+                        "1.0"
+                )
+        );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                service.getScoresByType(scoreType)
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void getScoresByScoringModelShouldExcludeSoftDeletedParent() {
+
+        String scoringModel =
+                "SOFT_MODEL_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        service.createScore(
+                TRANSACTION_ID,
+                buildRequest(
+                        "RULES",
+                        new BigDecimal("25.00"),
+                        new BigDecimal("40.00"),
+                        scoringModel,
+                        "1.0"
+                )
+        );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                service.getScoresByScoringModel(
+                        scoringModel
+                )
+                        .isEmpty()
+        );
+    }
+
+    private void softDeleteTransaction() {
+
+        entityManager.flush();
+
+        jdbcTemplate.update(
+                "UPDATE transaction.transaction " +
+                        "SET deleted_at = CURRENT_TIMESTAMP " +
+                        "WHERE transaction_id = ?",
+                TRANSACTION_ID
+        );
+
+        entityManager.clear();
     }
 
     private TransactionScoreRequest buildRequest(

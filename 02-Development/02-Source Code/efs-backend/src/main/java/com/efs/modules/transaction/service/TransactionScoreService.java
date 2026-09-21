@@ -2,6 +2,7 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionScoreRequest;
 import com.efs.modules.transaction.dto.TransactionScoreResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionScore;
 import com.efs.modules.transaction.mapper.TransactionScoreMapper;
 import com.efs.modules.transaction.repository.TransactionRepository;
@@ -12,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionScoreService
@@ -86,6 +89,18 @@ public class TransactionScoreService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        score.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction score not found: "
+                            + scoreId
+            );
+        }
+
         return transactionScoreMapper.toResponse(score);
     }
 
@@ -117,11 +132,12 @@ public class TransactionScoreService
     public List<TransactionScoreResponse> getScoresByType(
             String scoreType) {
 
-        return transactionScoreRepository
-                .findByScoreTypeOrderByCalculatedAtDesc(scoreType)
-                .stream()
-                .map(transactionScoreMapper::toResponse)
-                .toList();
+        return toActiveScoreResponses(
+                transactionScoreRepository
+                        .findByScoreTypeOrderByCalculatedAtDesc(
+                                scoreType
+                        )
+        );
     }
 
     @Override
@@ -130,11 +146,43 @@ public class TransactionScoreService
     getScoresByScoringModel(
             String scoringModel) {
 
-        return transactionScoreRepository
-                .findByScoringModelOrderByCalculatedAtDesc(
-                        scoringModel
+        return toActiveScoreResponses(
+                transactionScoreRepository
+                        .findByScoringModelOrderByCalculatedAtDesc(
+                                scoringModel
+                        )
+        );
+    }
+
+    private List<TransactionScoreResponse>
+    toActiveScoreResponses(
+            List<TransactionScore> scores) {
+
+        if (scores.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                scores.stream()
+                        .map(TransactionScore::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return scores.stream()
+                .filter(score ->
+                        activeTransactionIds.contains(
+                                score.getTransactionId()
+                        )
                 )
-                .stream()
                 .map(transactionScoreMapper::toResponse)
                 .toList();
     }
