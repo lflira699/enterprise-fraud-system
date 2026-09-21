@@ -2,10 +2,13 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionRequest;
 import com.efs.modules.transaction.dto.TransactionResponse;
-import com.efs.modules.transaction.service.TransactionServiceInterface;
+import com.efs.modules.transaction.service.TransactionAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,19 +18,37 @@ import java.util.UUID;
 @RequestMapping("/api/v1/transactions")
 public class TransactionController {
 
-    private final TransactionServiceInterface transactionService;
+    private final TransactionAccessServiceInterface
+            transactionAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public TransactionController(
-            TransactionServiceInterface transactionService) {
-        this.transactionService = transactionService;
+            TransactionAccessServiceInterface transactionAccessService,
+            SecurityContextProvider securityContextProvider) {
+
+        this.transactionAccessService =
+                transactionAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
     public ResponseEntity<TransactionResponse> createTransaction(
             @Valid @RequestBody TransactionRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionResponse response =
-                transactionService.createTransaction(request);
+                transactionAccessService
+                        .createTransaction(
+                                request,
+                                securityContext
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -38,8 +59,16 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> getTransactionById(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionService.getTransactionById(transactionId)
+                transactionAccessService
+                        .getTransactionById(
+                                transactionId,
+                                securityContext
+                        )
         );
     }
 
@@ -47,10 +76,16 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> getTransactionByReference(
             @PathVariable String transactionReference) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionService.getTransactionByReference(
-                        transactionReference
-                )
+                transactionAccessService
+                        .getTransactionByReference(
+                                transactionReference,
+                                securityContext
+                        )
         );
     }
 
@@ -59,8 +94,16 @@ public class TransactionController {
     getTransactionsByCustomerId(
             @PathVariable UUID customerId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionService.getTransactionsByCustomerId(customerId)
+                transactionAccessService
+                        .getTransactionsByCustomerId(
+                                customerId,
+                                securityContext
+                        )
         );
     }
 
@@ -69,11 +112,17 @@ public class TransactionController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionService.updateTransaction(
-                        transactionId,
-                        request
-                )
+                transactionAccessService
+                        .updateTransaction(
+                                transactionId,
+                                request,
+                                securityContext
+                        )
         );
     }
 
@@ -81,8 +130,27 @@ public class TransactionController {
     public ResponseEntity<Void> deleteTransaction(
             @PathVariable UUID transactionId) {
 
-        transactionService.deleteTransaction(transactionId);
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
 
-        return ResponseEntity.noContent().build();
+        transactionAccessService
+                .deleteTransaction(
+                        transactionId,
+                        securityContext
+                );
+
+        return ResponseEntity
+                .noContent()
+                .build();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

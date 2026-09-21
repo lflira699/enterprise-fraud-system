@@ -1,8 +1,12 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.transaction.dto.TransactionRequest;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,16 +15,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,8 +49,14 @@ class TransactionControllerIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface userAccountLookupService;
     private UUID customerId;
     private UUID createdBy;
+    private UUID organizationId;
 
     @BeforeEach
     void setUp() {
@@ -108,6 +121,15 @@ class TransactionControllerIntegrationTest {
 
         createdBy =
                 UUID.randomUUID();
+
+        organizationId =
+                UUID.randomUUID();
+
+        authorize(
+                allPermissions(),
+                organizationId,
+                null
+        );
     }
 
     @Test
@@ -701,6 +723,82 @@ class TransactionControllerIntegrationTest {
                 );
     }
 
+
+    @Test
+    void shouldReturnForbiddenWhenTransactionViewPermissionIsMissing()
+            throws Exception {
+
+        JsonNode created =
+                createTransaction(
+                        newReference()
+                );
+
+        authorize(
+                Set.of(),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}",
+                                created.get("transactionId").asText()
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideTransactionFromDifferentOrganization()
+            throws Exception {
+
+        JsonNode created =
+                createTransaction(
+                        newReference()
+                );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}",
+                                created.get("transactionId").asText()
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectCreateForDifferentOrganization()
+            throws Exception {
+
+        TransactionRequest request =
+                buildRequest(
+                        newReference()
+                );
+
+        request.setOrganizationId(
+                UUID.randomUUID()
+        );
+
+        mockMvc.perform(
+                        post("/api/v1/transactions")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper
+                                                .writeValueAsString(
+                                                        request
+                                                )
+                                )
+                )
+                .andExpect(status().isForbidden());
+    }
     private JsonNode createTransaction(
             String reference)
             throws Exception {
@@ -744,7 +842,7 @@ class TransactionControllerIntegrationTest {
         );
 
         request.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
         );
 
         request.setTransactionType(
@@ -766,6 +864,50 @@ class TransactionControllerIntegrationTest {
         return request;
     }
 
+
+    private void authorize(
+            Set<String> permissions,
+            UUID authorizedOrganizationId,
+            UUID authorizedTenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        createdBy,
+                        authorizedTenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                createdBy
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        createdBy,
+                        authorizedOrganizationId,
+                        authorizedTenantId,
+                        "transaction-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.create",
+                "transaction.update",
+                "transaction.delete"
+        );
+    }
     private String newReference() {
 
         return "TX-CTRL-" + UUID.randomUUID();
