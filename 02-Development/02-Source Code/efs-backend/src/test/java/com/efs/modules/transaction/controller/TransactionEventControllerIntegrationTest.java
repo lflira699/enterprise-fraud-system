@@ -618,6 +618,205 @@ class TransactionEventControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldRejectNegativeExecutionTime()
+            throws Exception {
+
+        TransactionEventRequest request =
+                buildRequest(
+                        "VALIDATION",
+                        "TRANSACTION"
+                );
+
+        request.setExecutionTimeMs(-1);
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/events",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCreatingEventForSoftDeletedTransaction()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        TransactionEventRequest request =
+                buildRequest(
+                        "CREATE_SOFT",
+                        "TRANSACTION"
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/events",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForEventWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createEvent(
+                        "SOFT_ID",
+                        "TRANSACTION",
+                        null
+                );
+
+        UUID eventId =
+                UUID.fromString(
+                        created.get(
+                                "eventId"
+                        ).asText()
+                );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/{eventId}",
+                                eventId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForEventListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/events",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingEventsByType()
+            throws Exception {
+
+        String eventType =
+                "TYPE_SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createEvent(
+                eventType,
+                "TRANSACTION",
+                null
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/type/{eventType}",
+                                eventType
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingEventsByComponent()
+            throws Exception {
+
+        String componentName =
+                "COMP_SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createEvent(
+                "PROCESSING",
+                componentName,
+                null
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/component/{componentName}",
+                                componentName
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingEventsByCorrelationId()
+            throws Exception {
+
+        UUID correlationId =
+                UUID.randomUUID();
+
+        createEvent(
+                "CORRELATION",
+                "TRANSACTION",
+                correlationId
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/correlation/{correlationId}",
+                                correlationId
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private JsonNode createEvent(
             String eventType,
             String componentName,

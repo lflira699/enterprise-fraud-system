@@ -1,6 +1,7 @@
 package com.efs.modules.transaction.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
@@ -30,6 +31,7 @@ public class TransactionEventRequest {
 
     private String eventMessage;
 
+    @PositiveOrZero
     private Integer executionTimeMs;
 
     public String getEventType() {

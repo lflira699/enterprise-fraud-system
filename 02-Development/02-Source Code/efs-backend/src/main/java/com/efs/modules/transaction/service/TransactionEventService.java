@@ -2,17 +2,21 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionEventRequest;
 import com.efs.modules.transaction.dto.TransactionEventResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionEvent;
 import com.efs.modules.transaction.mapper.TransactionEventMapper;
 import com.efs.modules.transaction.repository.TransactionEventRepository;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.validator.TransactionEventValueValidator;
 import com.efs.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionEventService
@@ -21,15 +25,21 @@ public class TransactionEventService
     private final TransactionEventRepository transactionEventRepository;
     private final TransactionRepository transactionRepository;
     private final TransactionEventMapper transactionEventMapper;
+    private final TransactionEventValueValidator
+            transactionEventValueValidator;
 
     public TransactionEventService(
             TransactionEventRepository transactionEventRepository,
             TransactionRepository transactionRepository,
-            TransactionEventMapper transactionEventMapper) {
+            TransactionEventMapper transactionEventMapper,
+            TransactionEventValueValidator
+                    transactionEventValueValidator) {
 
         this.transactionEventRepository = transactionEventRepository;
         this.transactionRepository = transactionRepository;
         this.transactionEventMapper = transactionEventMapper;
+        this.transactionEventValueValidator =
+                transactionEventValueValidator;
     }
 
     @Override
@@ -45,6 +55,9 @@ public class TransactionEventService
                                 "Transaction not found: " + transactionId
                         )
                 );
+
+        transactionEventValueValidator
+                .validate(request);
 
         TransactionEvent event =
                 transactionEventMapper.toEntity(request);
@@ -76,6 +89,18 @@ public class TransactionEventService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        event.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction event not found: "
+                            + eventId
+            );
+        }
+
         return transactionEventMapper.toResponse(event);
     }
 
@@ -104,11 +129,12 @@ public class TransactionEventService
     public List<TransactionEventResponse> getEventsByType(
             String eventType) {
 
-        return transactionEventRepository
-                .findByEventTypeOrderByEventTimestampDesc(eventType)
-                .stream()
-                .map(transactionEventMapper::toResponse)
-                .toList();
+        return toActiveEventResponses(
+                transactionEventRepository
+                        .findByEventTypeOrderByEventTimestampDesc(
+                                eventType
+                        )
+        );
     }
 
     @Override
@@ -116,11 +142,12 @@ public class TransactionEventService
     public List<TransactionEventResponse> getEventsByComponentName(
             String componentName) {
 
-        return transactionEventRepository
-                .findByComponentNameOrderByEventTimestampDesc(componentName)
-                .stream()
-                .map(transactionEventMapper::toResponse)
-                .toList();
+        return toActiveEventResponses(
+                transactionEventRepository
+                        .findByComponentNameOrderByEventTimestampDesc(
+                                componentName
+                        )
+        );
     }
 
     @Override
@@ -128,9 +155,43 @@ public class TransactionEventService
     public List<TransactionEventResponse> getEventsByCorrelationId(
             UUID correlationId) {
 
-        return transactionEventRepository
-                .findByCorrelationIdOrderByEventTimestampDesc(correlationId)
-                .stream()
+        return toActiveEventResponses(
+                transactionEventRepository
+                        .findByCorrelationIdOrderByEventTimestampDesc(
+                                correlationId
+                        )
+        );
+    }
+
+    private List<TransactionEventResponse>
+    toActiveEventResponses(
+            List<TransactionEvent> events) {
+
+        if (events.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                events.stream()
+                        .map(TransactionEvent::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return events.stream()
+                .filter(event ->
+                        activeTransactionIds.contains(
+                                event.getTransactionId()
+                        )
+                )
                 .map(transactionEventMapper::toResponse)
                 .toList();
     }

@@ -775,6 +775,170 @@ class TransactionEventServiceIntegrationTest {
         );
     }
 
+    @Test
+    void createEventShouldRejectNegativeExecutionTime() {
+
+        TransactionEventRequest request =
+                buildRequest(
+                        "VALIDATION",
+                        "TRANSACTION"
+                );
+
+        request.setExecutionTimeMs(-1);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionEventService
+                        .createEvent(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void getEventByIdShouldHideSoftDeletedParent() {
+
+        TransactionEventResponse created =
+                transactionEventService
+                        .createEvent(
+                                transactionId,
+                                buildRequest(
+                                        "SOFT_ID",
+                                        "TRANSACTION"
+                                )
+                        );
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionEventService
+                        .getEventById(
+                                created.getEventId()
+                        )
+        );
+    }
+
+    @Test
+    void getEventsByTransactionIdShouldRejectSoftDeletedParent() {
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionEventService
+                        .getEventsByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    @Test
+    void getEventsByTypeShouldExcludeSoftDeletedParent() {
+
+        String eventType =
+                "TYPE_SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        transactionEventService
+                .createEvent(
+                        transactionId,
+                        buildRequest(
+                                eventType,
+                                "TRANSACTION"
+                        )
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionEventService
+                        .getEventsByType(eventType)
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void getEventsByComponentNameShouldExcludeSoftDeletedParent() {
+
+        String componentName =
+                "COMP_SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        transactionEventService
+                .createEvent(
+                        transactionId,
+                        buildRequest(
+                                "PROCESSING",
+                                componentName
+                        )
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionEventService
+                        .getEventsByComponentName(
+                                componentName
+                        )
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void getEventsByCorrelationIdShouldExcludeSoftDeletedParent() {
+
+        UUID correlationId =
+                UUID.randomUUID();
+
+        TransactionEventRequest request =
+                buildRequest(
+                        "CORRELATION",
+                        "TRANSACTION"
+                );
+
+        request.setCorrelationId(
+                correlationId
+        );
+
+        transactionEventService
+                .createEvent(
+                        transactionId,
+                        request
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionEventService
+                        .getEventsByCorrelationId(
+                                correlationId
+                        )
+                        .isEmpty()
+        );
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private TransactionEventRequest buildRequest(
             String eventType,
             String componentName) {
