@@ -426,6 +426,150 @@ class TransactionMetadataServiceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldHideMetadataByIdWhenParentTransactionIsSoftDeleted() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        UUID metadataId =
+                UUID.randomUUID();
+
+        insertMetadata(
+                metadataId,
+                transactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-SOFT-DELETED"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(transactionId);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getMetadataById(metadataId)
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromMetadataTypeQuery() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID activeTransactionId =
+                createTransaction(organizationId);
+
+        UUID deletedTransactionId =
+                createTransaction(organizationId);
+
+        insertMetadata(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-ACTIVE"
+                }
+                """,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertMetadata(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-DELETED"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        List<TransactionMetadataResponse> result =
+                service.getMetadataByType("DEVICE_CONTEXT");
+
+        assertEquals(1, result.size());
+        assertEquals(
+                activeTransactionId,
+                result.get(0).getTransactionId()
+        );
+    }
+
+    @Test
+    void shouldThrowWhenRetrievingMetadataForSoftDeletedTransaction() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getMetadataByTransactionId(
+                        transactionId
+                )
+        );
+    }
+
+    @Test
+    void shouldThrowWhenCreatingMetadataForSoftDeletedTransaction() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        TransactionMetadataRequest request =
+                createRequest(
+                        "DEVICE_CONTEXT",
+                        Map.of(
+                                "deviceId",
+                                "DEVICE-SOFT-DELETED"
+                        )
+                );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.createMetadata(
+                        transactionId,
+                        request
+                )
+        );
+    }
+
+    private void softDeleteTransaction(
+            UUID transactionId) {
+
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE transaction.transaction
+                        SET deleted_at = CURRENT_TIMESTAMP
+                        WHERE transaction_id = ?
+                        """,
+                        transactionId
+                );
+
+        assertEquals(1, updated);
+    }
+
     private TransactionMetadataRequest createRequest(
             String metadataType,
             Map<String, Object> metadataJson) {

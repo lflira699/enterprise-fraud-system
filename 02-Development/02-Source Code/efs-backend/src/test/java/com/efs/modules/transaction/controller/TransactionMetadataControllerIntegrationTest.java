@@ -391,6 +391,172 @@ class TransactionMetadataControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldReturnNotFoundForMetadataWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        UUID metadataId =
+                UUID.randomUUID();
+
+        insertMetadata(
+                metadataId,
+                transactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-SOFT-DELETED"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(transactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/metadata/{metadataId}",
+                                metadataId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeMetadataFromSoftDeletedParentWhenQueryingByType()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID activeTransactionId =
+                createTransaction(organizationId);
+
+        UUID deletedTransactionId =
+                createTransaction(organizationId);
+
+        insertMetadata(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-ACTIVE"
+                }
+                """,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertMetadata(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-DELETED"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/metadata/type/{metadataType}",
+                                "DEVICE_CONTEXT"
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(
+                                        activeTransactionId.toString()
+                                )
+                );
+    }
+
+    @Test
+    void shouldReturnNotFoundForMetadataListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/metadata",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCreatingMetadataForSoftDeletedTransaction()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        String requestBody =
+                """
+                {
+                  "metadataType": "DEVICE_CONTEXT",
+                  "metadataJson": {
+                    "deviceId": "DEVICE-SOFT-DELETED"
+                  }
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/metadata",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    private void softDeleteTransaction(
+            UUID transactionId) {
+
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE transaction.transaction
+                        SET deleted_at = CURRENT_TIMESTAMP
+                        WHERE transaction_id = ?
+                        """,
+                        transactionId
+                );
+
+        if (updated != 1) {
+            throw new IllegalStateException(
+                    "Expected one soft-deleted transaction, got "
+                            + updated
+            );
+        }
+    }
+
     private UUID createOrganization() {
 
         UUID organizationId =

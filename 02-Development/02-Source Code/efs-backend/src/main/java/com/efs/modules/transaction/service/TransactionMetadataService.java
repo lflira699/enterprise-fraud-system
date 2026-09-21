@@ -2,6 +2,7 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionMetadataRequest;
 import com.efs.modules.transaction.dto.TransactionMetadataResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionMetadata;
 import com.efs.modules.transaction.mapper.TransactionMetadataMapper;
 import com.efs.modules.transaction.repository.TransactionMetadataRepository;
@@ -12,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionMetadataService
@@ -73,6 +76,18 @@ public class TransactionMetadataService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        metadata.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction metadata not found: "
+                            + metadataId
+            );
+        }
+
         return transactionMetadataMapper.toResponse(metadata);
     }
 
@@ -101,9 +116,43 @@ public class TransactionMetadataService
     public List<TransactionMetadataResponse> getMetadataByType(
             String metadataType) {
 
-        return transactionMetadataRepository
-                .findByMetadataTypeOrderByCreatedAtDesc(metadataType)
-                .stream()
+        return toActiveMetadataResponses(
+                transactionMetadataRepository
+                        .findByMetadataTypeOrderByCreatedAtDesc(
+                                metadataType
+                        )
+        );
+    }
+
+    private List<TransactionMetadataResponse>
+    toActiveMetadataResponses(
+            List<TransactionMetadata> metadataEntries) {
+
+        if (metadataEntries.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                metadataEntries.stream()
+                        .map(TransactionMetadata::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return metadataEntries.stream()
+                .filter(metadata ->
+                        activeTransactionIds.contains(
+                                metadata.getTransactionId()
+                        )
+                )
                 .map(transactionMetadataMapper::toResponse)
                 .toList();
     }
