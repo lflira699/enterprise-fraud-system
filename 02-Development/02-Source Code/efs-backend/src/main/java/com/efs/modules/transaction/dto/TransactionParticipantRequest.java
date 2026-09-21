@@ -1,6 +1,7 @@
 package com.efs.modules.transaction.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -18,6 +19,7 @@ public class TransactionParticipantRequest {
 
     private UUID institutionId;
 
+    @Pattern(regexp = "[A-Za-z]{2}")
     @Size(min = 2, max = 2)
     private String countryCode;
 

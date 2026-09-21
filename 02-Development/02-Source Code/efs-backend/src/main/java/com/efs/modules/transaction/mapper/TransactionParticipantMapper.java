@@ -3,6 +3,7 @@ package com.efs.modules.transaction.mapper;
 import com.efs.modules.transaction.dto.TransactionParticipantRequest;
 import com.efs.modules.transaction.dto.TransactionParticipantResponse;
 import com.efs.modules.transaction.entity.TransactionParticipant;
+import com.efs.modules.transaction.validator.TransactionParticipantValueValidator;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,7 +32,10 @@ public class TransactionParticipantMapper {
         );
 
         participant.setCountryCode(
-                request.getCountryCode()
+                TransactionParticipantValueValidator
+                        .normalizeCountryCode(
+                                request.getCountryCode()
+                        )
         );
 
         participant.setRiskLevel(

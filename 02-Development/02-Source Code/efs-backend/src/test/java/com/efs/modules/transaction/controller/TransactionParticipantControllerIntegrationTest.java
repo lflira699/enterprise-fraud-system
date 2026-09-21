@@ -511,6 +511,100 @@ class TransactionParticipantControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldRejectNonAlphabeticCountryCode()
+            throws Exception {
+
+        TransactionParticipantRequest request =
+                buildRequest("SENDER");
+
+        request.setCountryCode("G1");
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/participants",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldNormalizeLowercaseCountryCode()
+            throws Exception {
+
+        TransactionParticipantRequest request =
+                buildRequest("SENDER");
+
+        request.setCountryCode("gt");
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/participants",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isCreated())
+                .andExpect(
+                        jsonPath("$.countryCode")
+                                .value("GT")
+                );
+    }
+
+    @Test
+    void shouldHideParticipantWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createParticipant(
+                        "SENDER",
+                        customerId
+                );
+
+        UUID participantId =
+                UUID.fromString(
+                        created.get("participantId")
+                                .asText()
+                );
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/participants/{participantId}",
+                                participantId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
     private JsonNode createParticipant(
             String participantType,
             UUID participantCustomerId)

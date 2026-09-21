@@ -3,6 +3,7 @@ package com.efs.modules.transaction.service;
 import com.efs.modules.transaction.port.out.CustomerExistencePort;
 import com.efs.modules.transaction.dto.TransactionParticipantRequest;
 import com.efs.modules.transaction.dto.TransactionParticipantResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionParticipant;
 import com.efs.modules.transaction.mapper.TransactionParticipantMapper;
 import com.efs.modules.transaction.repository.TransactionParticipantRepository;
@@ -13,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionParticipantService
@@ -97,6 +100,18 @@ public class TransactionParticipantService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        participant.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction participant not found: "
+                            + participantId
+            );
+        }
+
         return transactionParticipantMapper.toResponse(
                 participant
         );
@@ -135,9 +150,44 @@ public class TransactionParticipantService
             );
         }
 
-        return transactionParticipantRepository
-                .findByCustomerId(customerId)
-                .stream()
+        return toActiveParticipantResponses(
+                transactionParticipantRepository
+                        .findByCustomerId(customerId)
+        );
+    }
+
+    private List<TransactionParticipantResponse>
+    toActiveParticipantResponses(
+            List<TransactionParticipant> participants) {
+
+        if (participants.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                participants.stream()
+                        .map(
+                                TransactionParticipant
+                                        ::getTransactionId
+                        )
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return participants.stream()
+                .filter(participant ->
+                        activeTransactionIds.contains(
+                                participant.getTransactionId()
+                        )
+                )
                 .map(transactionParticipantMapper::toResponse)
                 .toList();
     }

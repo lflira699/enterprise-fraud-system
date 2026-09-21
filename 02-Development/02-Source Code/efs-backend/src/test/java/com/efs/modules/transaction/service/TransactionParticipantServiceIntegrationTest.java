@@ -580,6 +580,121 @@ class TransactionParticipantServiceIntegrationTest {
         );
     }
 
+    @Test
+    void createParticipantShouldNormalizeLowercaseCountryCode() {
+
+        TransactionParticipantRequest request =
+                buildRequest("SENDER");
+
+        request.setCountryCode("gt");
+
+        TransactionParticipantResponse response =
+                transactionParticipantService
+                        .createParticipant(
+                                transactionId,
+                                request
+                        );
+
+        assertEquals(
+                "GT",
+                response.getCountryCode()
+        );
+    }
+
+    @Test
+    void createParticipantShouldRejectNonAlphabeticCountryCode() {
+
+        TransactionParticipantRequest request =
+                buildRequest("SENDER");
+
+        request.setCountryCode("G1");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionParticipantService
+                        .createParticipant(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void getParticipantByIdShouldHideSoftDeletedParent() {
+
+        TransactionParticipantResponse created =
+                transactionParticipantService
+                        .createParticipant(
+                                transactionId,
+                                buildRequest("SENDER")
+                        );
+
+        softDeleteCurrentTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionParticipantService
+                        .getParticipantById(
+                                created.getParticipantId()
+                        )
+        );
+    }
+
+    @Test
+    void getParticipantsByCustomerIdShouldExcludeSoftDeletedParent() {
+
+        TransactionParticipantRequest request =
+                buildRequest("SENDER");
+
+        request.setCustomerId(customerId);
+
+        transactionParticipantService
+                .createParticipant(
+                        transactionId,
+                        request
+                );
+
+        softDeleteCurrentTransaction();
+
+        List<TransactionParticipantResponse> results =
+                transactionParticipantService
+                        .getParticipantsByCustomerId(
+                                customerId
+                        );
+
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
+    void getParticipantsByTransactionIdShouldRejectSoftDeletedParent() {
+
+        softDeleteCurrentTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionParticipantService
+                        .getParticipantsByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    private void softDeleteCurrentTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private Customer createCustomer(
             String prefix) {
 
