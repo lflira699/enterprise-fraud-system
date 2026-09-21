@@ -681,6 +681,12 @@ class ReportServiceTest {
         ).thenReturn(true);
 
         when(
+                securityContext.hasPermission(
+                        "dashboard.view"
+                )
+        ).thenReturn(true);
+
+        when(
                 securityContext.getUserId()
         ).thenReturn(
                 userId
@@ -767,6 +773,12 @@ class ReportServiceTest {
         ).thenReturn(true);
 
         when(
+                securityContext.hasPermission(
+                        "dashboard.view"
+                )
+        ).thenReturn(true);
+
+        when(
                 securityContext.getUserId()
         ).thenReturn(
                 userId
@@ -820,6 +832,194 @@ class ReportServiceTest {
         ).findByReportIdAndOrganizationId(
                 reportId,
                 organizationId
+        );
+    }
+
+    @Test
+    void operationalSummaryReadShouldRejectMissingSourcePermission() {
+
+        UUID userId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+
+        when(
+                securityContext.hasPermission(
+                        "report.view"
+                )
+        ).thenReturn(true);
+
+        when(
+                securityContext.hasPermission(
+                        "dashboard.view"
+                )
+        ).thenReturn(false);
+
+        when(
+                securityContext.getUserId()
+        ).thenReturn(
+                userId
+        );
+
+        when(
+                securityContext.getTenantId()
+        ).thenReturn(
+                tenantId
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                userId
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        userId,
+                        organizationId,
+                        tenantId,
+                        "report-view-denied@example.com"
+                )
+        );
+
+        GeneratedReport report =
+                generatedReport(
+                        reportId,
+                        organizationId,
+                        tenantId,
+                        userId
+                );
+
+        when(
+                generatedReportRepository
+                        .findByReportIdAndOrganizationIdAndTenantId(
+                                reportId,
+                                organizationId,
+                                tenantId
+                        )
+        ).thenReturn(
+                Optional.of(report)
+        );
+
+        assertThrows(
+                AccessDeniedException.class,
+                () ->
+                        reportService.getReport(
+                                reportId,
+                                securityContext
+                        )
+        );
+
+        verify(
+                generatedReportRepository
+        ).findByReportIdAndOrganizationIdAndTenantId(
+                reportId,
+                organizationId,
+                tenantId
+        );
+
+        verify(
+                securityContext
+        ).hasPermission(
+                "dashboard.view"
+        );
+    }
+
+    @Test
+    void investigationCasesReadShouldRejectMissingSourcePermission() {
+
+        UUID userId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+
+        when(
+                securityContext.hasPermission(
+                        "report.view"
+                )
+        ).thenReturn(true);
+
+        when(
+                securityContext.hasPermission(
+                        "case.view"
+                )
+        ).thenReturn(false);
+
+        when(
+                securityContext.getUserId()
+        ).thenReturn(
+                userId
+        );
+
+        when(
+                securityContext.getTenantId()
+        ).thenReturn(
+                tenantId
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                userId
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        userId,
+                        organizationId,
+                        tenantId,
+                        "report-case-view-denied@example.com"
+                )
+        );
+
+        GeneratedReport report =
+                new GeneratedReport(
+                        organizationId,
+                        tenantId,
+                        "INVESTIGATION_CASES",
+                        Map.of(),
+                        Map.of(
+                                "value",
+                                "snapshot"
+                        ),
+                        userId,
+                        LocalDateTime.now()
+                );
+
+        report.setReportId(
+                reportId
+        );
+
+        when(
+                generatedReportRepository
+                        .findByReportIdAndOrganizationIdAndTenantId(
+                                reportId,
+                                organizationId,
+                                tenantId
+                        )
+        ).thenReturn(
+                Optional.of(report)
+        );
+
+        assertThrows(
+                AccessDeniedException.class,
+                () ->
+                        reportService.getReport(
+                                reportId,
+                                securityContext
+                        )
+        );
+
+        verify(
+                generatedReportRepository
+        ).findByReportIdAndOrganizationIdAndTenantId(
+                reportId,
+                organizationId,
+                tenantId
+        );
+
+        verify(
+                securityContext
+        ).hasPermission(
+                "case.view"
         );
     }
 

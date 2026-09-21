@@ -473,6 +473,11 @@ public class ReportService
                             );
         }
 
+        requireSourcePermissionForPersistedReport(
+                securityContext,
+                report
+        );
+
         return toResponse(
                 report
         );
@@ -1144,6 +1149,34 @@ public class ReportService
         }
 
         return result;
+    }
+
+    private void requireSourcePermissionForPersistedReport(
+            SecurityContext securityContext,
+            GeneratedReport report) {
+
+        Definition definition =
+                DEFINITIONS.stream()
+                        .filter(
+                                candidate ->
+                                        candidate.code().equals(
+                                                report.getReportCode()
+                                        )
+                        )
+                        .findFirst()
+                        .orElseThrow(
+                                () ->
+                                        new ReportException(
+                                                HttpStatus.NOT_FOUND,
+                                                "REPORT_NOT_FOUND",
+                                                "Generated report was not found"
+                                        )
+                        );
+
+        requireSourcePermission(
+                securityContext,
+                definition
+        );
     }
 
     private void requireSourcePermission(

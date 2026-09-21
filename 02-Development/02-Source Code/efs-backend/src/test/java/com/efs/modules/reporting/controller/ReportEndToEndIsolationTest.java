@@ -578,6 +578,12 @@ class ReportEndToEndIsolationTest {
         ).thenReturn(true);
 
         when(
+                securityContext.hasPermission(
+                        "dashboard.view"
+                )
+        ).thenReturn(true);
+
+        when(
                 securityContext.getUserId()
         ).thenReturn(
                 userId
