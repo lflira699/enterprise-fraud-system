@@ -2,19 +2,21 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionLocationRequest;
 import com.efs.modules.transaction.dto.TransactionLocationResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionLocation;
 import com.efs.modules.transaction.mapper.TransactionLocationMapper;
 import com.efs.modules.transaction.repository.TransactionLocationRepository;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.modules.transaction.validator.TransactionLocationValueValidator;
 import com.efs.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionLocationService
@@ -93,6 +95,18 @@ public class TransactionLocationService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        location.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction location not found: "
+                            + locationId
+            );
+        }
+
         return transactionLocationMapper.toResponse(location);
     }
 
@@ -123,22 +137,15 @@ public class TransactionLocationService
     getLocationsByIpAddress(
             String ipAddress) {
 
-        try {
-            InetAddress address =
-                    InetAddress.getByName(ipAddress);
-
-            return transactionLocationRepository
-                    .findByIpAddress(address)
-                    .stream()
-                    .map(transactionLocationMapper::toResponse)
-                    .toList();
-
-        } catch (UnknownHostException exception) {
-            throw new IllegalArgumentException(
-                    "Invalid IP address: " + ipAddress,
-                    exception
-            );
-        }
+        return toActiveLocationResponses(
+                transactionLocationRepository
+                        .findByIpAddress(
+                                TransactionLocationValueValidator
+                                        .parseLiteralIpAddress(
+                                                ipAddress
+                                        )
+                        )
+        );
     }
 
     @Override
@@ -147,11 +154,16 @@ public class TransactionLocationService
     getLocationsByCountryCode(
             String countryCode) {
 
-        return transactionLocationRepository
-                .findByCountryCode(countryCode)
-                .stream()
-                .map(transactionLocationMapper::toResponse)
-                .toList();
+        String normalizedCountryCode =
+                TransactionLocationValueValidator
+                        .normalizeCountryCode(countryCode);
+
+        return toActiveLocationResponses(
+                transactionLocationRepository
+                        .findByCountryCode(
+                                normalizedCountryCode
+                        )
+        );
     }
 
     @Override
@@ -160,9 +172,44 @@ public class TransactionLocationService
     getLocationsByAsn(
             Long asn) {
 
-        return transactionLocationRepository
-                .findByAsn(asn)
-                .stream()
+        return toActiveLocationResponses(
+                transactionLocationRepository
+                        .findByAsn(asn)
+        );
+    }
+
+    private List<TransactionLocationResponse>
+    toActiveLocationResponses(
+            List<TransactionLocation> locations) {
+
+        if (locations.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                locations.stream()
+                        .map(
+                                TransactionLocation
+                                        ::getTransactionId
+                        )
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return locations.stream()
+                .filter(location ->
+                        activeTransactionIds.contains(
+                                location.getTransactionId()
+                        )
+                )
                 .map(transactionLocationMapper::toResponse)
                 .toList();
     }

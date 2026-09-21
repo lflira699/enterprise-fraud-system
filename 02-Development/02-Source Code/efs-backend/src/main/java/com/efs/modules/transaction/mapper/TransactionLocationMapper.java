@@ -3,10 +3,9 @@ package com.efs.modules.transaction.mapper;
 import com.efs.modules.transaction.dto.TransactionLocationRequest;
 import com.efs.modules.transaction.dto.TransactionLocationResponse;
 import com.efs.modules.transaction.entity.TransactionLocation;
+import com.efs.modules.transaction.validator.TransactionLocationValueValidator;
 import org.springframework.stereotype.Component;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 
 @Component
 public class TransactionLocationMapper {
@@ -20,23 +19,19 @@ public class TransactionLocationMapper {
         if (request.getIpAddress() != null
                 && !request.getIpAddress().isBlank()) {
 
-            try {
-                location.setIpAddress(
-                        InetAddress.getByName(
-                                request.getIpAddress()
-                        )
-                );
-            } catch (UnknownHostException exception) {
-                throw new IllegalArgumentException(
-                        "Invalid IP address: "
-                                + request.getIpAddress(),
-                        exception
-                );
-            }
+            location.setIpAddress(
+                    TransactionLocationValueValidator
+                            .parseLiteralIpAddress(
+                                    request.getIpAddress()
+                            )
+            );
         }
 
         location.setCountryCode(
-                request.getCountryCode()
+                TransactionLocationValueValidator
+                        .normalizeCountryCode(
+                                request.getCountryCode()
+                        )
         );
 
         location.setState(
@@ -52,11 +47,17 @@ public class TransactionLocationMapper {
         );
 
         location.setLatitude(
-                request.getLatitude()
+                TransactionLocationValueValidator
+                        .validateLatitude(
+                                request.getLatitude()
+                        )
         );
 
         location.setLongitude(
-                request.getLongitude()
+                TransactionLocationValueValidator
+                        .validateLongitude(
+                                request.getLongitude()
+                        )
         );
 
         location.setAsn(

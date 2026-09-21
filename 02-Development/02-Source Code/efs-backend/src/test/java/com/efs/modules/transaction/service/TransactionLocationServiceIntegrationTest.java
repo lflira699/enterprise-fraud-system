@@ -800,6 +800,233 @@ class TransactionLocationServiceIntegrationTest {
         );
     }
 
+    @Test
+    void createLocationShouldNormalizeLowercaseCountryCode() {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setCountryCode("gt");
+
+        TransactionLocationResponse response =
+                transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                request
+                        );
+
+        assertEquals(
+                "GT",
+                response.getCountryCode()
+        );
+    }
+
+    @Test
+    void createLocationShouldRejectNonAlphabeticCountryCode() {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setCountryCode("G1");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void createLocationShouldRejectHostnameIpAddress() {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setIpAddress("localhost");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void createLocationShouldRejectOutOfRangeCoordinates() {
+
+        TransactionLocationRequest invalidLatitude =
+                new TransactionLocationRequest();
+
+        invalidLatitude.setLatitude(
+                new BigDecimal("90.0000001")
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                invalidLatitude
+                        )
+        );
+
+        TransactionLocationRequest invalidLongitude =
+                new TransactionLocationRequest();
+
+        invalidLongitude.setLongitude(
+                new BigDecimal("-180.0000001")
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                invalidLongitude
+                        )
+        );
+    }
+
+    @Test
+    void getLocationsByCountryCodeShouldNormalizeLowercaseInput() {
+
+        TransactionLocationResponse created =
+                transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                buildRequest(
+                                        "203.0.113.80",
+                                        "GT",
+                                        64570L
+                                )
+                        );
+
+        List<TransactionLocationResponse> results =
+                transactionLocationService
+                        .getLocationsByCountryCode("gt");
+
+        assertTrue(
+                containsLocation(
+                        results,
+                        created.getLocationId()
+                )
+        );
+    }
+
+    @Test
+    void getLocationsByIpAddressShouldRejectHostname() {
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionLocationService
+                        .getLocationsByIpAddress("localhost")
+        );
+    }
+
+    @Test
+    void getLocationByIdShouldHideSoftDeletedParent() {
+
+        TransactionLocationResponse created =
+                transactionLocationService
+                        .createLocation(
+                                transactionId,
+                                buildRequest(
+                                        "203.0.113.81",
+                                        "GT",
+                                        64571L
+                                )
+                        );
+
+        softDeleteCurrentTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionLocationService
+                        .getLocationById(
+                                created.getLocationId()
+                        )
+        );
+    }
+
+    @Test
+    void globalQueriesShouldExcludeSoftDeletedParent() {
+
+        String ipAddress =
+                "203.0.113.82";
+
+        String countryCode =
+                "GT";
+
+        Long asn =
+                64572L;
+
+        transactionLocationService
+                .createLocation(
+                        transactionId,
+                        buildRequest(
+                                ipAddress,
+                                countryCode,
+                                asn
+                        )
+                );
+
+        softDeleteCurrentTransaction();
+
+        assertTrue(
+                transactionLocationService
+                        .getLocationsByIpAddress(ipAddress)
+                        .isEmpty()
+        );
+
+        assertTrue(
+                transactionLocationService
+                        .getLocationsByCountryCode(countryCode)
+                        .isEmpty()
+        );
+
+        assertTrue(
+                transactionLocationService
+                        .getLocationsByAsn(asn)
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void getLocationsByTransactionIdShouldRejectSoftDeletedParent() {
+
+        softDeleteCurrentTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionLocationService
+                        .getLocationsByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    private void softDeleteCurrentTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private TransactionLocationRequest buildRequest(
             String ipAddress,
             String countryCode,

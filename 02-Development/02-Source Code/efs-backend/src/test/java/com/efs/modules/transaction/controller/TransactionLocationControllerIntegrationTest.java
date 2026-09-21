@@ -730,6 +730,180 @@ class TransactionLocationControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldRejectNonAlphabeticCountryCode()
+            throws Exception {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setCountryCode("G1");
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/locations",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectHostnameIpAddress()
+            throws Exception {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setIpAddress("localhost");
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/locations",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectLatitudeAboveMaximum()
+            throws Exception {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setLatitude(
+                new BigDecimal("90.0000001")
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/locations",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectLongitudeBelowMinimum()
+            throws Exception {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setLongitude(
+                new BigDecimal("-180.0000001")
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/locations",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldNormalizeLowercaseCountryCode()
+            throws Exception {
+
+        TransactionLocationRequest request =
+                new TransactionLocationRequest();
+
+        request.setCountryCode("gt");
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/locations",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isCreated())
+                .andExpect(
+                        jsonPath("$.countryCode")
+                                .value("GT")
+                );
+    }
+
+    @Test
+    void shouldHideLocationWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createLocation(
+                        "203.0.113.83",
+                        "GT",
+                        64573L
+                );
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/locations/{locationId}",
+                                UUID.fromString(
+                                        created.get("locationId")
+                                                .asText()
+                                )
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
     private JsonNode createLocation(
             String ipAddress,
             String countryCode,

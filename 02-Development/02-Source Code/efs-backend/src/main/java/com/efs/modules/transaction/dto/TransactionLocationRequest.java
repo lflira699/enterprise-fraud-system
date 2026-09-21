@@ -1,5 +1,11 @@
 package com.efs.modules.transaction.dto;
 
+import com.efs.modules.transaction.validator.TransactionLocationValueValidator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -8,6 +14,7 @@ public class TransactionLocationRequest {
 
     private String ipAddress;
 
+    @Pattern(regexp = "[A-Za-z]{2}")
     @Size(min = 2, max = 2)
     private String countryCode;
 
@@ -20,8 +27,12 @@ public class TransactionLocationRequest {
     @Size(max = 30)
     private String postalCode;
 
+    @DecimalMin(value = "-90.0")
+    @DecimalMax(value = "90.0")
     private BigDecimal latitude;
 
+    @DecimalMin(value = "-180.0")
+    @DecimalMax(value = "180.0")
     private BigDecimal longitude;
 
     private Long asn;
@@ -34,6 +45,18 @@ public class TransactionLocationRequest {
     private Boolean proxyDetected;
 
     private Boolean torDetected;
+
+    @JsonIgnore
+    @AssertTrue(message = "ipAddress must be a literal IPv4 or IPv6 address")
+    public boolean isIpAddressLiteral() {
+
+        if (ipAddress == null || ipAddress.isBlank()) {
+            return true;
+        }
+
+        return TransactionLocationValueValidator
+                .isLiteralIpAddress(ipAddress);
+    }
 
     public String getIpAddress() {
         return ipAddress;
