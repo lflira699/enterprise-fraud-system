@@ -529,6 +529,115 @@ class TransactionDeviceControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldReturnNotFoundWhenCreatingDeviceForSoftDeletedTransaction()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        TransactionDeviceRequest request =
+                new TransactionDeviceRequest();
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/devices",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForDeviceWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createDevice(
+                        "FP-SOFT-ID-" + UUID.randomUUID(),
+                        "MOBILE"
+                );
+
+        UUID deviceTransactionId =
+                UUID.fromString(
+                        created.get(
+                                "deviceTransactionId"
+                        ).asText()
+                );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/devices/{deviceTransactionId}",
+                                deviceTransactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForDeviceListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/devices",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingDevicesByFingerprint()
+            throws Exception {
+
+        String fingerprint =
+                "FP-SOFT-" + UUID.randomUUID();
+
+        createDevice(
+                fingerprint,
+                "MOBILE"
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/devices/fingerprint/{deviceFingerprint}",
+                                fingerprint
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private JsonNode createDevice(
             String fingerprint,
             String deviceType)

@@ -649,6 +649,94 @@ class TransactionDeviceServiceIntegrationTest {
         );
     }
 
+    @Test
+    void getDeviceByIdShouldHideSoftDeletedParent() {
+
+        TransactionDeviceRequest request =
+                new TransactionDeviceRequest();
+
+        request.setDeviceFingerprint(
+                "FP-SOFT-ID-" + UUID.randomUUID()
+        );
+
+        TransactionDeviceResponse created =
+                transactionDeviceService
+                        .createDevice(
+                                transactionId,
+                                request
+                        );
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionDeviceService
+                        .getDeviceById(
+                                created.getDeviceTransactionId()
+                        )
+        );
+    }
+
+    @Test
+    void getDevicesByTransactionIdShouldThrowWhenTransactionIsSoftDeleted() {
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionDeviceService
+                        .getDevicesByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    @Test
+    void getDevicesByFingerprintShouldExcludeSoftDeletedParent() {
+
+        String fingerprint =
+                "FP-SOFT-" + UUID.randomUUID();
+
+        TransactionDeviceRequest request =
+                new TransactionDeviceRequest();
+
+        request.setDeviceFingerprint(
+                fingerprint
+        );
+
+        transactionDeviceService
+                .createDevice(
+                        transactionId,
+                        request
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionDeviceService
+                        .getDevicesByFingerprint(
+                                fingerprint
+                        )
+                        .isEmpty()
+        );
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private boolean containsDevice(
             List<TransactionDeviceResponse> results,
             UUID deviceTransactionId) {

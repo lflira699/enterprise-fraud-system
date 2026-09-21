@@ -2,6 +2,7 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionDeviceRequest;
 import com.efs.modules.transaction.dto.TransactionDeviceResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionDevice;
 import com.efs.modules.transaction.mapper.TransactionDeviceMapper;
 import com.efs.modules.transaction.repository.TransactionDeviceRepository;
@@ -12,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionDeviceService
@@ -78,6 +81,18 @@ public class TransactionDeviceService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        device.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction device not found: "
+                            + deviceTransactionId
+            );
+        }
+
         return transactionDeviceMapper.toResponse(device);
     }
 
@@ -106,9 +121,43 @@ public class TransactionDeviceService
     public List<TransactionDeviceResponse> getDevicesByFingerprint(
             String deviceFingerprint) {
 
-        return transactionDeviceRepository
-                .findByDeviceFingerprint(deviceFingerprint)
-                .stream()
+        return toActiveDeviceResponses(
+                transactionDeviceRepository
+                        .findByDeviceFingerprint(
+                                deviceFingerprint
+                        )
+        );
+    }
+
+    private List<TransactionDeviceResponse>
+    toActiveDeviceResponses(
+            List<TransactionDevice> devices) {
+
+        if (devices.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                devices.stream()
+                        .map(TransactionDevice::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return devices.stream()
+                .filter(device ->
+                        activeTransactionIds.contains(
+                                device.getTransactionId()
+                        )
+                )
                 .map(transactionDeviceMapper::toResponse)
                 .toList();
     }
