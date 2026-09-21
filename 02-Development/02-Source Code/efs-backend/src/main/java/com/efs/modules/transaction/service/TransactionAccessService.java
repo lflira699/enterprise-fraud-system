@@ -1,13 +1,9 @@
 package com.efs.modules.transaction.service;
 
 import com.efs.modules.administration.dto.UserAccountReference;
-import com.efs.modules.administration.service.TenantOrganizationLookupServiceInterface;
-import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.transaction.dto.TransactionRequest;
 import com.efs.modules.transaction.dto.TransactionResponse;
-import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.security.SecurityContext;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,26 +31,19 @@ public class TransactionAccessService
     private final TransactionServiceInterface
             transactionService;
 
-    private final UserAccountLookupServiceInterface
-            userAccountLookupService;
-
-    private final TenantOrganizationLookupServiceInterface
-            tenantOrganizationLookupService;
+    private final TransactionScopeAuthorizationServiceInterface
+            scopeAuthorizationService;
 
     public TransactionAccessService(
             TransactionServiceInterface transactionService,
-            UserAccountLookupServiceInterface userAccountLookupService,
-            TenantOrganizationLookupServiceInterface
-                    tenantOrganizationLookupService) {
+            TransactionScopeAuthorizationServiceInterface
+                    scopeAuthorizationService) {
 
         this.transactionService =
                 transactionService;
 
-        this.userAccountLookupService =
-                userAccountLookupService;
-
-        this.tenantOrganizationLookupService =
-                tenantOrganizationLookupService;
+        this.scopeAuthorizationService =
+                scopeAuthorizationService;
     }
 
     @Override
@@ -69,15 +58,17 @@ public class TransactionAccessService
         );
 
         UserAccountReference actor =
-                authorize(
-                        securityContext,
-                        CREATE_PERMISSION
-                );
+                scopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                CREATE_PERMISSION
+                        );
 
-        validateRequestedScope(
-                request,
-                actor
-        );
+        scopeAuthorizationService
+                .validateRequestedScope(
+                        request,
+                        actor
+                );
 
         return transactionService
                 .createTransaction(
@@ -91,10 +82,11 @@ public class TransactionAccessService
             SecurityContext securityContext) {
 
         UserAccountReference actor =
-                authorize(
-                        securityContext,
-                        VIEW_PERMISSION
-                );
+                scopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                VIEW_PERMISSION
+                        );
 
         TransactionResponse transaction =
                 transactionService
@@ -102,12 +94,13 @@ public class TransactionAccessService
                                 transactionId
                         );
 
-        requireVisible(
-                transaction,
-                actor,
-                "Transaction not found: "
-                        + transactionId
-        );
+        scopeAuthorizationService
+                .requireVisible(
+                        transaction,
+                        actor,
+                        "Transaction not found: "
+                                + transactionId
+                );
 
         return transaction;
     }
@@ -118,10 +111,11 @@ public class TransactionAccessService
             SecurityContext securityContext) {
 
         UserAccountReference actor =
-                authorize(
-                        securityContext,
-                        VIEW_PERMISSION
-                );
+                scopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                VIEW_PERMISSION
+                        );
 
         TransactionResponse transaction =
                 transactionService
@@ -129,12 +123,13 @@ public class TransactionAccessService
                                 transactionReference
                         );
 
-        requireVisible(
-                transaction,
-                actor,
-                "Transaction not found: "
-                        + transactionReference
-        );
+        scopeAuthorizationService
+                .requireVisible(
+                        transaction,
+                        actor,
+                        "Transaction not found: "
+                                + transactionReference
+                );
 
         return transaction;
     }
@@ -145,10 +140,11 @@ public class TransactionAccessService
             SecurityContext securityContext) {
 
         UserAccountReference actor =
-                authorize(
-                        securityContext,
-                        VIEW_PERMISSION
-                );
+                scopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                VIEW_PERMISSION
+                        );
 
         return transactionService
                 .getTransactionsByCustomerId(
@@ -157,10 +153,11 @@ public class TransactionAccessService
                 .stream()
                 .filter(
                         transaction ->
-                                isVisible(
-                                        transaction,
-                                        actor
-                                )
+                                scopeAuthorizationService
+                                        .isVisible(
+                                                transaction,
+                                                actor
+                                        )
                 )
                 .toList();
     }
@@ -178,10 +175,11 @@ public class TransactionAccessService
         );
 
         UserAccountReference actor =
-                authorize(
-                        securityContext,
-                        UPDATE_PERMISSION
-                );
+                scopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                UPDATE_PERMISSION
+                        );
 
         TransactionResponse existing =
                 transactionService
@@ -189,22 +187,25 @@ public class TransactionAccessService
                                 transactionId
                         );
 
-        requireVisible(
-                existing,
-                actor,
-                "Transaction not found: "
-                        + transactionId
-        );
+        scopeAuthorizationService
+                .requireVisible(
+                        existing,
+                        actor,
+                        "Transaction not found: "
+                                + transactionId
+                );
 
-        validateRequestedScope(
-                request,
-                actor
-        );
+        scopeAuthorizationService
+                .validateRequestedScope(
+                        request,
+                        actor
+                );
 
-        validateScopeUnchanged(
-                existing,
-                request
-        );
+        scopeAuthorizationService
+                .validateScopeUnchanged(
+                        existing,
+                        request
+                );
 
         return transactionService
                 .updateTransaction(
@@ -220,10 +221,11 @@ public class TransactionAccessService
             SecurityContext securityContext) {
 
         UserAccountReference actor =
-                authorize(
-                        securityContext,
-                        DELETE_PERMISSION
-                );
+                scopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                DELETE_PERMISSION
+                        );
 
         TransactionResponse existing =
                 transactionService
@@ -231,189 +233,17 @@ public class TransactionAccessService
                                 transactionId
                         );
 
-        requireVisible(
-                existing,
-                actor,
-                "Transaction not found: "
-                        + transactionId
-        );
+        scopeAuthorizationService
+                .requireVisible(
+                        existing,
+                        actor,
+                        "Transaction not found: "
+                                + transactionId
+                );
 
         transactionService
                 .deleteTransaction(
                         transactionId
                 );
-    }
-
-    private UserAccountReference authorize(
-            SecurityContext securityContext,
-            String requiredPermission) {
-
-        Objects.requireNonNull(
-                securityContext,
-                "securityContext is required"
-        );
-
-        if (!securityContext.hasPermission(
-                requiredPermission
-        )) {
-
-            throw new AccessDeniedException(
-                    "Missing required permission: "
-                            + requiredPermission
-            );
-        }
-
-        UserAccountReference actor =
-                userAccountLookupService
-                        .getAuthorizedUser(
-                                securityContext
-                                        .getUserId()
-                        );
-
-        if (!Objects.equals(
-                securityContext.getTenantId(),
-                actor.tenantId()
-        )) {
-
-            throw new AccessDeniedException(
-                    "Authenticated tenant scope mismatch"
-            );
-        }
-
-        return actor;
-    }
-
-    private void validateRequestedScope(
-            TransactionRequest request,
-            UserAccountReference actor) {
-
-        UUID requestedOrganizationId =
-                request.getOrganizationId();
-
-        if (
-            requestedOrganizationId == null
-                    ||
-            !actor.organizationId()
-                    .equals(
-                            requestedOrganizationId
-                    )
-        ) {
-
-            throw new AccessDeniedException(
-                    "Transaction organization scope is not authorized"
-            );
-        }
-
-        UUID actorTenantId =
-                actor.tenantId();
-
-        UUID requestedTenantId =
-                request.getTenantId();
-
-        if (actorTenantId != null) {
-
-            if (!actorTenantId.equals(
-                    requestedTenantId
-            )) {
-
-                throw new AccessDeniedException(
-                        "Transaction tenant scope is not authorized"
-                );
-            }
-
-            return;
-        }
-
-        if (requestedTenantId == null) {
-            return;
-        }
-
-        UUID tenantOrganizationId =
-                tenantOrganizationLookupService
-                        .getOrganizationIdByTenantId(
-                                requestedTenantId
-                        );
-
-        if (!actor.organizationId()
-                .equals(
-                        tenantOrganizationId
-                )) {
-
-            throw new AccessDeniedException(
-                    "Transaction tenant belongs to another organization"
-            );
-        }
-    }
-
-    private void validateScopeUnchanged(
-            TransactionResponse existing,
-            TransactionRequest request) {
-
-        if (!Objects.equals(
-                existing.getOrganizationId(),
-                request.getOrganizationId()
-        )) {
-
-            throw new AccessDeniedException(
-                    "Transaction organization scope cannot be changed"
-            );
-        }
-
-        if (!Objects.equals(
-                existing.getTenantId(),
-                request.getTenantId()
-        )) {
-
-            throw new AccessDeniedException(
-                    "Transaction tenant scope cannot be changed"
-            );
-        }
-    }
-
-    private void requireVisible(
-            TransactionResponse transaction,
-            UserAccountReference actor,
-            String notFoundMessage) {
-
-        if (!isVisible(
-                transaction,
-                actor
-        )) {
-
-            throw new ResourceNotFoundException(
-                    notFoundMessage
-            );
-        }
-    }
-
-    private boolean isVisible(
-            TransactionResponse transaction,
-            UserAccountReference actor) {
-
-        if (
-            transaction == null
-                    ||
-            transaction.getOrganizationId() == null
-        ) {
-            return false;
-        }
-
-        if (!actor.organizationId()
-                .equals(
-                        transaction.getOrganizationId()
-                )) {
-            return false;
-        }
-
-        UUID actorTenantId =
-                actor.tenantId();
-
-        if (actorTenantId == null) {
-            return true;
-        }
-
-        return actorTenantId.equals(
-                transaction.getTenantId()
-        );
     }
 }

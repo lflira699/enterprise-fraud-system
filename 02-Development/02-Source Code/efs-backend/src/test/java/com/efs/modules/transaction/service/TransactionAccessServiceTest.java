@@ -5,6 +5,7 @@ import com.efs.modules.administration.service.TenantOrganizationLookupServiceInt
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.transaction.dto.TransactionRequest;
 import com.efs.modules.transaction.dto.TransactionResponse;
+import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.security.SecurityContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,17 +77,28 @@ class TransactionAccessServiceTest {
     private TenantOrganizationLookupServiceInterface
             tenantOrganizationLookupService;
 
+    @Mock
+    private TransactionRepository
+            transactionRepository;
+
     private TransactionAccessService
             service;
 
     @BeforeEach
     void setUp() {
 
+        TransactionScopeAuthorizationService
+                scopeAuthorizationService =
+                new TransactionScopeAuthorizationService(
+                        userAccountLookupService,
+                        tenantOrganizationLookupService,
+                        transactionRepository
+                );
+
         service =
                 new TransactionAccessService(
                         transactionService,
-                        userAccountLookupService,
-                        tenantOrganizationLookupService
+                        scopeAuthorizationService
                 );
     }
 
