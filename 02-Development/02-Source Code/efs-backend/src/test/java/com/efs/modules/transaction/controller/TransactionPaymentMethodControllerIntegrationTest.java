@@ -422,6 +422,75 @@ class TransactionPaymentMethodControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldReturnNotFoundForPaymentMethodWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createPaymentMethod(
+                        "CARD",
+                        "VISA"
+                );
+
+        UUID paymentMethodId =
+                UUID.fromString(
+                        created.get("paymentMethodId")
+                                .asText()
+                );
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/payment-methods/{paymentMethodId}",
+                                paymentMethodId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForPaymentMethodsWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        createPaymentMethod(
+                "CARD",
+                "VISA"
+        );
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/payment-methods",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
     private JsonNode createPaymentMethod(
             String paymentType,
             String network)

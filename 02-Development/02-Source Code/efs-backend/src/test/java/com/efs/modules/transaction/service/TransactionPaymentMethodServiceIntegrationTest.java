@@ -486,6 +486,69 @@ class TransactionPaymentMethodServiceIntegrationTest {
         );
     }
 
+    @Test
+    void getPaymentMethodByIdShouldHideSoftDeletedParent() {
+
+        TransactionPaymentMethodResponse created =
+                transactionPaymentMethodService
+                        .createPaymentMethod(
+                                transactionId,
+                                buildRequest("CARD")
+                        );
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionPaymentMethodService
+                        .getPaymentMethodById(
+                                created.getPaymentMethodId()
+                        )
+        );
+    }
+
+    @Test
+    void getPaymentMethodsByTransactionIdShouldThrowWhenTransactionIsSoftDeleted() {
+
+        transactionPaymentMethodService
+                .createPaymentMethod(
+                        transactionId,
+                        buildRequest("CARD")
+                );
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionPaymentMethodService
+                        .getPaymentMethodsByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
     private TransactionPaymentMethodRequest buildRequest(
             String paymentType) {
 

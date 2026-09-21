@@ -86,6 +86,18 @@ public class TransactionPaymentMethodService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        paymentMethod.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction payment method not found: "
+                            + paymentMethodId
+            );
+        }
+
         return transactionPaymentMethodMapper.toResponse(
                 paymentMethod
         );
