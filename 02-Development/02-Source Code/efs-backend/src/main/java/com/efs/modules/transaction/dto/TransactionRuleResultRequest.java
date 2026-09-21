@@ -2,6 +2,7 @@ package com.efs.modules.transaction.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ public class TransactionRuleResultRequest {
     @NotNull
     private Short executionOrder;
 
+    @PositiveOrZero
     private Integer executionTimeMs;
 
     @NotBlank

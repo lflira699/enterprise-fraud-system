@@ -7,6 +7,7 @@ import com.efs.modules.transaction.dto.TransactionRuleResultResponse;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.modules.transaction.repository.TransactionRuleResultRepository;
+import com.efs.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -302,6 +303,148 @@ class TransactionRuleResultServiceIntegrationTest {
                                         result.getEvaluationResult()
                                 )
                         )
+        );
+    }
+
+    @Test
+    void createRuleResultShouldRejectNegativeExecutionTime() {
+
+        TransactionRuleResultRequest request =
+                createRequest(
+                        ruleId,
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("25.00"),
+                        LocalDateTime.now()
+                );
+
+        request.setExecutionTimeMs(-1);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionRuleResultService
+                        .createRuleResult(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void getRuleResultByIdShouldHideSoftDeletedParent() {
+
+        TransactionRuleResultResponse created =
+                transactionRuleResultService
+                        .createRuleResult(
+                                transactionId,
+                                createRequest(
+                                        ruleId,
+                                        "MATCH",
+                                        (short) 1,
+                                        new BigDecimal("25.00"),
+                                        LocalDateTime.now()
+                                )
+                        );
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionRuleResultService
+                        .getRuleResultById(
+                                created.getRuleResultId()
+                        )
+        );
+    }
+
+    @Test
+    void getRuleResultsByTransactionIdShouldRejectSoftDeletedParent() {
+
+        softDeleteTransaction();
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionRuleResultService
+                        .getRuleResultsByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    @Test
+    void getRuleResultsByRuleIdShouldExcludeSoftDeletedParent() {
+
+        UUID scopedRuleId =
+                UUID.randomUUID();
+
+        transactionRuleResultService
+                .createRuleResult(
+                        transactionId,
+                        createRequest(
+                                scopedRuleId,
+                                "MATCH",
+                                (short) 1,
+                                new BigDecimal("25.00"),
+                                LocalDateTime.now()
+                        )
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionRuleResultService
+                        .getRuleResultsByRuleId(
+                                scopedRuleId
+                        )
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void getRuleResultsByEvaluationResultShouldExcludeSoftDeletedParent() {
+
+        String evaluationResult =
+                "SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        transactionRuleResultService
+                .createRuleResult(
+                        transactionId,
+                        createRequest(
+                                ruleId,
+                                evaluationResult,
+                                (short) 1,
+                                new BigDecimal("25.00"),
+                                LocalDateTime.now()
+                        )
+                );
+
+        softDeleteTransaction();
+
+        assertTrue(
+                transactionRuleResultService
+                        .getRuleResultsByEvaluationResult(
+                                evaluationResult
+                        )
+                        .isEmpty()
+        );
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
         );
     }
 

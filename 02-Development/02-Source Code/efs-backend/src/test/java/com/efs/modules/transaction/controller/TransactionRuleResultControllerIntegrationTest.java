@@ -581,6 +581,181 @@ class TransactionRuleResultControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldRejectNegativeExecutionTime()
+            throws Exception {
+
+        TransactionRuleResultRequest request =
+                buildRequest(
+                        UUID.randomUUID(),
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("25.00")
+                );
+
+        request.setExecutionTimeMs(-1);
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/rule-results",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCreatingRuleResultForSoftDeletedTransaction()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/rule-results",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest(
+                                                        UUID.randomUUID(),
+                                                        "MATCH",
+                                                        (short) 1,
+                                                        new BigDecimal("25.00")
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForRuleResultWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        JsonNode created =
+                createRuleResult(
+                        UUID.randomUUID(),
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("25.00")
+                );
+
+        UUID ruleResultId =
+                UUID.fromString(
+                        created.get(
+                                "ruleResultId"
+                        ).asText()
+                );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/{ruleResultId}",
+                                ruleResultId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForRuleResultListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/rule-results",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingRuleResultsByRuleId()
+            throws Exception {
+
+        UUID scopedRuleId =
+                UUID.randomUUID();
+
+        createRuleResult(
+                scopedRuleId,
+                "MATCH",
+                (short) 1,
+                new BigDecimal("25.00")
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/rule/{ruleId}",
+                                scopedRuleId
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingRuleResultsByEvaluationResult()
+            throws Exception {
+
+        String evaluationResult =
+                "SOFT_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createRuleResult(
+                UUID.randomUUID(),
+                evaluationResult,
+                (short) 1,
+                new BigDecimal("25.00")
+        );
+
+        softDeleteTransaction();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/result/{evaluationResult}",
+                                evaluationResult
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void softDeleteTransaction() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
     private JsonNode createRuleResult(
             UUID ruleId,
             String evaluationResult,
