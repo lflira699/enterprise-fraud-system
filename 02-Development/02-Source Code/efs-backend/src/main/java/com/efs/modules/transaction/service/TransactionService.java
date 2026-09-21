@@ -231,7 +231,7 @@ public class TransactionService
         transaction.setUpdatedAt(LocalDateTime.now());
 
         Transaction savedTransaction =
-                transactionRepository.save(transaction);
+                transactionRepository.saveAndFlush(transaction);
 
         return transactionMapper.toResponse(savedTransaction);
     }

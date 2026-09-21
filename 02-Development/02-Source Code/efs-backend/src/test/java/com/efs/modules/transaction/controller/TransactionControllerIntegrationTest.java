@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -549,6 +550,155 @@ class TransactionControllerIntegrationTest {
                         )
                 )
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenUpdatingSoftDeletedTransaction()
+            throws Exception {
+
+        JsonNode created =
+                createTransaction(
+                        newReference()
+                );
+
+        String transactionId =
+                created.get("transactionId").asText();
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/transactions/{transactionId}",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        put(
+                                "/api/v1/transactions/{transactionId}",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest(
+                                                        created.get(
+                                                                "transactionReference"
+                                                        ).asText()
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenDeletingAlreadySoftDeletedTransaction()
+            throws Exception {
+
+        JsonNode created =
+                createTransaction(
+                        newReference()
+                );
+
+        String transactionId =
+                created.get("transactionId").asText();
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/transactions/{transactionId}",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/transactions/{transactionId}",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideSoftDeletedTransactionByReference()
+            throws Exception {
+
+        String reference =
+                newReference();
+
+        JsonNode created =
+                createTransaction(reference);
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/transactions/{transactionId}",
+                                created.get("transactionId").asText()
+                        )
+                )
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/reference/{transactionReference}",
+                                reference
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedTransactionFromCustomerList()
+            throws Exception {
+
+        JsonNode active =
+                createTransaction(
+                        newReference()
+                );
+
+        JsonNode deleted =
+                createTransaction(
+                        newReference()
+                );
+
+        String deletedId =
+                deleted.get("transactionId").asText();
+
+        mockMvc.perform(
+                        delete(
+                                "/api/v1/transactions/{transactionId}",
+                                deletedId
+                        )
+                )
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/customer/{customerId}",
+                                customerId
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$[*].transactionId")
+                                .value(
+                                        hasItem(
+                                                active.get(
+                                                        "transactionId"
+                                                ).asText()
+                                        )
+                                )
+                )
+                .andExpect(
+                        jsonPath("$[*].transactionId")
+                                .value(
+                                        not(
+                                                hasItem(
+                                                        deletedId
+                                                )
+                                        )
+                                )
+                );
     }
 
     private JsonNode createTransaction(

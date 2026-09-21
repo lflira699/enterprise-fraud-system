@@ -1027,6 +1027,125 @@ class TransactionServiceIntegrationTest {
         );
     }
 
+    @Test
+    void updateTransactionShouldRejectSoftDeletedTransaction() {
+
+        TransactionResponse created =
+                createTransaction();
+
+        transactionService
+                .deleteTransaction(
+                        created.getTransactionId()
+                );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionService
+                        .updateTransaction(
+                                created.getTransactionId(),
+                                buildRequest(
+                                        created.getTransactionReference()
+                                )
+                        )
+        );
+    }
+
+    @Test
+    void deleteTransactionShouldRejectAlreadySoftDeletedTransaction() {
+
+        TransactionResponse created =
+                createTransaction();
+
+        transactionService
+                .deleteTransaction(
+                        created.getTransactionId()
+                );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionService
+                        .deleteTransaction(
+                                created.getTransactionId()
+                        )
+        );
+    }
+
+    @Test
+    void updateTransactionShouldReturnPersistedRecordVersion() {
+
+        TransactionResponse created =
+                createTransaction();
+
+        assertNotNull(
+                created.getRecordVersion()
+        );
+
+        TransactionRequest request =
+                buildRequest(
+                        created.getTransactionReference()
+                );
+
+        TransactionResponse updated =
+                transactionService
+                        .updateTransaction(
+                                created.getTransactionId(),
+                                request
+                        );
+
+        transactionRepository.flush();
+
+        Integer persistedRecordVersion =
+                transactionRepository
+                        .findById(
+                                created.getTransactionId()
+                        )
+                        .orElseThrow()
+                        .getRecordVersion();
+
+        assertTrue(
+                persistedRecordVersion
+                        > created.getRecordVersion()
+        );
+
+        assertEquals(
+                persistedRecordVersion,
+                updated.getRecordVersion()
+        );
+    }
+
+    @Test
+    void deleteTransactionShouldAdvanceRecordVersion() {
+
+        TransactionResponse created =
+                createTransaction();
+
+        Integer initialRecordVersion =
+                created.getRecordVersion();
+
+        transactionService
+                .deleteTransaction(
+                        created.getTransactionId()
+                );
+
+        transactionRepository.flush();
+
+        var persisted =
+                transactionRepository
+                        .findById(
+                                created.getTransactionId()
+                        )
+                        .orElseThrow();
+
+        assertNotNull(
+                persisted.getDeletedAt()
+        );
+
+        assertTrue(
+                persisted.getRecordVersion()
+                        > initialRecordVersion
+        );
+    }
+
     private TransactionResponse createTransaction() {
 
         return transactionService
