@@ -409,6 +409,245 @@ class TransactionAttachmentControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldRejectNegativeFileSize() throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        String requestBody =
+                """
+                {
+                  "fileName": "negative.pdf",
+                  "fileType": "EVIDENCE",
+                  "fileSize": -1,
+                  "storageUri": "efs://transactions/negative.pdf"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectInvalidSha256Checksum() throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        String requestBody =
+                """
+                {
+                  "fileName": "checksum.pdf",
+                  "fileType": "EVIDENCE",
+                  "storageUri": "efs://transactions/checksum.pdf",
+                  "checksumSha256": "not-a-valid-sha256"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundForAttachmentWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+        UUID attachmentId = UUID.randomUUID();
+
+        insertAttachment(
+                attachmentId,
+                transactionId,
+                "hidden-by-id.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(transactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/{attachmentId}",
+                                attachmentId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingAttachmentsByFileType()
+            throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID activeTransactionId = createTransaction(organizationId);
+        UUID deletedTransactionId = createTransaction(organizationId);
+
+        insertAttachment(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "active-type.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "deleted-type.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/type/{fileType}",
+                                "EVIDENCE"
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(
+                                        activeTransactionId.toString()
+                                )
+                );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentWhenQueryingAttachmentsByUploadedBy()
+            throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID uploadedBy = createUser(organizationId);
+        UUID activeTransactionId = createTransaction(organizationId);
+        UUID deletedTransactionId = createTransaction(organizationId);
+
+        insertAttachment(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "active-uploader.pdf",
+                "EVIDENCE",
+                uploadedBy,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "deleted-uploader.pdf",
+                "EVIDENCE",
+                uploadedBy,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/uploaded-by/{uploadedBy}",
+                                uploadedBy
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(
+                                        activeTransactionId.toString()
+                                )
+                );
+    }
+
+    @Test
+    void shouldReturnNotFoundForAttachmentListWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCreatingAttachmentForSoftDeletedTransaction()
+            throws Exception {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        String requestBody =
+                """
+                {
+                  "fileName": "soft-deleted.pdf",
+                  "fileType": "EVIDENCE",
+                  "storageUri": "efs://transactions/soft-deleted.pdf"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    private void softDeleteTransaction(
+            UUID transactionId) {
+
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE transaction.transaction
+                        SET deleted_at = CURRENT_TIMESTAMP
+                        WHERE transaction_id = ?
+                        """,
+                        transactionId
+                );
+
+        if (updated != 1) {
+            throw new IllegalStateException(
+                    "Expected one soft-deleted transaction, got "
+                            + updated
+            );
+        }
+    }
+
     private UUID createOrganization() {
 
         UUID organizationId = UUID.randomUUID();

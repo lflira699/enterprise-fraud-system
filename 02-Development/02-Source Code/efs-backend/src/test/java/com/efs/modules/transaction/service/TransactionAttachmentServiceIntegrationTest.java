@@ -350,6 +350,219 @@ class TransactionAttachmentServiceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldRejectNegativeFileSize() {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        TransactionAttachmentRequest request =
+                createRequest(
+                        "negative.pdf",
+                        "EVIDENCE",
+                        "application/pdf",
+                        -1L,
+                        "efs://transactions/negative.pdf",
+                        null,
+                        null
+                );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.createAttachment(
+                        transactionId,
+                        request
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectInvalidSha256Checksum() {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        TransactionAttachmentRequest request =
+                createRequest(
+                        "checksum.pdf",
+                        "EVIDENCE",
+                        "application/pdf",
+                        1024L,
+                        "efs://transactions/checksum.pdf",
+                        "not-a-valid-sha256",
+                        null
+                );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.createAttachment(
+                        transactionId,
+                        request
+                )
+        );
+    }
+
+    @Test
+    void shouldHideAttachmentByIdWhenParentTransactionIsSoftDeleted() {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+        UUID attachmentId = UUID.randomUUID();
+
+        insertAttachment(
+                attachmentId,
+                transactionId,
+                "hidden-by-id.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(transactionId);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getAttachmentById(attachmentId)
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromFileTypeQuery() {
+
+        UUID organizationId = createOrganization();
+        UUID activeTransactionId = createTransaction(organizationId);
+        UUID deletedTransactionId = createTransaction(organizationId);
+
+        insertAttachment(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "active-type.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "deleted-type.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        List<TransactionAttachmentResponse> result =
+                service.getAttachmentsByFileType(
+                        "EVIDENCE"
+                );
+
+        assertEquals(1, result.size());
+        assertEquals(
+                activeTransactionId,
+                result.get(0).getTransactionId()
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromUploadedByQuery() {
+
+        UUID organizationId = createOrganization();
+        UUID uploadedBy = createUser(organizationId);
+        UUID activeTransactionId = createTransaction(organizationId);
+        UUID deletedTransactionId = createTransaction(organizationId);
+
+        insertAttachment(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "active-uploader.pdf",
+                "EVIDENCE",
+                uploadedBy,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "deleted-uploader.pdf",
+                "EVIDENCE",
+                uploadedBy,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        List<TransactionAttachmentResponse> result =
+                service.getAttachmentsByUploadedBy(uploadedBy);
+
+        assertEquals(1, result.size());
+        assertEquals(
+                activeTransactionId,
+                result.get(0).getTransactionId()
+        );
+    }
+
+    @Test
+    void shouldThrowWhenRetrievingAttachmentsForSoftDeletedTransaction() {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getAttachmentsByTransactionId(
+                        transactionId
+                )
+        );
+    }
+
+    @Test
+    void shouldThrowWhenCreatingAttachmentForSoftDeletedTransaction() {
+
+        UUID organizationId = createOrganization();
+        UUID transactionId = createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        TransactionAttachmentRequest request =
+                createRequest(
+                        "soft-deleted.pdf",
+                        "EVIDENCE",
+                        "application/pdf",
+                        1024L,
+                        "efs://transactions/soft-deleted.pdf",
+                        null,
+                        null
+                );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.createAttachment(
+                        transactionId,
+                        request
+                )
+        );
+    }
+
+    private void softDeleteTransaction(
+            UUID transactionId) {
+
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE transaction.transaction
+                        SET deleted_at = CURRENT_TIMESTAMP
+                        WHERE transaction_id = ?
+                        """,
+                        transactionId
+                );
+
+        assertEquals(1, updated);
+    }
+
     private TransactionAttachmentRequest createRequest(
             String fileName,
             String fileType,

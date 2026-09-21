@@ -1,6 +1,8 @@
 package com.efs.modules.transaction.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -18,6 +20,7 @@ public class TransactionAttachmentRequest {
     @Size(max = 120)
     private String mimeType;
 
+    @PositiveOrZero
     private Long fileSize;
 
     @NotBlank
@@ -25,6 +28,7 @@ public class TransactionAttachmentRequest {
     private String storageUri;
 
     @Size(max = 64)
+    @Pattern(regexp = "[A-Fa-f0-9]{64}")
     private String checksumSha256;
 
     private UUID uploadedBy;
