@@ -17,6 +17,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Transactional
@@ -392,6 +393,213 @@ class TransactionStatusHistoryServiceIntegrationTest {
                                 .getStatusHistoryByTransactionId(
                                         UUID.randomUUID()
                                 )
+        );
+    }
+
+    @Test
+    void shouldRejectCreateForSoftDeletedTransaction() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        TransactionStatusHistoryRequest request =
+                new TransactionStatusHistoryRequest();
+
+        request.setPreviousStatus("RECEIVED");
+        request.setCurrentStatus("UNDER_REVIEW");
+        request.setChangedBy(changedBy);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionStatusHistoryService
+                        .createStatusHistory(
+                                transactionId,
+                                request
+                        )
+        );
+    }
+
+    @Test
+    void shouldHideStatusHistoryByIdWhenParentTransactionIsSoftDeleted() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        UUID historyId =
+                UUID.randomUUID();
+
+        insertStatusHistory(
+                historyId,
+                transactionId,
+                "RECEIVED",
+                "UNDER_REVIEW",
+                "Soft deleted parent",
+                changedBy,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(transactionId);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionStatusHistoryService
+                        .getStatusHistoryById(historyId)
+        );
+    }
+
+    @Test
+    void shouldRejectTransactionHistoryLookupWhenParentIsSoftDeleted() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> transactionStatusHistoryService
+                        .getStatusHistoryByTransactionId(
+                                transactionId
+                        )
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromCurrentStatusQuery() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID deletedTransactionId =
+                createTransaction(organizationId);
+
+        UUID activeTransactionId =
+                createTransaction(organizationId);
+
+        String currentStatus =
+                "SOFT_STATUS_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "RECEIVED",
+                currentStatus,
+                "Deleted parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 8, 0)
+        );
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "RECEIVED",
+                currentStatus,
+                "Active parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 9, 0)
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        List<TransactionStatusHistoryResponse> results =
+                transactionStatusHistoryService
+                        .getStatusHistoryByCurrentStatus(
+                                currentStatus
+                        );
+
+        assertEquals(1, results.size());
+        assertEquals(
+                activeTransactionId,
+                results.get(0).getTransactionId()
+        );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromChangedByQuery() {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID deletedTransactionId =
+                createTransaction(organizationId);
+
+        UUID activeTransactionId =
+                createTransaction(organizationId);
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "RECEIVED",
+                "UNDER_REVIEW",
+                "Deleted parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 8, 0)
+        );
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "RECEIVED",
+                "APPROVED",
+                "Active parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 9, 0)
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        List<TransactionStatusHistoryResponse> results =
+                transactionStatusHistoryService
+                        .getStatusHistoryByChangedBy(changedBy);
+
+        assertEquals(1, results.size());
+        assertEquals(
+                activeTransactionId,
+                results.get(0).getTransactionId()
+        );
+        assertTrue(
+                results.stream()
+                        .noneMatch(result ->
+                                result.getTransactionId()
+                                        .equals(deletedTransactionId)
+                        )
+        );
+    }
+
+    private void softDeleteTransaction(
+            UUID transactionId) {
+
+        jdbcTemplate.update(
+                "UPDATE transaction.transaction " +
+                        "SET deleted_at = CURRENT_TIMESTAMP " +
+                        "WHERE transaction_id = ?",
+                transactionId
         );
     }
 

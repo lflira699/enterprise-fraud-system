@@ -409,6 +409,221 @@ class TransactionStatusHistoryControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldReturnNotFoundWhenCreatingHistoryForSoftDeletedTransaction()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        String requestBody =
+                """
+                {
+                  "previousStatus": "RECEIVED",
+                  "currentStatus": "UNDER_REVIEW",
+                  "changeReason": "Soft deleted parent",
+                  "changedBy": "%s"
+                }
+                """.formatted(changedBy);
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/status-history",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForHistoryWhenParentTransactionIsSoftDeleted()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        UUID historyId =
+                UUID.randomUUID();
+
+        insertStatusHistory(
+                historyId,
+                transactionId,
+                "RECEIVED",
+                "UNDER_REVIEW",
+                "Soft deleted parent",
+                changedBy,
+                LocalDateTime.now()
+        );
+
+        softDeleteTransaction(transactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/{historyId}",
+                                historyId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForTransactionHistoryWhenParentIsSoftDeleted()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(organizationId);
+
+        softDeleteTransaction(transactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/status-history",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromCurrentStatusEndpoint()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID deletedTransactionId =
+                createTransaction(organizationId);
+
+        UUID activeTransactionId =
+                createTransaction(organizationId);
+
+        String currentStatus =
+                "SOFT_STATUS_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "RECEIVED",
+                currentStatus,
+                "Deleted parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 8, 0)
+        );
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "RECEIVED",
+                currentStatus,
+                "Active parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 9, 0)
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/status/{currentStatus}",
+                                currentStatus
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(activeTransactionId.toString())
+                );
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedParentFromChangedByEndpoint()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(organizationId);
+
+        UUID deletedTransactionId =
+                createTransaction(organizationId);
+
+        UUID activeTransactionId =
+                createTransaction(organizationId);
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                deletedTransactionId,
+                "RECEIVED",
+                "UNDER_REVIEW",
+                "Deleted parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 8, 0)
+        );
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                activeTransactionId,
+                "UNDER_REVIEW",
+                "APPROVED",
+                "Active parent",
+                changedBy,
+                LocalDateTime.of(2026, 9, 21, 9, 0)
+        );
+
+        softDeleteTransaction(deletedTransactionId);
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/changed-by/{changedBy}",
+                                changedBy
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(activeTransactionId.toString())
+                );
+    }
+
+    private void softDeleteTransaction(
+            UUID transactionId) {
+
+        jdbcTemplate.update(
+                "UPDATE transaction.transaction " +
+                        "SET deleted_at = CURRENT_TIMESTAMP " +
+                        "WHERE transaction_id = ?",
+                transactionId
+        );
+    }
+
     private UUID createOrganization() {
 
         UUID organizationId =

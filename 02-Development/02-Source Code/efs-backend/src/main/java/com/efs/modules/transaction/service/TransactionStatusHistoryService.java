@@ -2,6 +2,7 @@ package com.efs.modules.transaction.service;
 
 import com.efs.modules.transaction.dto.TransactionStatusHistoryRequest;
 import com.efs.modules.transaction.dto.TransactionStatusHistoryResponse;
+import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.entity.TransactionStatusHistory;
 import com.efs.modules.transaction.mapper.TransactionStatusHistoryMapper;
 import com.efs.modules.transaction.repository.TransactionRepository;
@@ -12,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionStatusHistoryService
@@ -76,6 +79,18 @@ public class TransactionStatusHistoryService
                                 )
                         );
 
+        if (transactionRepository
+                .findByTransactionIdAndDeletedAtIsNull(
+                        history.getTransactionId()
+                )
+                .isEmpty()) {
+
+            throw new ResourceNotFoundException(
+                    "Transaction status history not found: "
+                            + historyId
+            );
+        }
+
         return transactionStatusHistoryMapper.toResponse(history);
     }
 
@@ -104,11 +119,12 @@ public class TransactionStatusHistoryService
     public List<TransactionStatusHistoryResponse> getStatusHistoryByCurrentStatus(
             String currentStatus) {
 
-        return transactionStatusHistoryRepository
-                .findByCurrentStatusOrderByChangedAtDesc(currentStatus)
-                .stream()
-                .map(transactionStatusHistoryMapper::toResponse)
-                .toList();
+        return toActiveStatusHistoryResponses(
+                transactionStatusHistoryRepository
+                        .findByCurrentStatusOrderByChangedAtDesc(
+                                currentStatus
+                        )
+        );
     }
 
     @Override
@@ -116,9 +132,43 @@ public class TransactionStatusHistoryService
     public List<TransactionStatusHistoryResponse> getStatusHistoryByChangedBy(
             UUID changedBy) {
 
-        return transactionStatusHistoryRepository
-                .findByChangedByOrderByChangedAtDesc(changedBy)
-                .stream()
+        return toActiveStatusHistoryResponses(
+                transactionStatusHistoryRepository
+                        .findByChangedByOrderByChangedAtDesc(
+                                changedBy
+                        )
+        );
+    }
+
+    private List<TransactionStatusHistoryResponse>
+    toActiveStatusHistoryResponses(
+            List<TransactionStatusHistory> histories) {
+
+        if (histories.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> transactionIds =
+                histories.stream()
+                        .map(TransactionStatusHistory::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        Set<UUID> activeTransactionIds =
+                transactionRepository
+                        .findAllById(transactionIds)
+                        .stream()
+                        .filter(transaction ->
+                                transaction.getDeletedAt() == null
+                        )
+                        .map(Transaction::getTransactionId)
+                        .collect(Collectors.toSet());
+
+        return histories.stream()
+                .filter(history ->
+                        activeTransactionIds.contains(
+                                history.getTransactionId()
+                        )
+                )
                 .map(transactionStatusHistoryMapper::toResponse)
                 .toList();
     }
