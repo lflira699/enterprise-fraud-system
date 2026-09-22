@@ -1,18 +1,25 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,6 +35,18 @@ class TransactionAttachmentControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
+
+    private UUID authorizedOrganizationId;
 
     @Test
     void shouldCreateAttachment() throws Exception {
@@ -363,6 +382,8 @@ class TransactionAttachmentControllerIntegrationTest {
     void shouldReturnNotFoundForUnknownAttachmentId()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/attachments/{attachmentId}",
@@ -376,6 +397,8 @@ class TransactionAttachmentControllerIntegrationTest {
     void shouldReturnNotFoundForUnknownTransaction()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/{transactionId}/attachments",
@@ -388,6 +411,8 @@ class TransactionAttachmentControllerIntegrationTest {
     @Test
     void shouldReturnNotFoundWhenCreatingAttachmentForUnknownTransaction()
             throws Exception {
+
+        createOrganization();
 
         String requestBody =
                 """
@@ -627,6 +652,376 @@ class TransactionAttachmentControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        authorize(
+                Set.of(
+                        "transaction.view"
+                ),
+                organizationId,
+                null
+        );
+
+        String requestBody =
+                """
+                {
+                  "fileName": "forbidden-create.pdf",
+                  "fileType": "EVIDENCE",
+                  "storageUri": "efs://transactions/forbidden-create.pdf"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                transactionId
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        requestBody
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        UUID attachmentId =
+                UUID.randomUUID();
+
+        insertAttachment(
+                attachmentId,
+                transactionId,
+                "forbidden-read.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                Set.of(
+                        "transaction.update"
+                ),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/{attachmentId}",
+                                attachmentId
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void shouldHideCrossOrganizationAttachmentById()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID otherOrganization =
+                createOrganization();
+
+        UUID otherTransaction =
+                createTransaction(
+                        otherOrganization
+                );
+
+        UUID attachmentId =
+                UUID.randomUUID();
+
+        insertAttachment(
+                attachmentId,
+                otherTransaction,
+                "cross-org-id.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/{attachmentId}",
+                                attachmentId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void shouldHideCrossOrganizationAttachmentList()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID otherOrganization =
+                createOrganization();
+
+        UUID otherTransaction =
+                createTransaction(
+                        otherOrganization
+                );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                otherTransaction,
+                "cross-org-list.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                otherTransaction
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void shouldHideCrossOrganizationAttachmentCreate()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID otherOrganization =
+                createOrganization();
+
+        UUID otherTransaction =
+                createTransaction(
+                        otherOrganization
+                );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        String requestBody =
+                """
+                {
+                  "fileName": "cross-org-create.pdf",
+                  "fileType": "EVIDENCE",
+                  "storageUri": "efs://transactions/cross-org-create.pdf"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/attachments",
+                                otherTransaction
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        requestBody
+                                )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationAttachmentsByFileType()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID visibleTransaction =
+                createTransaction(
+                        authorizedOrganization
+                );
+
+        UUID otherOrganization =
+                createOrganization();
+
+        UUID hiddenTransaction =
+                createTransaction(
+                        otherOrganization
+                );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                visibleTransaction,
+                "visible-scope.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                hiddenTransaction,
+                "hidden-scope.pdf",
+                "EVIDENCE",
+                null,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/type/{fileType}",
+                                "EVIDENCE"
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.length()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(
+                                        visibleTransaction
+                                                .toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$[0].fileName")
+                                .value(
+                                        "visible-scope.pdf"
+                                )
+                );
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationAttachmentsByUploadedBy()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID uploadedBy =
+                createUser(
+                        authorizedOrganization
+                );
+
+        UUID visibleTransaction =
+                createTransaction(
+                        authorizedOrganization
+                );
+
+        UUID otherOrganization =
+                createOrganization();
+
+        UUID hiddenTransaction =
+                createTransaction(
+                        otherOrganization
+                );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                visibleTransaction,
+                "visible-uploader-scope.pdf",
+                "EVIDENCE",
+                uploadedBy,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertAttachment(
+                UUID.randomUUID(),
+                hiddenTransaction,
+                "hidden-uploader-scope.pdf",
+                "EVIDENCE",
+                uploadedBy,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/attachments/uploaded-by/{uploadedBy}",
+                                uploadedBy
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.length()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(
+                                        visibleTransaction
+                                                .toString()
+                                )
+                )
+                .andExpect(
+                        jsonPath("$[0].fileName")
+                                .value(
+                                        "visible-uploader-scope.pdf"
+                                )
+                );
+    }
+
     private void softDeleteTransaction(
             UUID transactionId) {
 
@@ -671,6 +1066,15 @@ class TransactionAttachmentControllerIntegrationTest {
                 "America/Guatemala",
                 "ACTIVE"
         );
+
+        if (authorizedOrganizationId == null) {
+
+            authorize(
+                    allPermissions(),
+                    organizationId,
+                    null
+            );
+        }
 
         return organizationId;
     }
@@ -772,6 +1176,51 @@ class TransactionAttachmentControllerIntegrationTest {
         );
 
         return transactionId;
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID organizationId,
+            UUID tenantId) {
+
+        authorizedOrganizationId =
+                organizationId;
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                actorId
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        organizationId,
+                        tenantId,
+                        "transaction-attachment-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
     }
 
     private void insertAttachment(
