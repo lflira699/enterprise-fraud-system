@@ -1,5 +1,9 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.transaction.dto.TransactionPaymentMethodRequest;
@@ -13,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,9 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +51,16 @@ class TransactionPaymentMethodControllerIntegrationTest {
 
     @Autowired
     private CustomerRepository customerRepository;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
 
     private UUID transactionId;
 
@@ -171,6 +188,12 @@ class TransactionPaymentMethodControllerIntegrationTest {
 
         transactionId =
                 savedTransaction.getTransactionId();
+
+        authorize(
+                allPermissions(),
+                savedTransaction.getOrganizationId(),
+                null
+        );
     }
 
     @Test
@@ -489,6 +512,182 @@ class TransactionPaymentMethodControllerIntegrationTest {
                         )
                 )
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        authorize(
+                Set.of("transaction.view"),
+                currentOrganizationId(),
+                null
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/payment-methods",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest("CARD")
+                                        )
+                                )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        authorize(
+                Set.of("transaction.update"),
+                currentOrganizationId(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/payment-methods",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationPaymentMethodById()
+            throws Exception {
+
+        JsonNode created =
+                createPaymentMethod(
+                        "CARD",
+                        "VISA"
+                );
+
+        UUID paymentMethodId =
+                UUID.fromString(
+                        created.get("paymentMethodId")
+                                .asText()
+                );
+
+        moveTransactionOutOfScope();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/payment-methods/{paymentMethodId}",
+                                paymentMethodId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationPaymentMethodList()
+            throws Exception {
+
+        createPaymentMethod(
+                "CARD",
+                "VISA"
+        );
+
+        moveTransactionOutOfScope();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/payment-methods",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationPaymentMethodCreate()
+            throws Exception {
+
+        moveTransactionOutOfScope();
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/payment-methods",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest("CARD")
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    private UUID currentOrganizationId() {
+
+        return transactionRepository
+                .findById(transactionId)
+                .orElseThrow()
+                .getOrganizationId();
+    }
+
+    private void moveTransactionOutOfScope() {
+
+        Transaction transaction =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        transaction.setOrganizationId(
+                UUID.randomUUID()
+        );
+
+        transactionRepository.saveAndFlush(
+                transaction
+        );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID organizationId,
+            UUID tenantId) {
+
+        when(
+                securityContextProvider.getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService.getAuthorizedUser(
+                        actorId
+                )
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        organizationId,
+                        tenantId,
+                        "payment-method-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
     }
 
     private JsonNode createPaymentMethod(

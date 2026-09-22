@@ -1,18 +1,25 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,6 +35,18 @@ class TransactionMetadataControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
+
+    private UUID authorizedOrganizationId;
 
     @Test
     void shouldCreateMetadata()
@@ -330,6 +349,8 @@ class TransactionMetadataControllerIntegrationTest {
     void shouldReturnEmptyListForUnknownMetadataType()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/metadata/type/{metadataType}",
@@ -344,6 +365,8 @@ class TransactionMetadataControllerIntegrationTest {
     void shouldReturnNotFoundForUnknownMetadataId()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/metadata/{metadataId}",
@@ -357,6 +380,8 @@ class TransactionMetadataControllerIntegrationTest {
     void shouldReturnNotFoundForUnknownTransaction()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/{transactionId}/metadata",
@@ -369,6 +394,8 @@ class TransactionMetadataControllerIntegrationTest {
     @Test
     void shouldReturnNotFoundWhenCreatingMetadataForUnknownTransaction()
             throws Exception {
+
+        createOrganization();
 
         String requestBody =
                 """
@@ -536,6 +563,316 @@ class TransactionMetadataControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        authorize(
+                Set.of("transaction.view"),
+                organizationId,
+                null
+        );
+
+        String requestBody =
+                """
+                {
+                  "metadataType": "DEVICE_CONTEXT",
+                  "metadataJson": {
+                    "deviceId": "DEVICE-FORBIDDEN"
+                  }
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/metadata",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        UUID metadataId =
+                UUID.randomUUID();
+
+        insertMetadata(
+                metadataId,
+                transactionId,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-FORBIDDEN-READ"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                Set.of("transaction.update"),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/metadata/{metadataId}",
+                                metadataId
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationMetadataById()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID hiddenOrganization =
+                createOrganization();
+
+        UUID hiddenTransaction =
+                createTransaction(
+                        hiddenOrganization
+                );
+
+        UUID metadataId =
+                UUID.randomUUID();
+
+        insertMetadata(
+                metadataId,
+                hiddenTransaction,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-HIDDEN-ID"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/metadata/{metadataId}",
+                                metadataId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationMetadataList()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID hiddenOrganization =
+                createOrganization();
+
+        UUID hiddenTransaction =
+                createTransaction(
+                        hiddenOrganization
+                );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/metadata",
+                                hiddenTransaction
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationMetadataCreate()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID hiddenOrganization =
+                createOrganization();
+
+        UUID hiddenTransaction =
+                createTransaction(
+                        hiddenOrganization
+                );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        String requestBody =
+                """
+                {
+                  "metadataType": "DEVICE_CONTEXT",
+                  "metadataJson": {
+                    "deviceId": "DEVICE-HIDDEN-CREATE"
+                  }
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/metadata",
+                                hiddenTransaction
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationMetadataByType()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                createOrganization();
+
+        UUID visibleTransaction =
+                createTransaction(
+                        authorizedOrganization
+                );
+
+        UUID hiddenOrganization =
+                createOrganization();
+
+        UUID hiddenTransaction =
+                createTransaction(
+                        hiddenOrganization
+                );
+
+        insertMetadata(
+                UUID.randomUUID(),
+                visibleTransaction,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-VISIBLE"
+                }
+                """,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        insertMetadata(
+                UUID.randomUUID(),
+                hiddenTransaction,
+                "DEVICE_CONTEXT",
+                """
+                {
+                  "deviceId": "DEVICE-HIDDEN"
+                }
+                """,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/metadata/type/{metadataType}",
+                                "DEVICE_CONTEXT"
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.length()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(
+                                        visibleTransaction.toString()
+                                )
+                );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID organizationId,
+            UUID tenantId) {
+
+        authorizedOrganizationId =
+                organizationId;
+
+        when(
+                securityContextProvider.getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService.getAuthorizedUser(
+                        actorId
+                )
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        organizationId,
+                        tenantId,
+                        "metadata-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
+    }
+
     private void softDeleteTransaction(
             UUID transactionId) {
 
@@ -581,6 +918,15 @@ class TransactionMetadataControllerIntegrationTest {
                 "America/Guatemala",
                 "ACTIVE"
         );
+
+        if (authorizedOrganizationId == null) {
+
+            authorize(
+                    allPermissions(),
+                    organizationId,
+                    null
+            );
+        }
 
         return organizationId;
     }

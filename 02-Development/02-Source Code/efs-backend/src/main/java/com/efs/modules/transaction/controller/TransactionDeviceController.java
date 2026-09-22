@@ -2,10 +2,14 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionDeviceRequest;
 import com.efs.modules.transaction.dto.TransactionDeviceResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionDeviceServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,10 +22,25 @@ public class TransactionDeviceController {
     private final TransactionDeviceServiceInterface
             transactionDeviceService;
 
-    public TransactionDeviceController(
-            TransactionDeviceServiceInterface transactionDeviceService) {
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
 
-        this.transactionDeviceService = transactionDeviceService;
+    private final SecurityContextProvider securityContextProvider;
+
+    public TransactionDeviceController(
+            TransactionDeviceServiceInterface transactionDeviceService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
+
+        this.transactionDeviceService =
+                transactionDeviceService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/devices")
@@ -29,10 +48,15 @@ public class TransactionDeviceController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionDeviceRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider.getCurrentContext();
+
         TransactionDeviceResponse response =
-                transactionDeviceService.createDevice(
+                transactionChildAccessService.create(
+                        securityContext,
                         transactionId,
-                        request
+                        request,
+                        transactionDeviceService::createDevice
                 );
 
         return ResponseEntity
@@ -44,9 +68,18 @@ public class TransactionDeviceController {
     public ResponseEntity<TransactionDeviceResponse> getDeviceById(
             @PathVariable UUID deviceTransactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider.getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDeviceService
-                        .getDeviceById(deviceTransactionId)
+                transactionChildAccessService.getById(
+                        securityContext,
+                        deviceTransactionId,
+                        transactionDeviceService::getDeviceById,
+                        TransactionDeviceResponse::getTransactionId,
+                        "Transaction device not found: "
+                                + deviceTransactionId
+                )
         );
     }
 
@@ -55,9 +88,16 @@ public class TransactionDeviceController {
     getDevicesByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider.getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDeviceService
-                        .getDevicesByTransactionId(transactionId)
+                transactionChildAccessService.getByTransactionId(
+                        securityContext,
+                        transactionId,
+                        transactionDeviceService
+                                ::getDevicesByTransactionId
+                )
         );
     }
 
@@ -66,9 +106,28 @@ public class TransactionDeviceController {
     getDevicesByFingerprint(
             @PathVariable String deviceFingerprint) {
 
+        SecurityContext securityContext =
+                securityContextProvider.getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDeviceService
-                        .getDevicesByFingerprint(deviceFingerprint)
+                transactionChildAccessService.filterVisible(
+                        securityContext,
+                        () ->
+                                transactionDeviceService
+                                        .getDevicesByFingerprint(
+                                                deviceFingerprint
+                                        ),
+                        TransactionDeviceResponse::getTransactionId
+                )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
