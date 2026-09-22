@@ -1,11 +1,17 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.transaction.dto.TransactionHistoryRequest;
 import com.efs.modules.transaction.dto.TransactionHistoryResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionHistoryServiceInterface;
+import com.efs.modules.transaction.service.TransactionScopeAuthorizationServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,12 +21,37 @@ import java.util.UUID;
 @RequestMapping("/api/v1/transactions")
 public class TransactionHistoryController {
 
-    private final TransactionHistoryServiceInterface transactionHistoryService;
+    private final TransactionHistoryServiceInterface
+            transactionHistoryService;
+
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
+
+    private final TransactionScopeAuthorizationServiceInterface
+            transactionScopeAuthorizationService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public TransactionHistoryController(
-            TransactionHistoryServiceInterface transactionHistoryService) {
+            TransactionHistoryServiceInterface transactionHistoryService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            TransactionScopeAuthorizationServiceInterface
+                    transactionScopeAuthorizationService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.transactionHistoryService = transactionHistoryService;
+        this.transactionHistoryService =
+                transactionHistoryService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.transactionScopeAuthorizationService =
+                transactionScopeAuthorizationService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/history")
@@ -28,11 +59,18 @@ public class TransactionHistoryController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionHistoryRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionHistoryResponse response =
-                transactionHistoryService.createHistory(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionHistoryService::createHistory
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -43,9 +81,20 @@ public class TransactionHistoryController {
     public ResponseEntity<TransactionHistoryResponse> getHistoryById(
             @PathVariable UUID historyId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionHistoryService
-                        .getHistoryById(historyId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                historyId,
+                                transactionHistoryService::getHistoryById,
+                                TransactionHistoryResponse::getTransactionId,
+                                "Transaction history not found: "
+                                        + historyId
+                        )
         );
     }
 
@@ -54,9 +103,18 @@ public class TransactionHistoryController {
     getHistoryByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionHistoryService
-                        .getHistoryByTransactionId(transactionId)
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionHistoryService
+                                        ::getHistoryByTransactionId
+                        )
         );
     }
 
@@ -65,6 +123,30 @@ public class TransactionHistoryController {
     getHistoryByTransactionIdAndVersionNumber(
             @PathVariable UUID transactionId,
             @PathVariable Integer versionNumber) {
+
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
+        UserAccountReference actor =
+                transactionScopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                "transaction.view"
+                        );
+
+        String notFoundMessage =
+                "Transaction history not found for transaction "
+                        + transactionId
+                        + " and version "
+                        + versionNumber;
+
+        transactionScopeAuthorizationService
+                .requireVisibleTransaction(
+                        transactionId,
+                        actor,
+                        notFoundMessage
+                );
 
         return ResponseEntity.ok(
                 transactionHistoryService
@@ -80,9 +162,31 @@ public class TransactionHistoryController {
     getHistoryByChangedBy(
             @PathVariable UUID changedBy) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionHistoryService
-                        .getHistoryByChangedBy(changedBy)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionHistoryService
+                                                .getHistoryByChangedBy(
+                                                        changedBy
+                                                ),
+                                TransactionHistoryResponse
+                                        ::getTransactionId
+                        )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

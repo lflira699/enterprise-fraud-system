@@ -1,5 +1,9 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -10,14 +14,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,6 +59,16 @@ class TransactionHistoryControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -72,6 +89,12 @@ class TransactionHistoryControllerIntegrationTest {
 
         insertCustomer();
         insertTransaction();
+
+        authorize(
+                allPermissions(),
+                ORGANIZATION_ID,
+                null
+        );
     }
 
     @Test
@@ -587,6 +610,486 @@ class TransactionHistoryControllerIntegrationTest {
         entityManager.clear();
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingHistoryWithoutTransactionUpdate()
+            throws Exception {
+
+        authorize(
+                Set.of("transaction.view"),
+                ORGANIZATION_ID,
+                null
+        );
+
+        Map<String, Object> request =
+                createRequest(
+                        90,
+                        "Forbidden create",
+                        CHANGED_BY,
+                        "RECEIVED",
+                        "PENDING"
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/history",
+                                TRANSACTION_ID
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingHistoryWithoutTransactionView()
+            throws Exception {
+
+        UUID historyId =
+                insertHistory(
+                        91,
+                        "Forbidden read",
+                        CHANGED_BY,
+                        "RECEIVED",
+                        "PENDING"
+                );
+
+        authorize(
+                Set.of("transaction.update"),
+                ORGANIZATION_ID,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/history/{historyId}",
+                                historyId
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingHistoryVersionWithoutTransactionView()
+            throws Exception {
+
+        insertHistory(
+                92,
+                "Forbidden version read",
+                CHANGED_BY,
+                "REVIEW",
+                "PENDING"
+        );
+
+        authorize(
+                Set.of("transaction.update"),
+                ORGANIZATION_ID,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/history/version/{versionNumber}",
+                                TRANSACTION_ID,
+                                92
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationHistoryById()
+            throws Exception {
+
+        CrossScopeFixture fixture =
+                createCrossScopeFixture();
+
+        UUID historyId =
+                insertHistoryForTransaction(
+                        fixture.transactionId(),
+                        93,
+                        "Cross organization history",
+                        fixture.userId()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/history/{historyId}",
+                                historyId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationHistoryList()
+            throws Exception {
+
+        CrossScopeFixture fixture =
+                createCrossScopeFixture();
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/history",
+                                fixture.transactionId()
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationHistoryCreate()
+            throws Exception {
+
+        CrossScopeFixture fixture =
+                createCrossScopeFixture();
+
+        Map<String, Object> request =
+                createRequest(
+                        94,
+                        "Cross organization create",
+                        CHANGED_BY,
+                        "RECEIVED",
+                        "PENDING"
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/history",
+                                fixture.transactionId()
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationHistoryVersion()
+            throws Exception {
+
+        CrossScopeFixture fixture =
+                createCrossScopeFixture();
+
+        insertHistoryForTransaction(
+                fixture.transactionId(),
+                95,
+                "Cross organization version",
+                fixture.userId()
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/history/version/{versionNumber}",
+                                fixture.transactionId(),
+                                95
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationHistoryFromChangedBy()
+            throws Exception {
+
+        insertHistory(
+                96,
+                "Visible history",
+                CHANGED_BY,
+                "RECEIVED",
+                "PENDING"
+        );
+
+        CrossScopeFixture fixture =
+                createCrossScopeFixture();
+
+        insertHistoryForTransaction(
+                fixture.transactionId(),
+                96,
+                "Hidden history",
+                CHANGED_BY
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/history/changed-by/{changedBy}",
+                                CHANGED_BY
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.length()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(TRANSACTION_ID.toString())
+                );
+    }
+
+    @Test
+    void shouldHideHistoryVersionWhenParentIsSoftDeleted()
+            throws Exception {
+
+        insertHistory(
+                97,
+                "Soft deleted parent",
+                CHANGED_BY,
+                "REVIEW",
+                "PENDING"
+        );
+
+        jdbcTemplate.update(
+                """
+                UPDATE transaction.transaction
+                SET deleted_at = clock_timestamp()
+                WHERE transaction_id = ?
+                """,
+                TRANSACTION_ID
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/history/version/{versionNumber}",
+                                TRANSACTION_ID,
+                                97
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID organizationId,
+            UUID tenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(actorId)
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        organizationId,
+                        tenantId,
+                        "transaction-history-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
+    }
+
+    private CrossScopeFixture createCrossScopeFixture() {
+
+        UUID organizationId =
+                UUID.randomUUID();
+
+        UUID userId =
+                UUID.randomUUID();
+
+        UUID transactionId =
+                UUID.randomUUID();
+
+        insertOrganization(
+                organizationId
+        );
+
+        insertUserAccount(
+                userId,
+                "history-security-" + userId,
+                organizationId
+        );
+
+        insertTransaction(
+                transactionId,
+                organizationId,
+                userId
+        );
+
+        return new CrossScopeFixture(
+                organizationId,
+                userId,
+                transactionId
+        );
+    }
+
+    private UUID insertHistoryForTransaction(
+            UUID targetTransactionId,
+            Integer versionNumber,
+            String changeReason,
+            UUID changedBy) {
+
+        UUID historyId =
+                UUID.randomUUID();
+
+        String snapshotJson =
+                """
+                {
+                  "transactionReference":
+                    "EFS-HISTORY-SECURITY",
+                  "transactionType": "TEST",
+                  "amount": 100.00,
+                  "currencyCode": "GTQ",
+                  "transactionStatus": "RECEIVED",
+                  "finalDecision": "PENDING"
+                }
+                """;
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO transaction.transaction_history (
+                    history_id,
+                    transaction_id,
+                    version_number,
+                    snapshot_json,
+                    change_reason,
+                    changed_by,
+                    changed_at
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    ?,
+                    CAST(? AS jsonb),
+                    ?,
+                    ?,
+                    clock_timestamp()
+                )
+                """,
+                historyId,
+                targetTransactionId,
+                versionNumber,
+                snapshotJson,
+                changeReason,
+                changedBy
+        );
+
+        return historyId;
+    }
+
+    private void insertOrganization(
+            UUID targetOrganizationId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                targetOrganizationId,
+                "EFS-HIST-SEC-" + targetOrganizationId,
+                "EFS History Security " + targetOrganizationId,
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+    }
+
+    private void insertUserAccount(
+            UUID userId,
+            String username,
+            UUID organizationId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                userId,
+                organizationId,
+                username,
+                "EFS History Security User",
+                username + "@efs.test",
+                "LOCAL",
+                false,
+                "ACTIVE"
+        );
+    }
+
+    private void insertTransaction(
+            UUID targetTransactionId,
+            UUID organizationId,
+            UUID createdBy) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO transaction.transaction (
+                    transaction_id,
+                    transaction_reference,
+                    customer_id,
+                    organization_id,
+                    transaction_type,
+                    amount,
+                    currency_code,
+                    transaction_status,
+                    final_decision,
+                    fraud_score,
+                    created_by,
+                    record_version
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                targetTransactionId,
+                "EFS-HIST-SEC-TXN-" + targetTransactionId,
+                CUSTOMER_ID,
+                organizationId,
+                "TEST",
+                new BigDecimal("100.00"),
+                "GTQ",
+                "RECEIVED",
+                "PENDING",
+                BigDecimal.ZERO,
+                createdBy,
+                1
+        );
+    }
+
+    private record CrossScopeFixture(
+            UUID organizationId,
+            UUID userId,
+            UUID transactionId) {
+    }
     private Map<String, Object> createRequest(
             Integer versionNumber,
             String changeReason,
