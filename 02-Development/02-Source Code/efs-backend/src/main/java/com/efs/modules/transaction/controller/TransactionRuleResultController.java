@@ -2,10 +2,14 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionRuleResultRequest;
 import com.efs.modules.transaction.dto.TransactionRuleResultResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionRuleResultServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,12 +22,27 @@ public class TransactionRuleResultController {
     private final TransactionRuleResultServiceInterface
             transactionRuleResultService;
 
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
+
     public TransactionRuleResultController(
             TransactionRuleResultServiceInterface
-                    transactionRuleResultService) {
+                    transactionRuleResultService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
 
         this.transactionRuleResultService =
                 transactionRuleResultService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/rule-results")
@@ -33,11 +52,19 @@ public class TransactionRuleResultController {
             @Valid @RequestBody
             TransactionRuleResultRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionRuleResultResponse response =
-                transactionRuleResultService.createRuleResult(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionRuleResultService
+                                        ::createRuleResult
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -49,9 +76,22 @@ public class TransactionRuleResultController {
     getRuleResultById(
             @PathVariable UUID ruleResultId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionRuleResultService
-                        .getRuleResultById(ruleResultId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                ruleResultId,
+                                transactionRuleResultService
+                                        ::getRuleResultById,
+                                TransactionRuleResultResponse
+                                        ::getTransactionId,
+                                "Transaction rule result not found: "
+                                        + ruleResultId
+                        )
         );
     }
 
@@ -60,10 +100,17 @@ public class TransactionRuleResultController {
     getRuleResultsByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionRuleResultService
-                        .getRuleResultsByTransactionId(
-                                transactionId
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionRuleResultService
+                                        ::getRuleResultsByTransactionId
                         )
         );
     }
@@ -73,9 +120,22 @@ public class TransactionRuleResultController {
     getRuleResultsByRuleId(
             @PathVariable UUID ruleId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionRuleResultService
-                        .getRuleResultsByRuleId(ruleId)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionRuleResultService
+                                                .getRuleResultsByRuleId(
+                                                        ruleId
+                                                ),
+                                TransactionRuleResultResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -84,11 +144,31 @@ public class TransactionRuleResultController {
     getRuleResultsByEvaluationResult(
             @PathVariable String evaluationResult) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionRuleResultService
-                        .getRuleResultsByEvaluationResult(
-                                evaluationResult
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionRuleResultService
+                                                .getRuleResultsByEvaluationResult(
+                                                        evaluationResult
+                                                ),
+                                TransactionRuleResultResponse
+                                        ::getTransactionId
                         )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

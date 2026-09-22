@@ -3,9 +3,13 @@ package com.efs.modules.transaction.controller;
 import com.efs.modules.transaction.dto.TransactionChannelRequest;
 import com.efs.modules.transaction.dto.TransactionChannelResponse;
 import com.efs.modules.transaction.service.TransactionChannelServiceInterface;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,11 +22,26 @@ public class TransactionChannelController {
     private final TransactionChannelServiceInterface
             transactionChannelService;
 
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
+
     public TransactionChannelController(
-            TransactionChannelServiceInterface transactionChannelService) {
+            TransactionChannelServiceInterface transactionChannelService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
 
         this.transactionChannelService =
                 transactionChannelService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/channels")
@@ -30,11 +49,19 @@ public class TransactionChannelController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionChannelRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionChannelResponse response =
-                transactionChannelService.createChannel(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionChannelService
+                                        ::createChannel
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -45,9 +72,22 @@ public class TransactionChannelController {
     public ResponseEntity<TransactionChannelResponse> getChannelById(
             @PathVariable UUID channelTransactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionChannelService
-                        .getChannelById(channelTransactionId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                channelTransactionId,
+                                transactionChannelService
+                                        ::getChannelById,
+                                TransactionChannelResponse
+                                        ::getTransactionId,
+                                "Transaction channel not found: "
+                                        + channelTransactionId
+                        )
         );
     }
 
@@ -56,9 +96,18 @@ public class TransactionChannelController {
     getChannelsByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionChannelService
-                        .getChannelsByTransactionId(transactionId)
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionChannelService
+                                        ::getChannelsByTransactionId
+                        )
         );
     }
 
@@ -67,9 +116,22 @@ public class TransactionChannelController {
     getChannelsByType(
             @PathVariable String channelType) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionChannelService
-                        .getChannelsByType(channelType)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionChannelService
+                                                .getChannelsByType(
+                                                        channelType
+                                                ),
+                                TransactionChannelResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -78,9 +140,31 @@ public class TransactionChannelController {
     getChannelsByApplicationName(
             @PathVariable String applicationName) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionChannelService
-                        .getChannelsByApplicationName(applicationName)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionChannelService
+                                                .getChannelsByApplicationName(
+                                                        applicationName
+                                                ),
+                                TransactionChannelResponse
+                                        ::getTransactionId
+                        )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

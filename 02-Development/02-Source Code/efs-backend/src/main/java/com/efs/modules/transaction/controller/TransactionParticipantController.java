@@ -2,10 +2,14 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionParticipantRequest;
 import com.efs.modules.transaction.dto.TransactionParticipantResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionParticipantServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,12 +22,27 @@ public class TransactionParticipantController {
     private final TransactionParticipantServiceInterface
             transactionParticipantService;
 
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
+
     public TransactionParticipantController(
             TransactionParticipantServiceInterface
-                    transactionParticipantService) {
+                    transactionParticipantService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
 
         this.transactionParticipantService =
                 transactionParticipantService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/participants")
@@ -33,11 +52,19 @@ public class TransactionParticipantController {
             @Valid @RequestBody
             TransactionParticipantRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionParticipantResponse response =
-                transactionParticipantService.createParticipant(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionParticipantService
+                                        ::createParticipant
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -49,9 +76,22 @@ public class TransactionParticipantController {
     getParticipantById(
             @PathVariable UUID participantId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionParticipantService
-                        .getParticipantById(participantId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                participantId,
+                                transactionParticipantService
+                                        ::getParticipantById,
+                                TransactionParticipantResponse
+                                        ::getTransactionId,
+                                "Transaction participant not found: "
+                                        + participantId
+                        )
         );
     }
 
@@ -60,10 +100,17 @@ public class TransactionParticipantController {
     getParticipantsByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionParticipantService
-                        .getParticipantsByTransactionId(
-                                transactionId
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionParticipantService
+                                        ::getParticipantsByTransactionId
                         )
         );
     }
@@ -73,11 +120,31 @@ public class TransactionParticipantController {
     getParticipantsByCustomerId(
             @PathVariable UUID customerId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionParticipantService
-                        .getParticipantsByCustomerId(
-                                customerId
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionParticipantService
+                                                .getParticipantsByCustomerId(
+                                                        customerId
+                                                ),
+                                TransactionParticipantResponse
+                                        ::getTransactionId
                         )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

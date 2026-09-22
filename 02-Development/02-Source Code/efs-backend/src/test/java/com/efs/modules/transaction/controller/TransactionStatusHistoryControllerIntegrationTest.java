@@ -1,18 +1,25 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,6 +35,18 @@ class TransactionStatusHistoryControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
+
+    private UUID authorizedOrganizationId;
 
     @Test
     void shouldCreateStatusHistory()
@@ -363,6 +382,8 @@ class TransactionStatusHistoryControllerIntegrationTest {
     void shouldReturnNotFoundForUnknownStatusHistoryId()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/status-history/{historyId}",
@@ -376,6 +397,8 @@ class TransactionStatusHistoryControllerIntegrationTest {
     void shouldReturnNotFoundForUnknownTransaction()
             throws Exception {
 
+        createOrganization();
+
         mockMvc.perform(
                         get(
                                 "/api/v1/transactions/{transactionId}/status-history",
@@ -388,6 +411,8 @@ class TransactionStatusHistoryControllerIntegrationTest {
     @Test
     void shouldReturnNotFoundWhenCreatingHistoryForUnknownTransaction()
             throws Exception {
+
+        createOrganization();
 
         String requestBody =
                 """
@@ -613,6 +638,302 @@ class TransactionStatusHistoryControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        authorize(
+                Set.of("transaction.view"),
+                organizationId,
+                null
+        );
+
+        String requestBody =
+                """
+                {
+                  "previousStatus": "RECEIVED",
+                  "currentStatus": "UNDER_REVIEW",
+                  "changeReason": "Permission test"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/status-history",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(
+                        organizationId
+                );
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        UUID historyId =
+                UUID.randomUUID();
+
+        insertStatusHistory(
+                historyId,
+                transactionId,
+                "RECEIVED",
+                "UNDER_REVIEW",
+                "Permission test",
+                changedBy,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                Set.of("transaction.update"),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/{historyId}",
+                                historyId
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationStatusHistoryById()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(
+                        organizationId
+                );
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        UUID historyId =
+                UUID.randomUUID();
+
+        insertStatusHistory(
+                historyId,
+                transactionId,
+                "RECEIVED",
+                "UNDER_REVIEW",
+                "Cross organization id",
+                changedBy,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/{historyId}",
+                                historyId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationStatusHistoryList()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/status-history",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationStatusHistoryCreate()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        String requestBody =
+                """
+                {
+                  "previousStatus": "RECEIVED",
+                  "currentStatus": "UNDER_REVIEW",
+                  "changeReason": "Cross organization create"
+                }
+                """;
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/status-history",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationStatusHistoryGlobalQueries()
+            throws Exception {
+
+        UUID organizationId =
+                createOrganization();
+
+        UUID changedBy =
+                createUserAccount(
+                        organizationId
+                );
+
+        UUID transactionId =
+                createTransaction(
+                        organizationId
+                );
+
+        String currentStatus =
+                "SEC_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        insertStatusHistory(
+                UUID.randomUUID(),
+                transactionId,
+                "RECEIVED",
+                currentStatus,
+                "Cross organization global filter",
+                changedBy,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/status/{currentStatus}",
+                                currentStatus
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/status-history/changed-by/{changedBy}",
+                                changedBy
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID organizationId,
+            UUID tenantId) {
+
+        authorizedOrganizationId =
+                organizationId;
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                actorId
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        organizationId,
+                        tenantId,
+                        "transaction-status-history-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
+    }
+
     private void softDeleteTransaction(
             UUID transactionId) {
 
@@ -648,6 +969,15 @@ class TransactionStatusHistoryControllerIntegrationTest {
                 "America/Guatemala",
                 "ACTIVE"
         );
+
+        if (authorizedOrganizationId == null) {
+
+            authorize(
+                    allPermissions(),
+                    organizationId,
+                    null
+            );
+        }
 
         return organizationId;
     }

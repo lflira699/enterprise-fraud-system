@@ -1,6 +1,10 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.customer.entity.Customer;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.transaction.dto.TransactionRuleResultRequest;
 import com.efs.modules.transaction.entity.Transaction;
@@ -13,15 +17,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -43,6 +50,18 @@ class TransactionRuleResultControllerIntegrationTest {
 
     @Autowired
     private CustomerRepository customerRepository;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
+
+    private UUID organizationId;
 
     private UUID transactionId;
 
@@ -115,8 +134,11 @@ class TransactionRuleResultControllerIntegrationTest {
                 savedCustomer.getCustomerId()
         );
 
+        organizationId =
+                UUID.randomUUID();
+
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
         );
 
         transaction.setTransactionType(
@@ -170,6 +192,12 @@ class TransactionRuleResultControllerIntegrationTest {
 
         transactionId =
                 savedTransaction.getTransactionId();
+
+        authorize(
+                allPermissions(),
+                organizationId,
+                null
+        );
     }
 
     @Test
@@ -740,6 +768,248 @@ class TransactionRuleResultControllerIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        authorize(
+                Set.of("transaction.view"),
+                organizationId,
+                null
+        );
+
+        TransactionRuleResultRequest request =
+                buildRequest(
+                        UUID.randomUUID(),
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("10.00")
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/rule-results",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        JsonNode created =
+                createRuleResult(
+                        UUID.randomUUID(),
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("10.00")
+                );
+
+        UUID ruleResultId =
+                UUID.fromString(
+                        created.get("ruleResultId").asText()
+                );
+
+        authorize(
+                Set.of("transaction.update"),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/{ruleResultId}",
+                                ruleResultId
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationRuleResultById()
+            throws Exception {
+
+        JsonNode created =
+                createRuleResult(
+                        UUID.randomUUID(),
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("10.00")
+                );
+
+        UUID ruleResultId =
+                UUID.fromString(
+                        created.get("ruleResultId").asText()
+                );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/{ruleResultId}",
+                                ruleResultId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationRuleResultList()
+            throws Exception {
+
+        createRuleResult(
+                UUID.randomUUID(),
+                "MATCH",
+                (short) 1,
+                new BigDecimal("10.00")
+        );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/rule-results",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationRuleResultCreate()
+            throws Exception {
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        TransactionRuleResultRequest request =
+                buildRequest(
+                        UUID.randomUUID(),
+                        "MATCH",
+                        (short) 1,
+                        new BigDecimal("10.00")
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/rule-results",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationRuleResultGlobalQueries()
+            throws Exception {
+
+        UUID ruleId =
+                UUID.randomUUID();
+
+        String evaluationResult =
+                "SEC_" +
+                        UUID.randomUUID()
+                                .toString()
+                                .substring(0, 8);
+
+        createRuleResult(
+                ruleId,
+                evaluationResult,
+                (short) 1,
+                new BigDecimal("10.00")
+        );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/rule/{ruleId}",
+                                ruleId
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/rule-results/result/{evaluationResult}",
+                                evaluationResult
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID authorizedOrganizationId,
+            UUID tenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                actorId
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        authorizedOrganizationId,
+                        tenantId,
+                        "transaction-child-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
+    }
     private void softDeleteTransaction() {
 
         Transaction transaction =

@@ -2,10 +2,14 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionScoreRequest;
 import com.efs.modules.transaction.dto.TransactionScoreResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionScoreServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,11 +22,26 @@ public class TransactionScoreController {
     private final TransactionScoreServiceInterface
             transactionScoreService;
 
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
+
     public TransactionScoreController(
-            TransactionScoreServiceInterface transactionScoreService) {
+            TransactionScoreServiceInterface transactionScoreService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
 
         this.transactionScoreService =
                 transactionScoreService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/scores")
@@ -30,11 +49,19 @@ public class TransactionScoreController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionScoreRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionScoreResponse response =
-                transactionScoreService.createScore(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionScoreService
+                                        ::createScore
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -45,8 +72,22 @@ public class TransactionScoreController {
     public ResponseEntity<TransactionScoreResponse> getScoreById(
             @PathVariable UUID scoreId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionScoreService.getScoreById(scoreId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                scoreId,
+                                transactionScoreService
+                                        ::getScoreById,
+                                TransactionScoreResponse
+                                        ::getTransactionId,
+                                "Transaction score not found: "
+                                        + scoreId
+                        )
         );
     }
 
@@ -55,9 +96,18 @@ public class TransactionScoreController {
     getScoresByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionScoreService
-                        .getScoresByTransactionId(transactionId)
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionScoreService
+                                        ::getScoresByTransactionId
+                        )
         );
     }
 
@@ -66,9 +116,22 @@ public class TransactionScoreController {
     getScoresByType(
             @PathVariable String scoreType) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionScoreService
-                        .getScoresByType(scoreType)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionScoreService
+                                                .getScoresByType(
+                                                        scoreType
+                                                ),
+                                TransactionScoreResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -77,9 +140,31 @@ public class TransactionScoreController {
     getScoresByScoringModel(
             @PathVariable String scoringModel) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionScoreService
-                        .getScoresByScoringModel(scoringModel)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionScoreService
+                                                .getScoresByScoringModel(
+                                                        scoringModel
+                                                ),
+                                TransactionScoreResponse
+                                        ::getTransactionId
+                        )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
