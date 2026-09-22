@@ -1,5 +1,18 @@
 package com.efs.modules.rules.controller;
 
+import com.efs.modules.rules.service.RuleAuthorizationServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.util.Set;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.transaction.entity.Transaction;
@@ -38,6 +51,55 @@ class RuleTestingControllerIntegrationTest {
 
     @Autowired
     private TransactionRepository transactionRepository;
+    private static final UUID SECURITY_USER_ID =
+            UUID.fromString(
+                    "10000000-0000-0000-0000-000000000177"
+            );
+
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
+
+    @MockitoBean
+    private RuleAuthorizationServiceInterface
+            ruleAuthorizationService;
+
+    @BeforeEach
+    void setUpRuleSecurity() {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        SECURITY_USER_ID,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(
+                                "rule.view",
+                                "rule.create",
+                                "rule.update",
+                                "rule.activate",
+                                "rule.deactivate",
+                                "rule.test"
+                        ),
+                        Set.of()
+                )
+        );
+
+        when(
+                ruleAuthorizationService
+                        .authorize(
+                                any(
+                                        SecurityContext.class
+                                ),
+                                anyString()
+                        )
+        ).thenReturn(
+                null
+        );
+    }
 
     @Test
     void shouldExecuteControlledTransactionRuleTest()

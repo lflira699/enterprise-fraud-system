@@ -8,8 +8,10 @@ import com.efs.modules.rules.dto.RuleRequest;
 import com.efs.modules.rules.dto.RuleResponse;
 import com.efs.modules.rules.dto.RuleUpdateRequest;
 import com.efs.modules.rules.dto.RuleVersionResponse;
-import com.efs.modules.rules.service.RuleServiceInterface;
-import com.efs.modules.rules.service.RuleTestingService;
+import com.efs.modules.rules.service.RuleAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
+import org.springframework.security.access.AccessDeniedException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,19 +24,21 @@ import java.util.UUID;
 @RequestMapping("/api/v1/rules")
 public class RuleController {
 
-    private final RuleServiceInterface ruleService;
+    private final RuleAccessServiceInterface
+            ruleAccessService;
 
-    private final RuleTestingService ruleTestingService;
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public RuleController(
-            RuleServiceInterface ruleService,
-            RuleTestingService ruleTestingService) {
+            RuleAccessServiceInterface ruleAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.ruleService =
-                ruleService;
+        this.ruleAccessService =
+                ruleAccessService;
 
-        this.ruleTestingService =
-                ruleTestingService;
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -42,7 +46,10 @@ public class RuleController {
             @Valid @RequestBody RuleRequest request) {
 
         RuleResponse response =
-                ruleService.createRule(request);
+                ruleAccessService.createRule(
+                        request,
+                        currentContext()
+                );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -53,7 +60,9 @@ public class RuleController {
     public ResponseEntity<List<RuleResponse>> getRules() {
 
         return ResponseEntity.ok(
-                ruleService.getRules()
+                ruleAccessService.getRules(
+                        currentContext()
+                )
         );
     }
 
@@ -62,7 +71,10 @@ public class RuleController {
             @PathVariable UUID ruleId) {
 
         return ResponseEntity.ok(
-                ruleService.getRuleById(ruleId)
+                ruleAccessService.getRuleById(
+                        ruleId,
+                        currentContext()
+                )
         );
     }
 
@@ -71,7 +83,10 @@ public class RuleController {
             @PathVariable String ruleCode) {
 
         return ResponseEntity.ok(
-                ruleService.getRuleByCode(ruleCode)
+                ruleAccessService.getRuleByCode(
+                        ruleCode,
+                        currentContext()
+                )
         );
     }
 
@@ -80,7 +95,10 @@ public class RuleController {
             @PathVariable String status) {
 
         return ResponseEntity.ok(
-                ruleService.getRulesByStatus(status)
+                ruleAccessService.getRulesByStatus(
+                        status,
+                        currentContext()
+                )
         );
     }
 
@@ -89,7 +107,10 @@ public class RuleController {
             @PathVariable String category) {
 
         return ResponseEntity.ok(
-                ruleService.getRulesByCategory(category)
+                ruleAccessService.getRulesByCategory(
+                        category,
+                        currentContext()
+                )
         );
     }
 
@@ -98,7 +119,10 @@ public class RuleController {
             @PathVariable String severity) {
 
         return ResponseEntity.ok(
-                ruleService.getRulesBySeverity(severity)
+                ruleAccessService.getRulesBySeverity(
+                        severity,
+                        currentContext()
+                )
         );
     }
 
@@ -108,9 +132,10 @@ public class RuleController {
             @Valid @RequestBody RuleUpdateRequest request) {
 
         return ResponseEntity.ok(
-                ruleService.updateRule(
+                ruleAccessService.updateRule(
                         ruleId,
-                        request
+                        request,
+                        currentContext()
                 )
         );
     }
@@ -121,9 +146,10 @@ public class RuleController {
             @Valid @RequestBody RuleActivationRequest request) {
 
         return ResponseEntity.ok(
-                ruleService.activateRule(
+                ruleAccessService.activateRule(
                         ruleId,
-                        request
+                        request,
+                        currentContext()
                 )
         );
     }
@@ -134,9 +160,10 @@ public class RuleController {
             @Valid @RequestBody RuleDeactivationRequest request) {
 
         return ResponseEntity.ok(
-                ruleService.deactivateRule(
+                ruleAccessService.deactivateRule(
                         ruleId,
-                        request
+                        request,
+                        currentContext()
                 )
         );
     }
@@ -150,14 +177,26 @@ public class RuleController {
             @Valid @RequestBody RuleTestingRequest request) {
 
         return ResponseEntity.ok(
-                ruleTestingService.execute(
+                ruleAccessService.testRule(
                         ruleId,
                         ruleVersionId,
-                        request.getSimulationName(),
-                        request.getDatasetReference(),
-                        request.getExecutedBy(),
-                        request.getCorrelationId()
+                        request,
+                        currentContext()
                 )
         );
+    }
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

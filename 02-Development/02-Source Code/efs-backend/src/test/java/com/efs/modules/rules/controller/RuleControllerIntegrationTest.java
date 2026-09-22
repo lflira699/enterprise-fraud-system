@@ -1,5 +1,18 @@
 package com.efs.modules.rules.controller;
 
+import com.efs.modules.rules.service.RuleAuthorizationServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.util.Set;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +46,55 @@ class RuleControllerIntegrationTest {
 
     @Autowired
     private EntityManager entityManager;
+    private static final UUID SECURITY_USER_ID =
+            UUID.fromString(
+                    "10000000-0000-0000-0000-000000000177"
+            );
+
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
+
+    @MockitoBean
+    private RuleAuthorizationServiceInterface
+            ruleAuthorizationService;
+
+    @BeforeEach
+    void setUpRuleSecurity() {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        SECURITY_USER_ID,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(
+                                "rule.view",
+                                "rule.create",
+                                "rule.update",
+                                "rule.activate",
+                                "rule.deactivate",
+                                "rule.test"
+                        ),
+                        Set.of()
+                )
+        );
+
+        when(
+                ruleAuthorizationService
+                        .authorize(
+                                any(
+                                        SecurityContext.class
+                                ),
+                                anyString()
+                        )
+        ).thenReturn(
+                null
+        );
+    }
 
     @Test
     void shouldCreateRuleThroughApi() throws Exception {
@@ -843,5 +905,34 @@ class RuleControllerIntegrationTest {
                 "ACTIVE",
                 0
         );
+    }
+    @Test
+    void shouldReturnForbiddenWhenRuleViewPermissionIsMissing()
+            throws Exception {
+
+        when(
+                ruleAuthorizationService
+                        .authorize(
+                                any(
+                                        SecurityContext.class
+                                ),
+                                eq(
+                                        "rule.view"
+                                )
+                        )
+        ).thenThrow(
+                new AccessDeniedException(
+                        "Missing required permission: rule.view"
+                )
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/rules"
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
     }
 }
