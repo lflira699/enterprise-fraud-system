@@ -7,11 +7,15 @@ import com.efs.shared.pagination.PageResponse;
 import com.efs.modules.alert.dto.AlertRequest;
 import com.efs.modules.alert.dto.AlertResponse;
 import com.efs.modules.alert.dto.AlertStatusUpdateRequest;
-import com.efs.modules.alert.service.AlertServiceInterface;
+import com.efs.modules.alert.service.AlertAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,14 +32,21 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/alerts")
 public class AlertController {
+private final AlertAccessServiceInterface
+            alertAccessService;
 
-    private final AlertServiceInterface alertService;
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public AlertController(
-            AlertServiceInterface alertService) {
+            AlertAccessServiceInterface alertAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.alertService =
-                alertService;
+        this.alertAccessService =
+                alertAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -43,8 +54,9 @@ public class AlertController {
             @Valid @RequestBody AlertRequest request) {
 
         AlertResponse response =
-                alertService.createAlert(
-                        request
+                alertAccessService.createAlert(
+                        request,
+                        currentContext()
                 );
 
         return ResponseEntity
@@ -57,8 +69,9 @@ public class AlertController {
             @PathVariable UUID alertId) {
 
         return ResponseEntity.ok(
-                alertService.getAlertById(
-                        alertId
+                alertAccessService.getAlertById(
+                        alertId,
+                        currentContext()
                 )
         );
     }
@@ -69,9 +82,10 @@ public class AlertController {
             @Valid @RequestBody AlertStatusUpdateRequest request) {
 
         return ResponseEntity.ok(
-                alertService.updateAlertStatus(
+                alertAccessService.updateAlertStatus(
                         alertId,
-                        request
+                        request,
+                        currentContext()
                 )
         );
     }
@@ -82,9 +96,10 @@ public class AlertController {
             @Valid @RequestBody AlertAssignmentRequest request) {
 
         return ResponseEntity.ok(
-                alertService.assignAlert(
+                alertAccessService.assignAlert(
                         alertId,
-                        request
+                        request,
+                        currentContext()
                 )
         );
     }
@@ -95,9 +110,10 @@ public class AlertController {
             @Valid @RequestBody AlertClosureRequest request) {
 
         return ResponseEntity.ok(
-                alertService.closeAlert(
+                alertAccessService.closeAlert(
                         alertId,
-                        request
+                        request,
+                        currentContext()
                 )
         );
     }
@@ -108,8 +124,9 @@ public class AlertController {
             @PathVariable UUID alertId) {
 
         return ResponseEntity.ok(
-                alertService.getAlertHistory(
-                        alertId
+                alertAccessService.getAlertHistory(
+                        alertId,
+                        currentContext()
                 )
         );
     }
@@ -120,8 +137,9 @@ public class AlertController {
             @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-                alertService.getAlertsByTransactionId(
-                        transactionId
+                alertAccessService.getAlertsByTransactionId(
+                        transactionId,
+                        currentContext()
                 )
         );
     }
@@ -132,8 +150,9 @@ public class AlertController {
             @PathVariable UUID decisionId) {
 
         return ResponseEntity.ok(
-                alertService.getAlertsByDecisionId(
-                        decisionId
+                alertAccessService.getAlertsByDecisionId(
+                        decisionId,
+                        currentContext()
                 )
         );
     }
@@ -159,7 +178,7 @@ public class AlertController {
             @RequestParam(defaultValue = "DESC") String direction) {
 
         return ResponseEntity.ok(
-                alertService.searchAlerts(
+                alertAccessService.searchAlerts(
                         status,
                         priority,
                         riskLevel,
@@ -172,8 +191,23 @@ public class AlertController {
                         page,
                         size,
                         sort,
-                        direction
+                        direction,
+                        currentContext()
                 )
         );
+    }
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

@@ -615,6 +615,90 @@ public class AlertService
             String sort,
             String direction) {
 
+        return searchAlertsInternal(
+                status,
+                priority,
+                riskLevel,
+                assignedTo,
+                createdFrom,
+                createdTo,
+                customerId,
+                scenarioCode,
+                caseId,
+                page,
+                size,
+                sort,
+                direction,
+                null,
+                null,
+                false
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AlertResponse> searchAlertsScoped(
+            String status,
+            String priority,
+            String riskLevel,
+            UUID assignedTo,
+            LocalDateTime createdFrom,
+            LocalDateTime createdTo,
+            UUID customerId,
+            String scenarioCode,
+            UUID caseId,
+            int page,
+            int size,
+            String sort,
+            String direction,
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (organizationId == null) {
+
+            throw new IllegalArgumentException(
+                    "organizationId is required for scoped alert search"
+            );
+        }
+
+        return searchAlertsInternal(
+                status,
+                priority,
+                riskLevel,
+                assignedTo,
+                createdFrom,
+                createdTo,
+                customerId,
+                scenarioCode,
+                caseId,
+                page,
+                size,
+                sort,
+                direction,
+                organizationId,
+                tenantId,
+                true
+        );
+    }
+
+    private PageResponse<AlertResponse> searchAlertsInternal(
+            String status,
+            String priority,
+            String riskLevel,
+            UUID assignedTo,
+            LocalDateTime createdFrom,
+            LocalDateTime createdTo,
+            UUID customerId,
+            String scenarioCode,
+            UUID caseId,
+            int page,
+            int size,
+            String sort,
+            String direction,
+            UUID organizationId,
+            UUID tenantId,
+            boolean enforceScope) {
+
         validatePagination(
                 page,
                 size,
@@ -720,6 +804,36 @@ public class AlertService
         Specification<Alert> specification =
                 (root, query, criteriaBuilder) ->
                         criteriaBuilder.conjunction();
+
+        if (enforceScope) {
+
+            UUID filterOrganizationId =
+                    organizationId;
+
+            specification =
+                    specification.and(
+                            (root, query, criteriaBuilder) ->
+                                    criteriaBuilder.equal(
+                                            root.get("organizationId"),
+                                            filterOrganizationId
+                                    )
+                    );
+
+            if (tenantId != null) {
+
+                UUID filterTenantId =
+                        tenantId;
+
+                specification =
+                        specification.and(
+                                (root, query, criteriaBuilder) ->
+                                        criteriaBuilder.equal(
+                                                root.get("tenantId"),
+                                                filterTenantId
+                                        )
+                        );
+            }
+        }
 
         if (normalizedStatus != null) {
 

@@ -1,5 +1,9 @@
 package com.efs.modules.alert.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,14 +11,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -77,8 +84,22 @@ class AlertControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
     @BeforeEach
     void setUp() {
+
+        authorize(
+                allPermissions(),
+                ORGANIZATION_ID,
+                null
+        );
 
         jdbcTemplate.update(
                 """
@@ -1627,6 +1648,102 @@ class AlertControllerIntegrationTest {
                 """,
                 Integer.class,
                 alertId
+        );
+    }
+    @Test
+    void shouldReturnForbiddenWhenReadingAlertWithoutViewPermission()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        authorize(
+                Set.of(),
+                ORGANIZATION_ID,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}",
+                                alertId
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void shouldHideCrossOrganizationAlertById()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        authorize(
+                allPermissions(),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}",
+                                alertId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID authorizedOrganizationId,
+            UUID authorizedTenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        CREATED_BY,
+                        authorizedTenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                CREATED_BY
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        CREATED_BY,
+                        authorizedOrganizationId,
+                        authorizedTenantId,
+                        "alert-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "alert.view",
+                "alert.create",
+                "alert.update",
+                "alert.assign",
+                "alert.close"
         );
     }
 }

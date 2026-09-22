@@ -1,18 +1,25 @@
 package com.efs.modules.alert.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -81,8 +88,24 @@ class AlertSearchControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
     @BeforeEach
     void setUp() {
+
+        authorize(
+                Set.of(
+                        "alert.view"
+                ),
+                ORGANIZATION_ID,
+                null
+        );
 
         jdbcTemplate.update(
                 """
@@ -989,6 +1012,102 @@ class AlertSearchControllerIntegrationTest {
                 "HIGH",
                 LocalDateTime.now(),
                 sourceAlertId
+        );
+    }
+    @Test
+    void shouldReturnForbiddenWhenSearchingWithoutAlertViewPermission()
+            throws Exception {
+
+        authorize(
+                Set.of(),
+                ORGANIZATION_ID,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts"
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void shouldScopeSearchToAuthorizedOrganizationBeforePagination()
+            throws Exception {
+
+        insertAlert(
+                "NEW",
+                "HIGH",
+                null,
+                null,
+                LocalDateTime.now()
+        );
+
+        authorize(
+                Set.of(
+                        "alert.view"
+                ),
+                UUID.randomUUID(),
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/alerts"
+                        )
+                                .param(
+                                        "page",
+                                        "0"
+                                )
+                                .param(
+                                        "size",
+                                        "25"
+                                )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.totalElements"
+                        ).value(0)
+                );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID authorizedOrganizationId,
+            UUID authorizedTenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        ASSIGNED_USER_ID,
+                        authorizedTenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                ASSIGNED_USER_ID
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        ASSIGNED_USER_ID,
+                        authorizedOrganizationId,
+                        authorizedTenantId,
+                        "efs.alert.search@example.com"
+                )
         );
     }
 }

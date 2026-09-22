@@ -124,7 +124,12 @@ class RiskDecisionAlertCaseEndToEndIntegrationTest {
                         null,
                         null,
                         Set.of(),
-                        Set.of("case.view", "transaction.create"),
+                        Set.of(
+                                "case.view",
+                                "transaction.create",
+                                "alert.create",
+                                "alert.view"
+                        ),
                         Set.of()
                 )
         );
