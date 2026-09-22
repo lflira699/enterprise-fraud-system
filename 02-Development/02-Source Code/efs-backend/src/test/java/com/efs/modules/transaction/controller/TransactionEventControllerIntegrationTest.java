@@ -1,10 +1,14 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.transaction.dto.TransactionEventRequest;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,15 +17,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +51,17 @@ class TransactionEventControllerIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
+
+    private UUID organizationId;
     private UUID transactionId;
 
     @BeforeEach
@@ -115,8 +133,11 @@ class TransactionEventControllerIntegrationTest {
                 savedCustomer.getCustomerId()
         );
 
+        organizationId =
+                UUID.randomUUID();
+
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
         );
 
         transaction.setTransactionType(
@@ -170,6 +191,12 @@ class TransactionEventControllerIntegrationTest {
 
         transactionId =
                 savedTransaction.getTransactionId();
+
+        authorize(
+                allPermissions(),
+                organizationId,
+                null
+        );
     }
 
     @Test
@@ -801,6 +828,402 @@ class TransactionEventControllerIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        authorize(
+                Set.of("transaction.view"),
+                organizationId,
+                null
+        );
+
+        TransactionEventRequest request =
+                buildRequest(
+                        "SECURITY_CREATE",
+                        "TRANSACTION"
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/events",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        JsonNode created =
+                createEvent(
+                        "SECURITY_READ",
+                        "TRANSACTION",
+                        null
+                );
+
+        authorize(
+                Set.of("transaction.update"),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/{eventId}",
+                                UUID.fromString(
+                                        created.get("eventId").asText()
+                                )
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationEventById()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                organizationId;
+
+        UUID otherOrganization =
+                UUID.randomUUID();
+
+        UUID otherTransaction =
+                createTransactionForOrganization(
+                        otherOrganization
+                );
+
+        authorize(
+                allPermissions(),
+                otherOrganization,
+                null
+        );
+
+        JsonNode hidden =
+                createEventForTransaction(
+                        otherTransaction,
+                        "SECURITY_ID",
+                        "TRANSACTION",
+                        null
+                );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/{eventId}",
+                                UUID.fromString(
+                                        hidden.get("eventId").asText()
+                                )
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationEventList()
+            throws Exception {
+
+        UUID otherTransaction =
+                createTransactionForOrganization(
+                        UUID.randomUUID()
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/events",
+                                otherTransaction
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationEventCreate()
+            throws Exception {
+
+        UUID otherTransaction =
+                createTransactionForOrganization(
+                        UUID.randomUUID()
+                );
+
+        TransactionEventRequest request =
+                buildRequest(
+                        "SECURITY_CROSS_CREATE",
+                        "TRANSACTION"
+                );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/events",
+                                otherTransaction
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                request
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationEventsFromGlobalQueries()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                organizationId;
+
+        String eventType =
+                "SECURITY_FILTER";
+
+        String componentName =
+                "SECURITY_COMPONENT";
+
+        UUID correlationId =
+                UUID.randomUUID();
+
+        createEvent(
+                eventType,
+                componentName,
+                correlationId
+        );
+
+        UUID otherOrganization =
+                UUID.randomUUID();
+
+        UUID otherTransaction =
+                createTransactionForOrganization(
+                        otherOrganization
+                );
+
+        authorize(
+                allPermissions(),
+                otherOrganization,
+                null
+        );
+
+        createEventForTransaction(
+                otherTransaction,
+                eventType,
+                componentName,
+                correlationId
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/type/{eventType}",
+                                eventType
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(transactionId.toString())
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/component/{componentName}",
+                                componentName
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(transactionId.toString())
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/events/correlation/{correlationId}",
+                                correlationId
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(transactionId.toString())
+                );
+    }
+
+    private UUID createTransactionForOrganization(
+            UUID targetOrganizationId) {
+
+        Transaction source =
+                transactionRepository
+                        .findById(transactionId)
+                        .orElseThrow();
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        Transaction transaction =
+                new Transaction();
+
+        transaction.setTransactionReference(
+                "TEVT-SEC-TXN-" + UUID.randomUUID()
+        );
+
+        transaction.setCustomerId(
+                source.getCustomerId()
+        );
+
+        transaction.setOrganizationId(
+                targetOrganizationId
+        );
+
+        transaction.setTransactionType(
+                "PAYMENT"
+        );
+
+        transaction.setAmount(
+                new BigDecimal("1000.00")
+        );
+
+        transaction.setCurrencyCode(
+                "GTQ"
+        );
+
+        transaction.setTransactionDatetime(
+                now
+        );
+
+        transaction.setTransactionStatus(
+                "RECEIVED"
+        );
+
+        transaction.setFinalDecision(
+                "PENDING"
+        );
+
+        transaction.setFraudScore(
+                BigDecimal.ZERO
+        );
+
+        transaction.setCreatedAt(
+                now
+        );
+
+        transaction.setUpdatedAt(
+                now
+        );
+
+        transaction.setCreatedBy(
+                UUID.randomUUID()
+        );
+
+        transaction.setRecordVersion(
+                0
+        );
+
+        return transactionRepository
+                .saveAndFlush(transaction)
+                .getTransactionId();
+    }
+
+    private JsonNode createEventForTransaction(
+            UUID targetTransactionId,
+            String eventType,
+            String componentName,
+            UUID correlationId)
+            throws Exception {
+
+        TransactionEventRequest request =
+                buildRequest(
+                        eventType,
+                        componentName
+                );
+
+        request.setCorrelationId(
+                correlationId
+        );
+
+        MvcResult result =
+                mockMvc.perform(
+                                post(
+                                        "/api/v1/transactions/{transactionId}/events",
+                                        targetTransactionId
+                                )
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                objectMapper
+                                                        .writeValueAsString(
+                                                                request
+                                                        )
+                                        )
+                        )
+                        .andExpect(status().isCreated())
+                        .andReturn();
+
+        return objectMapper.readTree(
+                result.getResponse()
+                        .getContentAsString()
+        );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID targetOrganizationId,
+            UUID tenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(actorId)
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        targetOrganizationId,
+                        tenantId,
+                        "transaction-event-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
+    }
     private void softDeleteTransaction() {
 
         Transaction transaction =

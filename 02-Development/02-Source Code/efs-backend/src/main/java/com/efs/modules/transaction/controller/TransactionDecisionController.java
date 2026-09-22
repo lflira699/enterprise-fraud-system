@@ -2,10 +2,14 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionDecisionRequest;
 import com.efs.modules.transaction.dto.TransactionDecisionResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionDecisionServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,11 +22,26 @@ public class TransactionDecisionController {
     private final TransactionDecisionServiceInterface
             transactionDecisionService;
 
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
+
     public TransactionDecisionController(
-            TransactionDecisionServiceInterface transactionDecisionService) {
+            TransactionDecisionServiceInterface transactionDecisionService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
 
         this.transactionDecisionService =
                 transactionDecisionService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/decisions")
@@ -30,11 +49,18 @@ public class TransactionDecisionController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionDecisionRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionDecisionResponse response =
-                transactionDecisionService.createDecision(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionDecisionService::createDecision
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -45,8 +71,20 @@ public class TransactionDecisionController {
     public ResponseEntity<TransactionDecisionResponse> getDecisionById(
             @PathVariable UUID decisionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDecisionService.getDecisionById(decisionId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                decisionId,
+                                transactionDecisionService::getDecisionById,
+                                TransactionDecisionResponse::getTransactionId,
+                                "Transaction decision not found: "
+                                        + decisionId
+                        )
         );
     }
 
@@ -55,9 +93,18 @@ public class TransactionDecisionController {
     getDecisionsByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDecisionService
-                        .getDecisionsByTransactionId(transactionId)
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionDecisionService
+                                        ::getDecisionsByTransactionId
+                        )
         );
     }
 
@@ -66,9 +113,22 @@ public class TransactionDecisionController {
     getDecisionsByType(
             @PathVariable String decisionType) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDecisionService
-                        .getDecisionsByType(decisionType)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionDecisionService
+                                                .getDecisionsByType(
+                                                        decisionType
+                                                ),
+                                TransactionDecisionResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -77,9 +137,22 @@ public class TransactionDecisionController {
     getDecisionsBySource(
             @PathVariable String decisionSource) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDecisionService
-                        .getDecisionsBySource(decisionSource)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionDecisionService
+                                                .getDecisionsBySource(
+                                                        decisionSource
+                                                ),
+                                TransactionDecisionResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -88,9 +161,31 @@ public class TransactionDecisionController {
     getDecisionsByFinalStatus(
             @PathVariable Boolean finalDecision) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionDecisionService
-                        .getDecisionsByFinalStatus(finalDecision)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionDecisionService
+                                                .getDecisionsByFinalStatus(
+                                                        finalDecision
+                                                ),
+                                TransactionDecisionResponse
+                                        ::getTransactionId
+                        )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

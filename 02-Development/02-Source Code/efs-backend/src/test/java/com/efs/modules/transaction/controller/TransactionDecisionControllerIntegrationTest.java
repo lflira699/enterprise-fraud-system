@@ -1,6 +1,10 @@
 package com.efs.modules.transaction.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.transaction.dto.TransactionDecisionRequest;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -12,15 +16,18 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,6 +49,16 @@ class TransactionDecisionControllerIntegrationTest {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private final UUID actorId =
+            UUID.randomUUID();
 
     private UUID customerId;
     private UUID transactionId;
@@ -178,6 +195,12 @@ class TransactionDecisionControllerIntegrationTest {
                 now,
                 now,
                 0
+        );
+
+        authorize(
+                allPermissions(),
+                organizationId,
+                null
         );
     }
 
@@ -775,6 +798,481 @@ class TransactionDecisionControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldReturnForbiddenWhenCreatingWithoutTransactionUpdate()
+            throws Exception {
+
+        authorize(
+                Set.of("transaction.view"),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/decisions",
+                                transactionId
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest(
+                                                        "REVIEW",
+                                                        "RISK_ENGINE",
+                                                        new BigDecimal("90.00"),
+                                                        "Forbidden create",
+                                                        false
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingWithoutTransactionView()
+            throws Exception {
+
+        JsonNode created =
+                createDecision(
+                        "REVIEW",
+                        "RISK_ENGINE",
+                        false
+                );
+
+        authorize(
+                Set.of("transaction.update"),
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/decisions/{decisionId}",
+                                UUID.fromString(
+                                        created.get("decisionId").asText()
+                                )
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationDecisionById()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                organizationId;
+
+        UUID otherOrganization =
+                UUID.randomUUID();
+
+        insertOrganization(
+                otherOrganization
+        );
+
+        UUID otherTransaction =
+                UUID.randomUUID();
+
+        UUID otherRiskAssessment =
+                UUID.randomUUID();
+
+        insertAdditionalTransactionForOrganization(
+                otherTransaction,
+                otherOrganization
+        );
+
+        insertRiskAssessmentForOrganization(
+                otherRiskAssessment,
+                otherTransaction,
+                otherOrganization
+        );
+
+        authorize(
+                allPermissions(),
+                otherOrganization,
+                null
+        );
+
+        JsonNode hidden =
+                createDecisionForTransaction(
+                        otherTransaction,
+                        otherRiskAssessment,
+                        "REVIEW",
+                        "RISK_ENGINE",
+                        false
+                );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/decisions/{decisionId}",
+                                UUID.fromString(
+                                        hidden.get("decisionId").asText()
+                                )
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationDecisionList()
+            throws Exception {
+
+        UUID otherOrganization =
+                UUID.randomUUID();
+
+        insertOrganization(
+                otherOrganization
+        );
+
+        UUID otherTransaction =
+                UUID.randomUUID();
+
+        insertAdditionalTransactionForOrganization(
+                otherTransaction,
+                otherOrganization
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/{transactionId}/decisions",
+                                otherTransaction
+                        )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldHideCrossOrganizationDecisionCreate()
+            throws Exception {
+
+        UUID otherOrganization =
+                UUID.randomUUID();
+
+        insertOrganization(
+                otherOrganization
+        );
+
+        UUID otherTransaction =
+                UUID.randomUUID();
+
+        insertAdditionalTransactionForOrganization(
+                otherTransaction,
+                otherOrganization
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/transactions/{transactionId}/decisions",
+                                otherTransaction
+                        )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                buildRequest(
+                                                        "REVIEW",
+                                                        "RISK_ENGINE",
+                                                        new BigDecimal("90.00"),
+                                                        "Cross organization create",
+                                                        false
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldFilterCrossOrganizationDecisionsFromGlobalQueries()
+            throws Exception {
+
+        UUID authorizedOrganization =
+                organizationId;
+
+        createDecision(
+                "REVIEW",
+                "RISK_ENGINE",
+                false
+        );
+
+        UUID otherOrganization =
+                UUID.randomUUID();
+
+        insertOrganization(
+                otherOrganization
+        );
+
+        UUID otherTransaction =
+                UUID.randomUUID();
+
+        UUID otherRiskAssessment =
+                UUID.randomUUID();
+
+        insertAdditionalTransactionForOrganization(
+                otherTransaction,
+                otherOrganization
+        );
+
+        insertRiskAssessmentForOrganization(
+                otherRiskAssessment,
+                otherTransaction,
+                otherOrganization
+        );
+
+        authorize(
+                allPermissions(),
+                otherOrganization,
+                null
+        );
+
+        createDecisionForTransaction(
+                otherTransaction,
+                otherRiskAssessment,
+                "REVIEW",
+                "RISK_ENGINE",
+                false
+        );
+
+        authorize(
+                allPermissions(),
+                authorizedOrganization,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/decisions/type/{decisionType}",
+                                "REVIEW"
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(transactionId.toString())
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/decisions/source/{decisionSource}",
+                                "RISK_ENGINE"
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(transactionId.toString())
+                );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/transactions/decisions/final/{finalDecision}",
+                                false
+                        )
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(
+                        jsonPath("$[0].transactionId")
+                                .value(transactionId.toString())
+                );
+    }
+
+    private void insertOrganization(
+            UUID targetOrganizationId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                targetOrganizationId,
+                "EFS-TD-SEC-" + targetOrganizationId,
+                "EFS Transaction Decision Security "
+                        + targetOrganizationId,
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+    }
+
+    private void insertAdditionalTransactionForOrganization(
+            UUID additionalTransactionId,
+            UUID targetOrganizationId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO transaction.transaction (
+                    transaction_id,
+                    transaction_reference,
+                    customer_id,
+                    organization_id,
+                    transaction_type,
+                    amount,
+                    currency_code,
+                    transaction_status,
+                    final_decision,
+                    fraud_score,
+                    created_by,
+                    record_version
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                additionalTransactionId,
+                "TD-SEC-SECOND-" + additionalTransactionId,
+                customerId,
+                targetOrganizationId,
+                "TEST",
+                new BigDecimal("100.00"),
+                "GTQ",
+                "RECEIVED",
+                "PENDING",
+                BigDecimal.ZERO,
+                createdBy,
+                1
+        );
+    }
+
+    private void insertRiskAssessmentForOrganization(
+            UUID assessmentId,
+            UUID assessmentTransactionId,
+            UUID targetOrganizationId) {
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO transaction.risk_assessment (
+                    risk_assessment_id,
+                    transaction_id,
+                    organization_id,
+                    assessment_type,
+                    assessment_stage,
+                    overall_risk_score,
+                    risk_level,
+                    assessment_result,
+                    confidence_score,
+                    assessment_timestamp,
+                    created_at,
+                    updated_at,
+                    record_version
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                assessmentId,
+                assessmentTransactionId,
+                targetOrganizationId,
+                "TRANSACTION",
+                "DECISION",
+                new BigDecimal("85.00"),
+                "HIGH",
+                "REVIEW",
+                new BigDecimal("90.00"),
+                now,
+                now,
+                now,
+                0
+        );
+    }
+
+    private JsonNode createDecisionForTransaction(
+            UUID targetTransactionId,
+            UUID targetRiskAssessmentId,
+            String decisionType,
+            String decisionSource,
+            Boolean finalDecision)
+            throws Exception {
+
+        TransactionDecisionRequest request =
+                buildRequest(
+                        decisionType,
+                        decisionSource,
+                        new BigDecimal("90.00"),
+                        "Controller security decision",
+                        finalDecision
+                );
+
+        request.setRiskAssessmentId(
+                targetRiskAssessmentId
+        );
+
+        MvcResult result =
+                mockMvc.perform(
+                                post(
+                                        "/api/v1/transactions/{transactionId}/decisions",
+                                        targetTransactionId
+                                )
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                objectMapper
+                                                        .writeValueAsString(
+                                                                request
+                                                        )
+                                        )
+                        )
+                        .andExpect(status().isCreated())
+                        .andReturn();
+
+        return objectMapper.readTree(
+                result.getResponse()
+                        .getContentAsString()
+        );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID targetOrganizationId,
+            UUID tenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        actorId,
+                        tenantId,
+                        null,
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(actorId)
+        ).thenReturn(
+                new UserAccountReference(
+                        actorId,
+                        targetOrganizationId,
+                        tenantId,
+                        "transaction-decision-controller@example.com"
+                )
+        );
+    }
+
+    private Set<String> allPermissions() {
+
+        return Set.of(
+                "transaction.view",
+                "transaction.update"
+        );
+    }
     private void softDeleteTransaction(
             UUID targetTransactionId) {
 

@@ -2,10 +2,14 @@ package com.efs.modules.transaction.controller;
 
 import com.efs.modules.transaction.dto.TransactionLocationRequest;
 import com.efs.modules.transaction.dto.TransactionLocationResponse;
+import com.efs.modules.transaction.service.TransactionChildAccessServiceInterface;
 import com.efs.modules.transaction.service.TransactionLocationServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,10 +22,26 @@ public class TransactionLocationController {
     private final TransactionLocationServiceInterface
             transactionLocationService;
 
-    public TransactionLocationController(
-            TransactionLocationServiceInterface transactionLocationService) {
+    private final TransactionChildAccessServiceInterface
+            transactionChildAccessService;
 
-        this.transactionLocationService = transactionLocationService;
+    private final SecurityContextProvider
+            securityContextProvider;
+
+    public TransactionLocationController(
+            TransactionLocationServiceInterface transactionLocationService,
+            TransactionChildAccessServiceInterface
+                    transactionChildAccessService,
+            SecurityContextProvider securityContextProvider) {
+
+        this.transactionLocationService =
+                transactionLocationService;
+
+        this.transactionChildAccessService =
+                transactionChildAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping("/{transactionId}/locations")
@@ -29,11 +49,18 @@ public class TransactionLocationController {
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionLocationRequest request) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         TransactionLocationResponse response =
-                transactionLocationService.createLocation(
-                        transactionId,
-                        request
-                );
+                transactionChildAccessService
+                        .create(
+                                securityContext,
+                                transactionId,
+                                request,
+                                transactionLocationService::createLocation
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -44,9 +71,20 @@ public class TransactionLocationController {
     public ResponseEntity<TransactionLocationResponse> getLocationById(
             @PathVariable UUID locationId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionLocationService
-                        .getLocationById(locationId)
+                transactionChildAccessService
+                        .getById(
+                                securityContext,
+                                locationId,
+                                transactionLocationService::getLocationById,
+                                TransactionLocationResponse::getTransactionId,
+                                "Transaction location not found: "
+                                        + locationId
+                        )
         );
     }
 
@@ -55,9 +93,18 @@ public class TransactionLocationController {
     getLocationsByTransactionId(
             @PathVariable UUID transactionId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionLocationService
-                        .getLocationsByTransactionId(transactionId)
+                transactionChildAccessService
+                        .getByTransactionId(
+                                securityContext,
+                                transactionId,
+                                transactionLocationService
+                                        ::getLocationsByTransactionId
+                        )
         );
     }
 
@@ -66,9 +113,22 @@ public class TransactionLocationController {
     getLocationsByIpAddress(
             @PathVariable String ipAddress) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionLocationService
-                        .getLocationsByIpAddress(ipAddress)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionLocationService
+                                                .getLocationsByIpAddress(
+                                                        ipAddress
+                                                ),
+                                TransactionLocationResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -77,9 +137,22 @@ public class TransactionLocationController {
     getLocationsByCountryCode(
             @PathVariable String countryCode) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionLocationService
-                        .getLocationsByCountryCode(countryCode)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionLocationService
+                                                .getLocationsByCountryCode(
+                                                        countryCode
+                                                ),
+                                TransactionLocationResponse
+                                        ::getTransactionId
+                        )
         );
     }
 
@@ -88,9 +161,31 @@ public class TransactionLocationController {
     getLocationsByAsn(
             @PathVariable Long asn) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                transactionLocationService
-                        .getLocationsByAsn(asn)
+                transactionChildAccessService
+                        .filterVisible(
+                                securityContext,
+                                () ->
+                                        transactionLocationService
+                                                .getLocationsByAsn(
+                                                        asn
+                                                ),
+                                TransactionLocationResponse
+                                        ::getTransactionId
+                        )
         );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
