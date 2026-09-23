@@ -2,10 +2,13 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.DeviceAnalysisRequest;
 import com.efs.modules.detection.dto.DeviceAnalysisResponse;
-import com.efs.modules.detection.service.DeviceAnalysisServiceInterface;
+import com.efs.modules.detection.service.DeviceAnalysisAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,12 +18,21 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/device-analyses")
 public class DeviceAnalysisController {
 
-    private final DeviceAnalysisServiceInterface deviceAnalysisService;
+    private final DeviceAnalysisAccessServiceInterface
+            deviceAnalysisAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public DeviceAnalysisController(
-            DeviceAnalysisServiceInterface deviceAnalysisService) {
+            DeviceAnalysisAccessServiceInterface deviceAnalysisAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.deviceAnalysisService = deviceAnalysisService;
+        this.deviceAnalysisAccessService =
+                deviceAnalysisAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -29,7 +41,11 @@ public class DeviceAnalysisController {
             @Valid @RequestBody DeviceAnalysisRequest request) {
 
         DeviceAnalysisResponse response =
-                deviceAnalysisService.createDeviceAnalysis(request);
+                deviceAnalysisAccessService
+                        .createDeviceAnalysis(
+                                request,
+                                currentContext()
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -42,9 +58,11 @@ public class DeviceAnalysisController {
             @PathVariable UUID deviceAnalysisId) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getDeviceAnalysisById(
-                        deviceAnalysisId
-                )
+                deviceAnalysisAccessService
+                        .getDeviceAnalysisById(
+                                deviceAnalysisId,
+                                currentContext()
+                        )
         );
     }
 
@@ -54,9 +72,11 @@ public class DeviceAnalysisController {
             @PathVariable UUID customerId) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByCustomer(
-                        customerId
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByCustomer(
+                                customerId,
+                                currentContext()
+                        )
         );
     }
 
@@ -66,9 +86,11 @@ public class DeviceAnalysisController {
             @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByTransaction(
-                        transactionId
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByTransaction(
+                                transactionId,
+                                currentContext()
+                        )
         );
     }
 
@@ -78,9 +100,11 @@ public class DeviceAnalysisController {
             @PathVariable UUID correlationId) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByCorrelation(
-                        correlationId
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByCorrelation(
+                                correlationId,
+                                currentContext()
+                        )
         );
     }
 
@@ -90,9 +114,11 @@ public class DeviceAnalysisController {
             @PathVariable String deviceId) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByDeviceId(
-                        deviceId
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByDeviceId(
+                                deviceId,
+                                currentContext()
+                        )
         );
     }
 
@@ -102,9 +128,11 @@ public class DeviceAnalysisController {
             @PathVariable String deviceFingerprint) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByFingerprint(
-                        deviceFingerprint
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByFingerprint(
+                                deviceFingerprint,
+                                currentContext()
+                        )
         );
     }
 
@@ -114,9 +142,11 @@ public class DeviceAnalysisController {
             @PathVariable String ipAddress) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByIpAddress(
-                        ipAddress
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByIpAddress(
+                                ipAddress,
+                                currentContext()
+                        )
         );
     }
 
@@ -126,9 +156,26 @@ public class DeviceAnalysisController {
             @PathVariable String analysisStatus) {
 
         return ResponseEntity.ok(
-                deviceAnalysisService.getAnalysesByStatus(
-                        analysisStatus
-                )
+                deviceAnalysisAccessService
+                        .getAnalysesByStatus(
+                                analysisStatus,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

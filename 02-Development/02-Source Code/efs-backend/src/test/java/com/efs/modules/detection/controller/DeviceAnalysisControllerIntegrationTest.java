@@ -1,4 +1,6 @@
 package com.efs.modules.detection.controller;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -22,9 +25,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -54,6 +59,35 @@ class DeviceAnalysisControllerIntegrationTest {
     private UUID transactionId;
     private UUID correlationId;
 
+    private static final UUID SECURITY_USER_ID =
+            UUID.fromString(
+                    "d179d179-d179-d179-d179-d179d179d179"
+            );
+
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
+
+    @BeforeEach
+    void setUpSecurityContext() {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        SECURITY_USER_ID,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(
+                                "device.analysis.view",
+                                "device.analysis.create"
+                        ),
+                        Set.of()
+                )
+        );
+    }
     @BeforeEach
     void setUp() {
 
