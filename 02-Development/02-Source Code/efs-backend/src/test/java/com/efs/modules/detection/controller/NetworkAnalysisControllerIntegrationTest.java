@@ -4,6 +4,8 @@ import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.detection.entity.Correlation;
 import com.efs.modules.detection.repository.CorrelationRepository;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -22,9 +25,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +39,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class NetworkAnalysisControllerIntegrationTest {
+
+    private static final UUID SECURITY_USER_ID =
+            UUID.fromString(
+                    "d181d181-d181-d181-d181-d181d181d181"
+            );
+
+    @MockitoBean
+    private SecurityContextProvider
+            securityContextProvider;
 
     @Autowired
     private MockMvc mockMvc;
@@ -53,6 +67,27 @@ class NetworkAnalysisControllerIntegrationTest {
     private UUID customerId;
     private UUID transactionId;
     private UUID correlationId;
+
+    @BeforeEach
+    void setUpSecurityContext() {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        SECURITY_USER_ID,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(
+                                "network.analysis.view",
+                                "network.analysis.create"
+                        ),
+                        Set.of()
+                )
+        );
+    }
 
     @BeforeEach
     void setUp() {

@@ -2,10 +2,13 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.NetworkAnalysisRequest;
 import com.efs.modules.detection.dto.NetworkAnalysisResponse;
-import com.efs.modules.detection.service.NetworkAnalysisServiceInterface;
+import com.efs.modules.detection.service.NetworkAnalysisAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,12 +18,21 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/network-analyses")
 public class NetworkAnalysisController {
 
-    private final NetworkAnalysisServiceInterface networkAnalysisService;
+    private final NetworkAnalysisAccessServiceInterface
+            networkAnalysisAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public NetworkAnalysisController(
-            NetworkAnalysisServiceInterface networkAnalysisService) {
+            NetworkAnalysisAccessServiceInterface networkAnalysisAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.networkAnalysisService = networkAnalysisService;
+        this.networkAnalysisAccessService =
+                networkAnalysisAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -29,7 +41,11 @@ public class NetworkAnalysisController {
             @Valid @RequestBody NetworkAnalysisRequest request) {
 
         NetworkAnalysisResponse response =
-                networkAnalysisService.createNetworkAnalysis(request);
+                networkAnalysisAccessService
+                        .createNetworkAnalysis(
+                                request,
+                                currentContext()
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -42,9 +58,11 @@ public class NetworkAnalysisController {
             @PathVariable UUID networkAnalysisId) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getNetworkAnalysisById(
-                        networkAnalysisId
-                )
+                networkAnalysisAccessService
+                        .getNetworkAnalysisById(
+                                networkAnalysisId,
+                                currentContext()
+                        )
         );
     }
 
@@ -54,9 +72,11 @@ public class NetworkAnalysisController {
             @PathVariable UUID customerId) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getAnalysesByCustomer(
-                        customerId
-                )
+                networkAnalysisAccessService
+                        .getAnalysesByCustomer(
+                                customerId,
+                                currentContext()
+                        )
         );
     }
 
@@ -66,9 +86,11 @@ public class NetworkAnalysisController {
             @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getAnalysesByTransaction(
-                        transactionId
-                )
+                networkAnalysisAccessService
+                        .getAnalysesByTransaction(
+                                transactionId,
+                                currentContext()
+                        )
         );
     }
 
@@ -78,9 +100,11 @@ public class NetworkAnalysisController {
             @PathVariable UUID correlationId) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getAnalysesByCorrelation(
-                        correlationId
-                )
+                networkAnalysisAccessService
+                        .getAnalysesByCorrelation(
+                                correlationId,
+                                currentContext()
+                        )
         );
     }
 
@@ -90,9 +114,11 @@ public class NetworkAnalysisController {
             @PathVariable String networkType) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getAnalysesByType(
-                        networkType
-                )
+                networkAnalysisAccessService
+                        .getAnalysesByType(
+                                networkType,
+                                currentContext()
+                        )
         );
     }
 
@@ -102,9 +128,11 @@ public class NetworkAnalysisController {
             @PathVariable String analysisStatus) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getAnalysesByStatus(
-                        analysisStatus
-                )
+                networkAnalysisAccessService
+                        .getAnalysesByStatus(
+                                analysisStatus,
+                                currentContext()
+                        )
         );
     }
 
@@ -114,9 +142,26 @@ public class NetworkAnalysisController {
             @PathVariable String networkKey) {
 
         return ResponseEntity.ok(
-                networkAnalysisService.getAnalysesByKey(
-                        networkKey
-                )
+                networkAnalysisAccessService
+                        .getAnalysesByKey(
+                                networkKey,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
