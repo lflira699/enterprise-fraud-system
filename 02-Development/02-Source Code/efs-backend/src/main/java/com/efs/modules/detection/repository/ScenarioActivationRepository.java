@@ -12,38 +12,136 @@ import java.util.UUID;
 public interface ScenarioActivationRepository
         extends JpaRepository<ScenarioActivation, UUID> {
 
-    Optional<ScenarioActivation> findByActivationId(
-            UUID activationId
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.activationId = :activationId
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            """
+    )
+    Optional<ScenarioActivation> findScopedByActivationId(
+            @Param("activationId") UUID activationId,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
-    List<ScenarioActivation>
-    findByScenarioIdOrderByTriggeredAtDesc(
-            UUID scenarioId
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.scenarioId = :scenarioId
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            ORDER BY activation.triggeredAt DESC
+            """
+    )
+    List<ScenarioActivation> findScopedByScenarioId(
+            @Param("scenarioId") UUID scenarioId,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
-    List<ScenarioActivation>
-    findByScenarioVersionIdOrderByTriggeredAtDesc(
-            UUID scenarioVersionId
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.scenarioVersionId = :scenarioVersionId
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            ORDER BY activation.triggeredAt DESC
+            """
+    )
+    List<ScenarioActivation> findScopedByScenarioVersionId(
+            @Param("scenarioVersionId") UUID scenarioVersionId,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
-    List<ScenarioActivation>
-    findByTransactionIdOrderByTriggeredAtDesc(
-            UUID transactionId
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.transactionId = :transactionId
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            ORDER BY activation.triggeredAt DESC
+            """
+    )
+    List<ScenarioActivation> findScopedByTransactionId(
+            @Param("transactionId") UUID transactionId,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
-    List<ScenarioActivation>
-    findByCustomerIdOrderByTriggeredAtDesc(
-            UUID customerId
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.customerId = :customerId
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            ORDER BY activation.triggeredAt DESC
+            """
+    )
+    List<ScenarioActivation> findScopedByCustomerId(
+            @Param("customerId") UUID customerId,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
-    List<ScenarioActivation>
-    findByActivationStatusOrderByTriggeredAtDesc(
-            String activationStatus
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.activationStatus = :activationStatus
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            ORDER BY activation.triggeredAt DESC
+            """
+    )
+    List<ScenarioActivation> findScopedByActivationStatus(
+            @Param("activationStatus") String activationStatus,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
-    List<ScenarioActivation>
-    findBySeverityOrderByTriggeredAtDesc(
-            String severity
+    @Query(
+            """
+            SELECT activation
+            FROM ScenarioActivation activation
+            WHERE activation.severity = :severity
+              AND activation.organizationId = :organizationId
+              AND (
+                    :tenantId IS NULL
+                    OR activation.tenantId = :tenantId
+                  )
+            ORDER BY activation.triggeredAt DESC
+            """
+    )
+    List<ScenarioActivation> findScopedBySeverity(
+            @Param("severity") String severity,
+            @Param("organizationId") UUID organizationId,
+            @Param("tenantId") UUID tenantId
     );
 
     @Query(

@@ -1,5 +1,7 @@
 package com.efs.modules.detection.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.detection.entity.DetectionScenario;
@@ -10,6 +12,8 @@ import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,9 +30,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +44,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class ScenarioActivationControllerIntegrationTest {
+
+    private static final UUID SECURITY_USER_ID =
+            UUID.fromString(
+                    "ca182ca1-82ca-182c-a182-ca182ca182ca"
+            );
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,6 +70,13 @@ class ScenarioActivationControllerIntegrationTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
 
     private UUID organizationId;
     private UUID tenantId;
@@ -385,6 +404,8 @@ class ScenarioActivationControllerIntegrationTest {
 
         scenarioVersionId =
                 savedScenarioVersion.getScenarioVersionId();
+
+        authorizeAll();
     }
 
     @Test
@@ -1003,6 +1024,409 @@ class ScenarioActivationControllerIntegrationTest {
                                         )
                                 )
                 );
+    }
+
+
+    @Test
+    void shouldAllowCreateWithScenarioActivationCreatePermissionOnly()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.activation.create"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/detection/scenario-activations"
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                fullRequest(
+                                                        "TRIGGERED",
+                                                        "HIGH"
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(
+                        status().isCreated()
+                );
+    }
+
+    @Test
+    void shouldRejectCreateWithoutScenarioActivationCreatePermission()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/detection/scenario-activations"
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                fullRequest(
+                                                        "TRIGGERED",
+                                                        "HIGH"
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void shouldAllowReadWithScenarioActivationViewPermissionOnly()
+            throws Exception {
+
+        JsonNode created =
+                createActivation(
+                        "TRIGGERED",
+                        "HIGH"
+                );
+
+        UUID activationId =
+                UUID.fromString(
+                        created.get(
+                                "activationId"
+                        ).asText()
+                );
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/{activationId}",
+                                activationId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                );
+    }
+
+    @Test
+    void shouldRejectEveryReadEndpointWithoutScenarioActivationViewPermission()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.activation.create"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/{activationId}",
+                                UUID.randomUUID()
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/scenario/{scenarioId}",
+                                scenarioId
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/scenario-version/{scenarioVersionId}",
+                                scenarioVersionId
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/transaction/{transactionId}",
+                                transactionId
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/customer/{customerId}",
+                                customerId
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/status/{activationStatus}",
+                                "TRIGGERED"
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/severity/{severity}",
+                                "HIGH"
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectAuthenticatedTenantMismatch()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                UUID.randomUUID(),
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/{activationId}",
+                                UUID.randomUUID()
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void organizationLevelActorShouldReadTenantOwnedActivation()
+            throws Exception {
+
+        JsonNode created =
+                createActivation(
+                        "TRIGGERED",
+                        "HIGH"
+                );
+
+        UUID activationId =
+                UUID.fromString(
+                        created.get(
+                                "activationId"
+                        ).asText()
+                );
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                null,
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/{activationId}",
+                                activationId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.activationId")
+                                .value(
+                                        activationId.toString()
+                                )
+                );
+    }
+
+    @Test
+    void crossOrganizationActivationShouldRemainHiddenAsNotFound()
+            throws Exception {
+
+        JsonNode created =
+                createActivation(
+                        "TRIGGERED",
+                        "HIGH"
+                );
+
+        UUID activationId =
+                UUID.fromString(
+                        created.get(
+                                "activationId"
+                        ).asText()
+                );
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                tenantId,
+                UUID.randomUUID(),
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/{activationId}",
+                                activationId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void crossTenantActivationShouldRemainHiddenAsNotFound()
+            throws Exception {
+
+        JsonNode created =
+                createActivation(
+                        "TRIGGERED",
+                        "HIGH"
+                );
+
+        UUID activationId =
+                UUID.fromString(
+                        created.get(
+                                "activationId"
+                        ).asText()
+                );
+
+        UUID otherTenantId =
+                UUID.randomUUID();
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                otherTenantId,
+                organizationId,
+                otherTenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/{activationId}",
+                                activationId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void crossTenantCollectionShouldReturnEmptyCollection()
+            throws Exception {
+
+        createActivation(
+                "TRIGGERED",
+                "HIGH"
+        );
+
+        UUID otherTenantId =
+                UUID.randomUUID();
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view"
+                ),
+                otherTenantId,
+                organizationId,
+                otherTenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-activations/scenario/{scenarioId}",
+                                scenarioId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$").isEmpty()
+                );
+    }
+
+    private void authorizeAll() {
+
+        authorize(
+                Set.of(
+                        "scenario.activation.view",
+                        "scenario.activation.create"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID contextTenantId,
+            UUID actorOrganizationId,
+            UUID actorTenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        SECURITY_USER_ID,
+                        contextTenantId,
+                        UUID.randomUUID(),
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                SECURITY_USER_ID
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        SECURITY_USER_ID,
+                        actorOrganizationId,
+                        actorTenantId,
+                        "scenario.activation.security@example.com"
+                )
+        );
     }
 
     private JsonNode createActivation(

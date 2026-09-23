@@ -9,6 +9,7 @@ import com.efs.modules.detection.mapper.ScenarioActivationMapper;
 import com.efs.modules.detection.repository.ScenarioActivationRepository;
 import com.efs.modules.transaction.dto.TransactionResponse;
 import com.efs.modules.transaction.service.TransactionServiceInterface;
+import com.efs.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -105,7 +106,9 @@ class ScenarioActivationOrganizationalScopeTest {
                 request(
                         transactionId,
                         customerId
-                )
+                ),
+                organizationId,
+                tenantId
         );
 
         ArgumentCaptor<ScenarioActivation> captor =
@@ -156,7 +159,9 @@ class ScenarioActivationOrganizationalScopeTest {
                 request(
                         transactionId,
                         null
-                )
+                ),
+                organizationId,
+                tenantId
         );
 
         ArgumentCaptor<ScenarioActivation> captor =
@@ -206,7 +211,9 @@ class ScenarioActivationOrganizationalScopeTest {
                 request(
                         transactionId,
                         null
-                )
+                ),
+                organizationId,
+                null
         );
 
         ArgumentCaptor<ScenarioActivation> captor =
@@ -260,7 +267,9 @@ class ScenarioActivationOrganizationalScopeTest {
                 request(
                         null,
                         customerId
-                )
+                ),
+                organizationId,
+                tenantId
         );
 
         ArgumentCaptor<ScenarioActivation> captor =
@@ -332,7 +341,9 @@ class ScenarioActivationOrganizationalScopeTest {
                                 request(
                                         transactionId,
                                         customerId
-                                )
+                                ),
+                                organizationId,
+                                transactionTenantId
                         )
         );
 
@@ -389,7 +400,9 @@ class ScenarioActivationOrganizationalScopeTest {
                                 request(
                                         transactionId,
                                         customerId
-                                )
+                                ),
+                                transactionOrganizationId,
+                                tenantId
                         )
         );
 
@@ -424,7 +437,9 @@ class ScenarioActivationOrganizationalScopeTest {
                                 request(
                                         transactionId,
                                         null
-                                )
+                                ),
+                                UUID.randomUUID(),
+                                null
                         )
         );
 
@@ -457,7 +472,9 @@ class ScenarioActivationOrganizationalScopeTest {
                                 request(
                                         null,
                                         customerId
-                                )
+                                ),
+                                UUID.randomUUID(),
+                                null
                         )
         );
 
@@ -477,7 +494,9 @@ class ScenarioActivationOrganizationalScopeTest {
                                 request(
                                         null,
                                         null
-                                )
+                                ),
+                                UUID.randomUUID(),
+                                null
                         )
         );
 
@@ -485,6 +504,143 @@ class ScenarioActivationOrganizationalScopeTest {
                 scenarioActivationRepository,
                 never()
         ).save(any());
+    }
+
+
+    @Test
+    void authorizedOrganizationMismatchShouldFailClosedBeforeSave() {
+
+        UUID transactionId = UUID.randomUUID();
+        UUID actualOrganizationId = UUID.randomUUID();
+        UUID authorizedOrganizationId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+
+        when(
+                transactionService.getTransactionById(
+                        transactionId
+                )
+        ).thenReturn(
+                transactionResponse(
+                        transactionId,
+                        UUID.randomUUID(),
+                        actualOrganizationId,
+                        tenantId
+                )
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> scenarioActivationService
+                        .createScenarioActivation(
+                                request(
+                                        transactionId,
+                                        null
+                                ),
+                                authorizedOrganizationId,
+                                tenantId
+                        )
+        );
+
+        verify(
+                scenarioActivationRepository,
+                never()
+        ).save(any());
+    }
+
+    @Test
+    void authorizedTenantMismatchShouldFailClosedBeforeSave() {
+
+        UUID transactionId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID actualTenantId = UUID.randomUUID();
+        UUID authorizedTenantId = UUID.randomUUID();
+
+        when(
+                transactionService.getTransactionById(
+                        transactionId
+                )
+        ).thenReturn(
+                transactionResponse(
+                        transactionId,
+                        UUID.randomUUID(),
+                        organizationId,
+                        actualTenantId
+                )
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> scenarioActivationService
+                        .createScenarioActivation(
+                                request(
+                                        transactionId,
+                                        null
+                                ),
+                                organizationId,
+                                authorizedTenantId
+                        )
+        );
+
+        verify(
+                scenarioActivationRepository,
+                never()
+        ).save(any());
+    }
+
+    @Test
+    void organizationLevelAuthorizedScopeShouldAllowTenantOwnedActivation() {
+
+        stubScenarioActivationSave();
+
+        UUID transactionId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+
+        when(
+                transactionService.getTransactionById(
+                        transactionId
+                )
+        ).thenReturn(
+                transactionResponse(
+                        transactionId,
+                        UUID.randomUUID(),
+                        organizationId,
+                        tenantId
+                )
+        );
+
+        scenarioActivationService
+                .createScenarioActivation(
+                        request(
+                                transactionId,
+                                null
+                        ),
+                        organizationId,
+                        null
+                );
+
+        ArgumentCaptor<ScenarioActivation> captor =
+                ArgumentCaptor.forClass(
+                        ScenarioActivation.class
+                );
+
+        verify(
+                scenarioActivationRepository
+        ).save(
+                captor.capture()
+        );
+
+        assertEquals(
+                organizationId,
+                captor.getValue()
+                        .getOrganizationId()
+        );
+
+        assertEquals(
+                tenantId,
+                captor.getValue()
+                        .getTenantId()
+        );
     }
 
     private void stubScenarioActivationSave() {

@@ -392,7 +392,9 @@ class ScenarioActivationServiceIntegrationTest {
         ScenarioActivationResponse response =
                 scenarioActivationService
                         .createScenarioActivation(
-                                request
+                                request,
+                                organizationId,
+                                tenantId
                         );
 
         assertNotNull(
@@ -504,7 +506,9 @@ class ScenarioActivationServiceIntegrationTest {
                 IllegalStateException.class,
                 () -> scenarioActivationService
                         .createScenarioActivation(
-                                request
+                                request,
+                                organizationId,
+                                tenantId
                         )
         );
     }
@@ -520,13 +524,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         "HIGH"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse found =
                 scenarioActivationService
                         .getScenarioActivationById(
-                                created.getActivationId()
+                                created.getActivationId(),
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -572,7 +580,9 @@ class ScenarioActivationServiceIntegrationTest {
                 ResourceNotFoundException.class,
                 () -> scenarioActivationService
                         .getScenarioActivationById(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
         );
     }
@@ -588,7 +598,9 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         "HIGH"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse second =
@@ -599,13 +611,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "PENDING",
                                         "MEDIUM"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioActivationResponse> results =
                 scenarioActivationService
                         .getActivationsByScenario(
-                                scenarioId
+                                scenarioId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -648,7 +664,9 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         "HIGH"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse second =
@@ -659,13 +677,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         "LOW"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioActivationResponse> results =
                 scenarioActivationService
                         .getActivationsByScenarioVersion(
-                                scenarioVersionId
+                                scenarioVersionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -708,7 +730,9 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         "HIGH"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse second =
@@ -719,13 +743,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "PENDING",
                                         "MEDIUM"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioActivationResponse> results =
                 scenarioActivationService
                         .getActivationsByTransaction(
-                                transactionId
+                                transactionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -768,7 +796,9 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         "HIGH"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse second =
@@ -779,13 +809,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "PENDING",
                                         "LOW"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioActivationResponse> results =
                 scenarioActivationService
                         .getActivationsByCustomer(
-                                customerId
+                                customerId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -834,7 +868,9 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         status,
                                         "HIGH"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse second =
@@ -845,13 +881,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         status,
                                         "MEDIUM"
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioActivationResponse> results =
                 scenarioActivationService
                         .getActivationsByStatus(
-                                status
+                                status,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -900,7 +940,9 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "TRIGGERED",
                                         severity
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioActivationResponse second =
@@ -911,13 +953,17 @@ class ScenarioActivationServiceIntegrationTest {
                                         customerId,
                                         "PENDING",
                                         severity
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioActivationResponse> results =
                 scenarioActivationService
                         .getActivationsBySeverity(
-                                severity
+                                severity,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -955,7 +1001,9 @@ class ScenarioActivationServiceIntegrationTest {
         assertTrue(
                 scenarioActivationService
                         .getActivationsByScenario(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -963,7 +1011,9 @@ class ScenarioActivationServiceIntegrationTest {
         assertTrue(
                 scenarioActivationService
                         .getActivationsByScenarioVersion(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -971,7 +1021,9 @@ class ScenarioActivationServiceIntegrationTest {
         assertTrue(
                 scenarioActivationService
                         .getActivationsByTransaction(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -979,7 +1031,9 @@ class ScenarioActivationServiceIntegrationTest {
         assertTrue(
                 scenarioActivationService
                         .getActivationsByCustomer(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -990,7 +1044,9 @@ class ScenarioActivationServiceIntegrationTest {
                                 "UNKNOWN_" +
                                         UUID.randomUUID()
                                                 .toString()
-                                                .substring(0, 8)
+                                                .substring(0, 8),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -1001,7 +1057,9 @@ class ScenarioActivationServiceIntegrationTest {
                                 "UNKNOWN_" +
                                         UUID.randomUUID()
                                                 .toString()
-                                                .substring(0, 8)
+                                                .substring(0, 8),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );

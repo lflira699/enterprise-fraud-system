@@ -2,10 +2,13 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.ScenarioActivationRequest;
 import com.efs.modules.detection.dto.ScenarioActivationResponse;
-import com.efs.modules.detection.service.ScenarioActivationServiceInterface;
+import com.efs.modules.detection.service.ScenarioActivationAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,20 +18,35 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/scenario-activations")
 public class ScenarioActivationController {
 
-    private final ScenarioActivationServiceInterface scenarioActivationService;
+    private final ScenarioActivationAccessServiceInterface
+            scenarioActivationAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public ScenarioActivationController(
-            ScenarioActivationServiceInterface scenarioActivationService) {
+            ScenarioActivationAccessServiceInterface
+                    scenarioActivationAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.scenarioActivationService = scenarioActivationService;
+        this.scenarioActivationAccessService =
+                scenarioActivationAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
-    public ResponseEntity<ScenarioActivationResponse> createScenarioActivation(
+    public ResponseEntity<ScenarioActivationResponse>
+    createScenarioActivation(
             @Valid @RequestBody ScenarioActivationRequest request) {
 
         ScenarioActivationResponse response =
-                scenarioActivationService.createScenarioActivation(request);
+                scenarioActivationAccessService
+                        .createScenarioActivation(
+                                request,
+                                currentContext()
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -36,12 +54,16 @@ public class ScenarioActivationController {
     }
 
     @GetMapping("/{activationId}")
-    public ResponseEntity<ScenarioActivationResponse> getScenarioActivationById(
+    public ResponseEntity<ScenarioActivationResponse>
+    getScenarioActivationById(
             @PathVariable UUID activationId) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
-                        .getScenarioActivationById(activationId)
+                scenarioActivationAccessService
+                        .getScenarioActivationById(
+                                activationId,
+                                currentContext()
+                        )
         );
     }
 
@@ -51,8 +73,11 @@ public class ScenarioActivationController {
             @PathVariable UUID scenarioId) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
-                        .getActivationsByScenario(scenarioId)
+                scenarioActivationAccessService
+                        .getActivationsByScenario(
+                                scenarioId,
+                                currentContext()
+                        )
         );
     }
 
@@ -62,9 +87,10 @@ public class ScenarioActivationController {
             @PathVariable UUID scenarioVersionId) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
+                scenarioActivationAccessService
                         .getActivationsByScenarioVersion(
-                                scenarioVersionId
+                                scenarioVersionId,
+                                currentContext()
                         )
         );
     }
@@ -75,8 +101,11 @@ public class ScenarioActivationController {
             @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
-                        .getActivationsByTransaction(transactionId)
+                scenarioActivationAccessService
+                        .getActivationsByTransaction(
+                                transactionId,
+                                currentContext()
+                        )
         );
     }
 
@@ -86,8 +115,11 @@ public class ScenarioActivationController {
             @PathVariable UUID customerId) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
-                        .getActivationsByCustomer(customerId)
+                scenarioActivationAccessService
+                        .getActivationsByCustomer(
+                                customerId,
+                                currentContext()
+                        )
         );
     }
 
@@ -97,8 +129,11 @@ public class ScenarioActivationController {
             @PathVariable String activationStatus) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
-                        .getActivationsByStatus(activationStatus)
+                scenarioActivationAccessService
+                        .getActivationsByStatus(
+                                activationStatus,
+                                currentContext()
+                        )
         );
     }
 
@@ -108,8 +143,25 @@ public class ScenarioActivationController {
             @PathVariable String severity) {
 
         return ResponseEntity.ok(
-                scenarioActivationService
-                        .getActivationsBySeverity(severity)
+                scenarioActivationAccessService
+                        .getActivationsBySeverity(
+                                severity,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied() {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

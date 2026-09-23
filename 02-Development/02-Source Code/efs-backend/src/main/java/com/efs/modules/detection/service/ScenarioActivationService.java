@@ -40,12 +40,16 @@ public class ScenarioActivationService
 
         this.scenarioActivationRepository =
                 scenarioActivationRepository;
+
         this.scenarioActivationMapper =
                 scenarioActivationMapper;
+
         this.transactionService =
                 transactionService;
+
         this.customerService =
                 customerService;
+
         this.tenantOrganizationLookupService =
                 tenantOrganizationLookupService;
     }
@@ -53,27 +57,56 @@ public class ScenarioActivationService
     @Override
     @Transactional
     public ScenarioActivationResponse createScenarioActivation(
-            ScenarioActivationRequest request) {
+            ScenarioActivationRequest request,
+            UUID organizationId,
+            UUID tenantId) {
+
+        Objects.requireNonNull(
+                request,
+                "request is required"
+        );
+
+        requireOrganizationScope(
+                organizationId
+        );
 
         ScenarioActivation activation =
-                scenarioActivationMapper.toEntity(request);
+                scenarioActivationMapper.toEntity(
+                        request
+                );
 
         applyOrganizationalOwnership(
                 activation,
                 request
         );
 
-        LocalDateTime now = LocalDateTime.now();
+        validateAuthorizedScope(
+                activation,
+                organizationId,
+                tenantId
+        );
 
-        activation.setTriggeredAt(now);
-        activation.setCreatedAt(now);
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        activation.setTriggeredAt(
+                now
+        );
+
+        activation.setCreatedAt(
+                now
+        );
 
         ScenarioActivation savedActivation =
-                scenarioActivationRepository.save(activation);
+                scenarioActivationRepository
+                        .save(
+                                activation
+                        );
 
-        return scenarioActivationMapper.toResponse(
-                savedActivation
-        );
+        return scenarioActivationMapper
+                .toResponse(
+                        savedActivation
+                );
     }
 
     private void applyOrganizationalOwnership(
@@ -83,11 +116,13 @@ public class ScenarioActivationService
         if (request.getTransactionId() != null) {
 
             TransactionResponse transaction =
-                    transactionService.getTransactionById(
-                            request.getTransactionId()
-                    );
+                    transactionService
+                            .getTransactionById(
+                                    request.getTransactionId()
+                            );
 
             if (transaction.getOrganizationId() == null) {
+
                 throw new IllegalStateException(
                         "Transaction organizationId is required "
                                 + "for ScenarioActivation organizational scope"
@@ -97,14 +132,16 @@ public class ScenarioActivationService
             if (request.getCustomerId() != null) {
 
                 CustomerResponse customer =
-                        customerService.getCustomerById(
-                                request.getCustomerId()
-                        );
+                        customerService
+                                .getCustomerById(
+                                        request.getCustomerId()
+                                );
 
                 UUID customerTenantId =
                         customer.getTenantId();
 
                 if (customerTenantId == null) {
+
                     throw new IllegalStateException(
                             "Customer tenantId is required "
                                     + "to validate ScenarioActivation "
@@ -118,13 +155,18 @@ public class ScenarioActivationService
                                         customerTenantId
                                 );
 
-                if (!transaction
-                        .getOrganizationId()
-                        .equals(customerOrganizationId)
-                        || !Objects.equals(
-                                transaction.getTenantId(),
-                                customerTenantId
-                        )) {
+                if (
+                    !transaction
+                            .getOrganizationId()
+                            .equals(
+                                    customerOrganizationId
+                            )
+                            ||
+                    !Objects.equals(
+                            transaction.getTenantId(),
+                            customerTenantId
+                    )
+                ) {
 
                     throw new IllegalStateException(
                             "Transaction and Customer organizational "
@@ -147,14 +189,16 @@ public class ScenarioActivationService
         if (request.getCustomerId() != null) {
 
             CustomerResponse customer =
-                    customerService.getCustomerById(
-                            request.getCustomerId()
-                    );
+                    customerService
+                            .getCustomerById(
+                                    request.getCustomerId()
+                            );
 
             UUID customerTenantId =
                     customer.getTenantId();
 
             if (customerTenantId == null) {
+
                 throw new IllegalStateException(
                         "Customer tenantId is required "
                                 + "for ScenarioActivation organizational scope"
@@ -168,6 +212,7 @@ public class ScenarioActivationService
                             );
 
             if (customerOrganizationId == null) {
+
                 throw new IllegalStateException(
                         "Customer organizationId could not be resolved "
                                 + "for ScenarioActivation organizational scope"
@@ -191,14 +236,54 @@ public class ScenarioActivationService
         );
     }
 
+    private void validateAuthorizedScope(
+            ScenarioActivation activation,
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (!organizationId.equals(
+                activation.getOrganizationId()
+        )) {
+
+            throw new ResourceNotFoundException(
+                    "Scenario activation source not found "
+                            + "in authorized scope"
+            );
+        }
+
+        if (
+            tenantId != null
+                    &&
+            !tenantId.equals(
+                    activation.getTenantId()
+            )
+        ) {
+
+            throw new ResourceNotFoundException(
+                    "Scenario activation source not found "
+                            + "in authorized scope"
+            );
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ScenarioActivationResponse getScenarioActivationById(
-            UUID activationId) {
+            UUID activationId,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
+        );
 
         ScenarioActivation activation =
                 scenarioActivationRepository
-                        .findByActivationId(activationId)
+                        .findScopedByActivationId(
+                                activationId,
+                                organizationId,
+                                tenantId
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Scenario activation not found: "
@@ -206,88 +291,159 @@ public class ScenarioActivationService
                                 )
                         );
 
-        return scenarioActivationMapper.toResponse(
-                activation
+        return scenarioActivationMapper
+                .toResponse(
+                        activation
+                );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ScenarioActivationResponse>
+    getActivationsByScenario(
+            UUID scenarioId,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
         );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ScenarioActivationResponse>
-    getActivationsByScenario(UUID scenarioId) {
 
         return scenarioActivationRepository
-                .findByScenarioIdOrderByTriggeredAtDesc(scenarioId)
-                .stream()
-                .map(scenarioActivationMapper::toResponse)
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ScenarioActivationResponse>
-    getActivationsByScenarioVersion(UUID scenarioVersionId) {
-
-        return scenarioActivationRepository
-                .findByScenarioVersionIdOrderByTriggeredAtDesc(
-                        scenarioVersionId
+                .findScopedByScenarioId(
+                        scenarioId,
+                        organizationId,
+                        tenantId
                 )
                 .stream()
-                .map(scenarioActivationMapper::toResponse)
+                .map(
+                        scenarioActivationMapper::toResponse
+                )
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ScenarioActivationResponse>
-    getActivationsByTransaction(UUID transactionId) {
+    getActivationsByScenarioVersion(
+            UUID scenarioVersionId,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
+        );
 
         return scenarioActivationRepository
-                .findByTransactionIdOrderByTriggeredAtDesc(
-                        transactionId
+                .findScopedByScenarioVersionId(
+                        scenarioVersionId,
+                        organizationId,
+                        tenantId
                 )
                 .stream()
-                .map(scenarioActivationMapper::toResponse)
+                .map(
+                        scenarioActivationMapper::toResponse
+                )
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ScenarioActivationResponse>
-    getActivationsByCustomer(UUID customerId) {
+    getActivationsByTransaction(
+            UUID transactionId,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
+        );
 
         return scenarioActivationRepository
-                .findByCustomerIdOrderByTriggeredAtDesc(
-                        customerId
+                .findScopedByTransactionId(
+                        transactionId,
+                        organizationId,
+                        tenantId
                 )
                 .stream()
-                .map(scenarioActivationMapper::toResponse)
+                .map(
+                        scenarioActivationMapper::toResponse
+                )
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ScenarioActivationResponse>
-    getActivationsByStatus(String activationStatus) {
+    getActivationsByCustomer(
+            UUID customerId,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
+        );
 
         return scenarioActivationRepository
-                .findByActivationStatusOrderByTriggeredAtDesc(
-                        activationStatus
+                .findScopedByCustomerId(
+                        customerId,
+                        organizationId,
+                        tenantId
                 )
                 .stream()
-                .map(scenarioActivationMapper::toResponse)
+                .map(
+                        scenarioActivationMapper::toResponse
+                )
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ScenarioActivationResponse>
-    getActivationsBySeverity(String severity) {
+    getActivationsByStatus(
+            String activationStatus,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
+        );
 
         return scenarioActivationRepository
-                .findBySeverityOrderByTriggeredAtDesc(severity)
+                .findScopedByActivationStatus(
+                        activationStatus,
+                        organizationId,
+                        tenantId
+                )
                 .stream()
-                .map(scenarioActivationMapper::toResponse)
+                .map(
+                        scenarioActivationMapper::toResponse
+                )
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ScenarioActivationResponse>
+    getActivationsBySeverity(
+            String severity,
+            UUID organizationId,
+            UUID tenantId) {
+
+        requireOrganizationScope(
+                organizationId
+        );
+
+        return scenarioActivationRepository
+                .findScopedBySeverity(
+                        severity,
+                        organizationId,
+                        tenantId
+                )
+                .stream()
+                .map(
+                        scenarioActivationMapper::toResponse
+                )
                 .toList();
     }
 
@@ -297,13 +453,12 @@ public class ScenarioActivationService
             UUID organizationId,
             UUID tenantId) {
 
-        if (organizationId == null) {
-            throw new IllegalArgumentException(
-                    "organizationId is required"
-            );
-        }
+        requireOrganizationScope(
+                organizationId
+        );
 
         if (tenantId == null) {
+
             return scenarioActivationRepository
                     .countDistinctScenariosByOrganizationIdAndTenantIdIsNull(
                             organizationId
@@ -315,5 +470,16 @@ public class ScenarioActivationService
                         organizationId,
                         tenantId
                 );
+    }
+
+    private void requireOrganizationScope(
+            UUID organizationId) {
+
+        if (organizationId == null) {
+
+            throw new IllegalArgumentException(
+                    "organizationId is required"
+            );
+        }
     }
 }

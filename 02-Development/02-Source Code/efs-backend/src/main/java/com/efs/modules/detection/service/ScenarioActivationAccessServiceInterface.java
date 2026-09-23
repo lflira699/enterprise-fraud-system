@@ -2,62 +2,50 @@ package com.efs.modules.detection.service;
 
 import com.efs.modules.detection.dto.ScenarioActivationRequest;
 import com.efs.modules.detection.dto.ScenarioActivationResponse;
+import com.efs.shared.security.SecurityContext;
 
 import java.util.List;
 import java.util.UUID;
 
-public interface ScenarioActivationServiceInterface {
+public interface ScenarioActivationAccessServiceInterface {
 
     ScenarioActivationResponse createScenarioActivation(
             ScenarioActivationRequest request,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     ScenarioActivationResponse getScenarioActivationById(
             UUID activationId,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     List<ScenarioActivationResponse> getActivationsByScenario(
             UUID scenarioId,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     List<ScenarioActivationResponse> getActivationsByScenarioVersion(
             UUID scenarioVersionId,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     List<ScenarioActivationResponse> getActivationsByTransaction(
             UUID transactionId,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     List<ScenarioActivationResponse> getActivationsByCustomer(
             UUID customerId,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     List<ScenarioActivationResponse> getActivationsByStatus(
             String activationStatus,
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 
     List<ScenarioActivationResponse> getActivationsBySeverity(
             String severity,
-            UUID organizationId,
-            UUID tenantId
-    );
-
-    long countActivatedDetectionScenarios(
-            UUID organizationId,
-            UUID tenantId
+            SecurityContext securityContext
     );
 }

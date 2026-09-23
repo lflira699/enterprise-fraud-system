@@ -370,8 +370,10 @@ class ScenarioActivationRepositoryIntegrationTest {
                 );
 
         Optional<ScenarioActivation> result =
-                scenarioActivationRepository.findByActivationId(
-                        saved.getActivationId()
+                scenarioActivationRepository.findScopedByActivationId(
+                        saved.getActivationId(),
+                        organizationId,
+                        tenantId
                 );
 
         assertTrue(result.isPresent());
@@ -486,8 +488,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         List<ScenarioActivation> result =
                 scenarioActivationRepository
-                        .findByScenarioIdOrderByTriggeredAtDesc(
-                                scenarioId
+                        .findScopedByScenarioId(
+                                scenarioId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -532,8 +536,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         List<ScenarioActivation> result =
                 scenarioActivationRepository
-                        .findByScenarioVersionIdOrderByTriggeredAtDesc(
-                                scenarioVersionId
+                        .findScopedByScenarioVersionId(
+                                scenarioVersionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -578,8 +584,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         List<ScenarioActivation> result =
                 scenarioActivationRepository
-                        .findByTransactionIdOrderByTriggeredAtDesc(
-                                transactionId
+                        .findScopedByTransactionId(
+                                transactionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -624,8 +632,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         List<ScenarioActivation> result =
                 scenarioActivationRepository
-                        .findByCustomerIdOrderByTriggeredAtDesc(
-                                customerId
+                        .findScopedByCustomerId(
+                                customerId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -678,8 +688,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         List<ScenarioActivation> result =
                 scenarioActivationRepository
-                        .findByActivationStatusOrderByTriggeredAtDesc(
-                                "TRIGGERED"
+                        .findScopedByActivationStatus(
+                                "TRIGGERED",
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -742,8 +754,10 @@ class ScenarioActivationRepositoryIntegrationTest {
 
         List<ScenarioActivation> result =
                 scenarioActivationRepository
-                        .findBySeverityOrderByTriggeredAtDesc(
-                                "HIGH"
+                        .findScopedBySeverity(
+                                "HIGH",
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -776,8 +790,10 @@ class ScenarioActivationRepositoryIntegrationTest {
     void shouldReturnEmptyWhenActivationDoesNotExist() {
 
         Optional<ScenarioActivation> result =
-                scenarioActivationRepository.findByActivationId(
-                        UUID.randomUUID()
+                scenarioActivationRepository.findScopedByActivationId(
+                        UUID.randomUUID(),
+                        organizationId,
+                        tenantId
                 );
 
         assertTrue(
