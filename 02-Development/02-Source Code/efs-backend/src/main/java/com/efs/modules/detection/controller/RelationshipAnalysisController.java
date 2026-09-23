@@ -2,10 +2,13 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.RelationshipAnalysisRequest;
 import com.efs.modules.detection.dto.RelationshipAnalysisResponse;
-import com.efs.modules.detection.service.RelationshipAnalysisServiceInterface;
+import com.efs.modules.detection.service.RelationshipAnalysisAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,13 +18,21 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/relationship-analyses")
 public class RelationshipAnalysisController {
 
-    private final RelationshipAnalysisServiceInterface relationshipAnalysisService;
+    private final RelationshipAnalysisAccessServiceInterface
+            relationshipAnalysisAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public RelationshipAnalysisController(
-            RelationshipAnalysisServiceInterface relationshipAnalysisService) {
+            RelationshipAnalysisAccessServiceInterface relationshipAnalysisAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.relationshipAnalysisService =
-                relationshipAnalysisService;
+        this.relationshipAnalysisAccessService =
+                relationshipAnalysisAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -30,9 +41,11 @@ public class RelationshipAnalysisController {
             @Valid @RequestBody RelationshipAnalysisRequest request) {
 
         RelationshipAnalysisResponse response =
-                relationshipAnalysisService.createRelationshipAnalysis(
-                        request
-                );
+                relationshipAnalysisAccessService
+                        .createRelationshipAnalysis(
+                                request,
+                                currentContext()
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -45,9 +58,10 @@ public class RelationshipAnalysisController {
             @PathVariable UUID relationshipAnalysisId) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
+                relationshipAnalysisAccessService
                         .getRelationshipAnalysisById(
-                                relationshipAnalysisId
+                                relationshipAnalysisId,
+                                currentContext()
                         )
         );
     }
@@ -58,8 +72,11 @@ public class RelationshipAnalysisController {
             @PathVariable UUID customerId) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesByCustomer(customerId)
+                relationshipAnalysisAccessService
+                        .getAnalysesByCustomer(
+                                customerId,
+                                currentContext()
+                        )
         );
     }
 
@@ -69,8 +86,11 @@ public class RelationshipAnalysisController {
             @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesByTransaction(transactionId)
+                relationshipAnalysisAccessService
+                        .getAnalysesByTransaction(
+                                transactionId,
+                                currentContext()
+                        )
         );
     }
 
@@ -80,8 +100,11 @@ public class RelationshipAnalysisController {
             @PathVariable UUID correlationId) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesByCorrelation(correlationId)
+                relationshipAnalysisAccessService
+                        .getAnalysesByCorrelation(
+                                correlationId,
+                                currentContext()
+                        )
         );
     }
 
@@ -91,8 +114,11 @@ public class RelationshipAnalysisController {
             @PathVariable String relationshipType) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesByType(relationshipType)
+                relationshipAnalysisAccessService
+                        .getAnalysesByType(
+                                relationshipType,
+                                currentContext()
+                        )
         );
     }
 
@@ -102,8 +128,11 @@ public class RelationshipAnalysisController {
             @PathVariable String sourceEntityKey) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesBySource(sourceEntityKey)
+                relationshipAnalysisAccessService
+                        .getAnalysesBySource(
+                                sourceEntityKey,
+                                currentContext()
+                        )
         );
     }
 
@@ -113,8 +142,11 @@ public class RelationshipAnalysisController {
             @PathVariable String targetEntityKey) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesByTarget(targetEntityKey)
+                relationshipAnalysisAccessService
+                        .getAnalysesByTarget(
+                                targetEntityKey,
+                                currentContext()
+                        )
         );
     }
 
@@ -124,8 +156,26 @@ public class RelationshipAnalysisController {
             @PathVariable String analysisStatus) {
 
         return ResponseEntity.ok(
-                relationshipAnalysisService
-                        .getAnalysesByStatus(analysisStatus)
+                relationshipAnalysisAccessService
+                        .getAnalysesByStatus(
+                                analysisStatus,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
