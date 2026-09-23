@@ -2,11 +2,14 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.DetectionScenarioRequest;
 import com.efs.modules.detection.dto.DetectionScenarioResponse;
-import com.efs.modules.detection.service.DetectionScenarioServiceInterface;
+import com.efs.modules.detection.service.DetectionScenarioAccessServiceInterface;
 import com.efs.shared.pagination.PageResponse;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,13 +19,22 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/scenarios")
 public class DetectionScenarioController {
 
-    private final DetectionScenarioServiceInterface detectionScenarioService;
+    private final DetectionScenarioAccessServiceInterface
+            detectionScenarioAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public DetectionScenarioController(
-            DetectionScenarioServiceInterface detectionScenarioService) {
+            DetectionScenarioAccessServiceInterface
+                    detectionScenarioAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.detectionScenarioService =
-                detectionScenarioService;
+        this.detectionScenarioAccessService =
+                detectionScenarioAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -31,7 +43,10 @@ public class DetectionScenarioController {
             @Valid @RequestBody DetectionScenarioRequest request) {
 
         DetectionScenarioResponse response =
-                detectionScenarioService.createScenario(request);
+                detectionScenarioAccessService.createScenario(
+                        request,
+                        currentContext()
+                );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -61,7 +76,7 @@ public class DetectionScenarioController {
             String direction) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.searchScenarios(
+                detectionScenarioAccessService.searchScenarios(
                         scenarioCode,
                         category,
                         status,
@@ -70,7 +85,8 @@ public class DetectionScenarioController {
                         page,
                         size,
                         sort,
-                        direction
+                        direction,
+                        currentContext()
                 )
         );
     }
@@ -81,8 +97,9 @@ public class DetectionScenarioController {
             @PathVariable UUID scenarioId) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.getScenarioById(
-                        scenarioId
+                detectionScenarioAccessService.getScenarioById(
+                        scenarioId,
+                        currentContext()
                 )
         );
     }
@@ -94,10 +111,11 @@ public class DetectionScenarioController {
             @PathVariable Integer version) {
 
         return ResponseEntity.ok(
-                detectionScenarioService
+                detectionScenarioAccessService
                         .getScenarioByCodeAndVersion(
                                 scenarioCode,
-                                version
+                                version,
+                                currentContext()
                         )
         );
     }
@@ -108,8 +126,9 @@ public class DetectionScenarioController {
             @PathVariable String scenarioCode) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.getScenariosByCode(
-                        scenarioCode
+                detectionScenarioAccessService.getScenariosByCode(
+                        scenarioCode,
+                        currentContext()
                 )
         );
     }
@@ -120,9 +139,11 @@ public class DetectionScenarioController {
             @PathVariable String category) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.getScenariosByCategory(
-                        category
-                )
+                detectionScenarioAccessService
+                        .getScenariosByCategory(
+                                category,
+                                currentContext()
+                        )
         );
     }
 
@@ -132,9 +153,11 @@ public class DetectionScenarioController {
             @PathVariable String status) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.getScenariosByStatus(
-                        status
-                )
+                detectionScenarioAccessService
+                        .getScenariosByStatus(
+                                status,
+                                currentContext()
+                        )
         );
     }
 
@@ -144,9 +167,11 @@ public class DetectionScenarioController {
             @PathVariable String criticality) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.getScenariosByCriticality(
-                        criticality
-                )
+                detectionScenarioAccessService
+                        .getScenariosByCriticality(
+                                criticality,
+                                currentContext()
+                        )
         );
     }
 
@@ -156,9 +181,26 @@ public class DetectionScenarioController {
             @PathVariable String owner) {
 
         return ResponseEntity.ok(
-                detectionScenarioService.getScenariosByOwner(
-                        owner
-                )
+                detectionScenarioAccessService
+                        .getScenariosByOwner(
+                                owner,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
