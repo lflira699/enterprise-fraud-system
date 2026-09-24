@@ -12,6 +12,7 @@ import com.efs.modules.detection.repository.ScenarioVersionRepository;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.ResourceNotFoundException;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,11 @@ class ScenarioEvaluationServiceIntegrationTest {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID scenarioId;
     private UUID scenarioVersionId;
     private UUID customerId;
@@ -58,6 +64,93 @@ class ScenarioEvaluationServiceIntegrationTest {
 
         LocalDateTime now =
                 LocalDateTime.now();
+
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SE-SVC-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Evaluation Service Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SE-SVC-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Evaluation Service Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
 
         Customer customer =
                 new Customer();
@@ -106,6 +199,10 @@ class ScenarioEvaluationServiceIntegrationTest {
                 0
         );
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -126,7 +223,11 @@ class ScenarioEvaluationServiceIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -294,7 +395,9 @@ class ScenarioEvaluationServiceIntegrationTest {
         ScenarioEvaluationResponse response =
                 scenarioEvaluationService
                         .createScenarioEvaluation(
-                                request
+                                request,
+                                organizationId,
+                                tenantId
                         );
 
         assertNotNull(
@@ -420,7 +523,9 @@ class ScenarioEvaluationServiceIntegrationTest {
         ScenarioEvaluationResponse response =
                 scenarioEvaluationService
                         .createScenarioEvaluation(
-                                request
+                                request,
+                                organizationId,
+                                tenantId
                         );
 
         assertNotNull(
@@ -489,13 +594,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "COMPLETED",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse found =
                 scenarioEvaluationService
                         .getScenarioEvaluationById(
-                                created.getEvaluationId()
+                                created.getEvaluationId(),
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -540,7 +649,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                 ResourceNotFoundException.class,
                 () -> scenarioEvaluationService
                         .getScenarioEvaluationById(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
         );
     }
@@ -556,7 +667,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "COMPLETED",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse second =
@@ -567,13 +680,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         null,
                                         "PENDING",
                                         false
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioEvaluationResponse> results =
                 scenarioEvaluationService
                         .getEvaluationsByScenario(
-                                scenarioId
+                                scenarioId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -616,7 +733,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "COMPLETED",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse second =
@@ -627,13 +746,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         null,
                                         "PENDING",
                                         false
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioEvaluationResponse> results =
                 scenarioEvaluationService
                         .getEvaluationsByScenarioVersion(
-                                scenarioVersionId
+                                scenarioVersionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -676,7 +799,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "COMPLETED",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse second =
@@ -687,13 +812,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "PENDING",
                                         false
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioEvaluationResponse> results =
                 scenarioEvaluationService
                         .getEvaluationsByTransaction(
-                                transactionId
+                                transactionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -736,7 +865,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "COMPLETED",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse second =
@@ -747,13 +878,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "PENDING",
                                         false
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioEvaluationResponse> results =
                 scenarioEvaluationService
                         .getEvaluationsByCustomer(
-                                customerId
+                                customerId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -802,7 +937,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         status,
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse second =
@@ -813,13 +950,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         null,
                                         status,
                                         false
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         List<ScenarioEvaluationResponse> results =
                 scenarioEvaluationService
                         .getEvaluationsByStatus(
-                                status
+                                status,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -862,7 +1003,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         customerId,
                                         "MATCHED_TEST",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         ScenarioEvaluationResponse second =
@@ -873,7 +1016,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                         null,
                                         "MATCHED_TEST",
                                         true
-                                )
+                                ),
+                                organizationId,
+                                tenantId
                         );
 
         scenarioEvaluationService
@@ -883,13 +1028,17 @@ class ScenarioEvaluationServiceIntegrationTest {
                                 customerId,
                                 "MATCHED_TEST",
                                 false
-                        )
+                        ),
+                        organizationId,
+                        tenantId
                 );
 
         List<ScenarioEvaluationResponse> results =
                 scenarioEvaluationService
                         .getEvaluationsByMatched(
-                                true
+                                true,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -927,7 +1076,9 @@ class ScenarioEvaluationServiceIntegrationTest {
         assertTrue(
                 scenarioEvaluationService
                         .getEvaluationsByScenario(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -935,7 +1086,9 @@ class ScenarioEvaluationServiceIntegrationTest {
         assertTrue(
                 scenarioEvaluationService
                         .getEvaluationsByScenarioVersion(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -943,7 +1096,9 @@ class ScenarioEvaluationServiceIntegrationTest {
         assertTrue(
                 scenarioEvaluationService
                         .getEvaluationsByTransaction(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -951,7 +1106,9 @@ class ScenarioEvaluationServiceIntegrationTest {
         assertTrue(
                 scenarioEvaluationService
                         .getEvaluationsByCustomer(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -962,7 +1119,9 @@ class ScenarioEvaluationServiceIntegrationTest {
                                 "UNKNOWN_" +
                                         UUID.randomUUID()
                                                 .toString()
-                                                .substring(0, 8)
+                                                .substring(0, 8),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );

@@ -9,34 +9,50 @@ import java.util.UUID;
 public interface ScenarioEvaluationServiceInterface {
 
     ScenarioEvaluationResponse createScenarioEvaluation(
-            ScenarioEvaluationRequest request
+            ScenarioEvaluationRequest request,
+            UUID organizationId,
+            UUID tenantId
     );
 
     ScenarioEvaluationResponse getScenarioEvaluationById(
-            UUID evaluationId
+            UUID evaluationId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationResponse> getEvaluationsByScenario(
-            UUID scenarioId
+            UUID scenarioId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationResponse> getEvaluationsByScenarioVersion(
-            UUID scenarioVersionId
+            UUID scenarioVersionId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationResponse> getEvaluationsByTransaction(
-            UUID transactionId
+            UUID transactionId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationResponse> getEvaluationsByCustomer(
-            UUID customerId
+            UUID customerId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationResponse> getEvaluationsByStatus(
-            String evaluationStatus
+            String evaluationStatus,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationResponse> getEvaluationsByMatched(
-            Boolean matched
+            Boolean matched,
+            UUID organizationId,
+            UUID tenantId
     );
 }

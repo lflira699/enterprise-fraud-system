@@ -3,6 +3,7 @@ package com.efs.modules.detection.repository;
 import com.efs.modules.detection.entity.DetectionScenario;
 import com.efs.modules.detection.entity.ScenarioEvaluation;
 import com.efs.modules.detection.entity.ScenarioVersion;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,11 @@ class ScenarioEvaluationRepositoryIntegrationTest {
     @Autowired
     private DetectionScenarioRepository detectionScenarioRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID scenarioId;
     private UUID scenarioVersionId;
 
@@ -39,6 +45,93 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         LocalDateTime now =
                 LocalDateTime.now();
+
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SE-REP-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Evaluation Repository Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SE-REP-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Evaluation Repository Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
 
         DetectionScenario scenario =
                 new DetectionScenario();
@@ -154,8 +247,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
         );
 
         Optional<ScenarioEvaluation> result =
-                scenarioEvaluationRepository.findByEvaluationId(
-                        saved.getEvaluationId()
+                scenarioEvaluationRepository.findScopedByEvaluationId(
+                        saved.getEvaluationId(),
+                        organizationId,
+                        tenantId
                 );
 
         assertTrue(
@@ -270,8 +365,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         List<ScenarioEvaluation> results =
                 scenarioEvaluationRepository
-                        .findByScenarioIdOrderByEvaluatedAtDesc(
-                                scenarioId
+                        .findScopedByScenarioId(
+                                scenarioId,
+                                organizationId,
+                                tenantId
                         );
 
         int newerIndex =
@@ -325,8 +422,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         List<ScenarioEvaluation> results =
                 scenarioEvaluationRepository
-                        .findByScenarioVersionIdOrderByEvaluatedAtDesc(
-                                scenarioVersionId
+                        .findScopedByScenarioVersionId(
+                                scenarioVersionId,
+                                organizationId,
+                                tenantId
                         );
 
         int newerIndex =
@@ -386,8 +485,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         List<ScenarioEvaluation> results =
                 scenarioEvaluationRepository
-                        .findByEvaluationStatusOrderByEvaluatedAtDesc(
-                                status
+                        .findScopedByEvaluationStatus(
+                                status,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -434,8 +535,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         List<ScenarioEvaluation> results =
                 scenarioEvaluationRepository
-                        .findByMatchedOrderByEvaluatedAtDesc(
-                                true
+                        .findScopedByMatched(
+                                true,
+                                organizationId,
+                                tenantId
                         );
 
         int newerIndex =
@@ -491,8 +594,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         ScenarioEvaluation found =
                 scenarioEvaluationRepository
-                        .findByEvaluationId(
-                                saved.getEvaluationId()
+                        .findScopedByEvaluationId(
+                                saved.getEvaluationId(),
+                                organizationId,
+                                tenantId
                         )
                         .orElseThrow();
 
@@ -546,8 +651,10 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         ScenarioEvaluation found =
                 scenarioEvaluationRepository
-                        .findByEvaluationId(
-                                saved.getEvaluationId()
+                        .findScopedByEvaluationId(
+                                saved.getEvaluationId(),
+                                organizationId,
+                                tenantId
                         )
                         .orElseThrow();
 
@@ -582,6 +689,14 @@ class ScenarioEvaluationRepositoryIntegrationTest {
 
         evaluation.setCustomerId(
                 null
+        );
+
+        evaluation.setOrganizationId(
+                organizationId
+        );
+
+        evaluation.setTenantId(
+                tenantId
         );
 
         evaluation.setEvaluationStatus(

@@ -1,5 +1,7 @@
 package com.efs.modules.detection.controller;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.customer.entity.Customer;
 import com.efs.modules.customer.repository.CustomerRepository;
 import com.efs.modules.detection.entity.DetectionScenario;
@@ -14,12 +16,16 @@ import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +34,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,6 +48,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
+
+    private static final UUID SECURITY_USER_ID =
+            UUID.fromString(
+                    "ef182ca1-82ca-182c-a182-ca182ca182ca"
+            );
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,6 +78,18 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @MockitoBean
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID evaluationId;
     private UUID executionId;
     private UUID scenarioId;
@@ -77,6 +102,93 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
 
         LocalDateTime now =
                 LocalDateTime.now();
+
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SERE-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Evaluation Rule Execution Test Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SERE-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Evaluation Rule Execution Test Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
 
         Customer customer =
                 new Customer();
@@ -125,6 +237,10 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
                 0
         );
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -145,7 +261,11 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -326,6 +446,8 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
 
         executionId =
                 savedRuleExecution.getExecutionId();
+
+        authorizeAll();
     }
 
     @Test
@@ -598,6 +720,377 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
                 );
     }
 
+
+    @Test
+    void shouldAllowChildCreateWithScenarioEvaluationCreatePermissionOnly()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.create"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/detection/scenario-evaluation-rule-executions"
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                validRequest(
+                                                        evaluationId,
+                                                        executionId
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(
+                        status().isCreated()
+                );
+    }
+
+    @Test
+    void shouldRejectChildCreateWithoutScenarioEvaluationCreatePermission()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        post(
+                                "/api/v1/detection/scenario-evaluation-rule-executions"
+                        )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content(
+                                        objectMapper.writeValueAsString(
+                                                validRequest(
+                                                        evaluationId,
+                                                        executionId
+                                                )
+                                        )
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void shouldAllowChildReadWithScenarioEvaluationViewPermissionOnly()
+            throws Exception {
+
+        JsonNode created =
+                createRelation(
+                        evaluationId,
+                        executionId
+                );
+
+        UUID relationId =
+                UUID.fromString(
+                        created.get(
+                                "evaluationRuleExecutionId"
+                        ).asText()
+                );
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/{evaluationRuleExecutionId}",
+                                relationId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                );
+    }
+
+    @Test
+    void shouldRejectEveryChildReadEndpointWithoutScenarioEvaluationViewPermission()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.create"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/{evaluationRuleExecutionId}",
+                                UUID.randomUUID()
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/evaluation/{evaluationId}",
+                                evaluationId
+                        )
+                )
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/execution/{executionId}",
+                                executionId
+                        )
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectChildAuthenticatedTenantMismatch()
+            throws Exception {
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                UUID.randomUUID(),
+                organizationId,
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/{evaluationRuleExecutionId}",
+                                UUID.randomUUID()
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
+
+    @Test
+    void organizationLevelActorShouldReadTenantOwnedChildRelation()
+            throws Exception {
+
+        JsonNode created =
+                createRelation(
+                        evaluationId,
+                        executionId
+                );
+
+        UUID relationId =
+                UUID.fromString(
+                        created.get(
+                                "evaluationRuleExecutionId"
+                        ).asText()
+                );
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                null,
+                organizationId,
+                null
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/{evaluationRuleExecutionId}",
+                                relationId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$.evaluationRuleExecutionId")
+                                .value(
+                                        relationId.toString()
+                                )
+                );
+    }
+
+    @Test
+    void crossOrganizationChildRelationShouldRemainHiddenAsNotFound()
+            throws Exception {
+
+        JsonNode created =
+                createRelation(
+                        evaluationId,
+                        executionId
+                );
+
+        UUID relationId =
+                UUID.fromString(
+                        created.get(
+                                "evaluationRuleExecutionId"
+                        ).asText()
+                );
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                tenantId,
+                UUID.randomUUID(),
+                tenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/{evaluationRuleExecutionId}",
+                                relationId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void crossTenantChildRelationShouldRemainHiddenAsNotFound()
+            throws Exception {
+
+        JsonNode created =
+                createRelation(
+                        evaluationId,
+                        executionId
+                );
+
+        UUID relationId =
+                UUID.fromString(
+                        created.get(
+                                "evaluationRuleExecutionId"
+                        ).asText()
+                );
+
+        UUID otherTenantId =
+                UUID.randomUUID();
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                otherTenantId,
+                organizationId,
+                otherTenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/{evaluationRuleExecutionId}",
+                                relationId
+                        )
+                )
+                .andExpect(
+                        status().isNotFound()
+                );
+    }
+
+    @Test
+    void crossTenantChildCollectionShouldReturnEmptyCollection()
+            throws Exception {
+
+        createRelation(
+                evaluationId,
+                executionId
+        );
+
+        UUID otherTenantId =
+                UUID.randomUUID();
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view"
+                ),
+                otherTenantId,
+                organizationId,
+                otherTenantId
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/detection/scenario-evaluation-rule-executions/evaluation/{evaluationId}",
+                                evaluationId
+                        )
+                )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath("$").isEmpty()
+                );
+    }
+
+    private void authorizeAll() {
+
+        authorize(
+                Set.of(
+                        "scenario.evaluation.view",
+                        "scenario.evaluation.create"
+                ),
+                tenantId,
+                organizationId,
+                tenantId
+        );
+    }
+
+    private void authorize(
+            Set<String> permissions,
+            UUID contextTenantId,
+            UUID actorOrganizationId,
+            UUID actorTenantId) {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        SECURITY_USER_ID,
+                        contextTenantId,
+                        UUID.randomUUID(),
+                        Set.of(),
+                        permissions,
+                        Set.of()
+                )
+        );
+
+        when(
+                userAccountLookupService
+                        .getAuthorizedUser(
+                                SECURITY_USER_ID
+                        )
+        ).thenReturn(
+                new UserAccountReference(
+                        SECURITY_USER_ID,
+                        actorOrganizationId,
+                        actorTenantId,
+                        "scenario.evaluation.security@example.com"
+                )
+        );
+    }
+
     private JsonNode createRelation(
             UUID targetEvaluationId,
             UUID targetExecutionId)
@@ -674,6 +1167,14 @@ class ScenarioEvaluationRuleExecutionControllerIntegrationTest {
 
         evaluation.setCustomerId(
                 customerId
+        );
+
+        evaluation.setOrganizationId(
+                organizationId
+        );
+
+        evaluation.setTenantId(
+                tenantId
         );
 
         evaluation.setEvaluationStatus(

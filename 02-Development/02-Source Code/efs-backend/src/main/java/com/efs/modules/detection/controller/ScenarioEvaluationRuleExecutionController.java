@@ -2,10 +2,13 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.ScenarioEvaluationRuleExecutionRequest;
 import com.efs.modules.detection.dto.ScenarioEvaluationRuleExecutionResponse;
-import com.efs.modules.detection.service.ScenarioEvaluationRuleExecutionServiceInterface;
+import com.efs.modules.detection.service.ScenarioEvaluationAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,12 +18,22 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/scenario-evaluation-rule-executions")
 public class ScenarioEvaluationRuleExecutionController {
 
-    private final ScenarioEvaluationRuleExecutionServiceInterface service;
+    private final ScenarioEvaluationAccessServiceInterface
+            scenarioEvaluationAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public ScenarioEvaluationRuleExecutionController(
-            ScenarioEvaluationRuleExecutionServiceInterface service) {
+            ScenarioEvaluationAccessServiceInterface
+                    scenarioEvaluationAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.service = service;
+        this.scenarioEvaluationAccessService =
+                scenarioEvaluationAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
@@ -31,7 +44,11 @@ public class ScenarioEvaluationRuleExecutionController {
             ScenarioEvaluationRuleExecutionRequest request) {
 
         ScenarioEvaluationRuleExecutionResponse response =
-                service.createScenarioEvaluationRuleExecution(request);
+                scenarioEvaluationAccessService
+                        .createScenarioEvaluationRuleExecution(
+                                request,
+                                currentContext()
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -44,9 +61,11 @@ public class ScenarioEvaluationRuleExecutionController {
             @PathVariable UUID evaluationRuleExecutionId) {
 
         return ResponseEntity.ok(
-                service.getScenarioEvaluationRuleExecutionById(
-                        evaluationRuleExecutionId
-                )
+                scenarioEvaluationAccessService
+                        .getScenarioEvaluationRuleExecutionById(
+                                evaluationRuleExecutionId,
+                                currentContext()
+                        )
         );
     }
 
@@ -56,9 +75,11 @@ public class ScenarioEvaluationRuleExecutionController {
             @PathVariable UUID evaluationId) {
 
         return ResponseEntity.ok(
-                service.getRuleExecutionsByEvaluation(
-                        evaluationId
-                )
+                scenarioEvaluationAccessService
+                        .getRuleExecutionsByEvaluation(
+                                evaluationId,
+                                currentContext()
+                        )
         );
     }
 
@@ -68,9 +89,26 @@ public class ScenarioEvaluationRuleExecutionController {
             @PathVariable UUID executionId) {
 
         return ResponseEntity.ok(
-                service.getEvaluationsByRuleExecution(
-                        executionId
-                )
+                scenarioEvaluationAccessService
+                        .getEvaluationsByRuleExecution(
+                                executionId,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }

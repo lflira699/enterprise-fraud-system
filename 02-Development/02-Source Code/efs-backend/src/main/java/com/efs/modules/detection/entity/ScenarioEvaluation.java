@@ -36,6 +36,12 @@ public class ScenarioEvaluation {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
+    @Column(name = "tenant_id")
+    private UUID tenantId;
+
     @Column(name = "evaluation_status", nullable = false, length = 30)
     private String evaluationStatus;
 
@@ -116,6 +122,22 @@ public class ScenarioEvaluation {
         this.customerId = customerId;
     }
 
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(UUID organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(UUID tenantId) {
+        this.tenantId = tenantId;
+    }
+
     public String getEvaluationStatus() {
         return evaluationStatus;
     }
@@ -154,6 +176,7 @@ public class ScenarioEvaluation {
 
     public void setRequiredEvidenceCount(
             Short requiredEvidenceCount) {
+
         this.requiredEvidenceCount =
                 requiredEvidenceCount;
     }
@@ -164,6 +187,7 @@ public class ScenarioEvaluation {
 
     public void setAvailableEvidenceCount(
             Short availableEvidenceCount) {
+
         this.availableEvidenceCount =
                 availableEvidenceCount;
     }
@@ -182,6 +206,7 @@ public class ScenarioEvaluation {
 
     public void setRiskContribution(
             BigDecimal riskContribution) {
+
         this.riskContribution = riskContribution;
     }
 
@@ -199,6 +224,7 @@ public class ScenarioEvaluation {
 
     public void setEvaluationDurationMs(
             Long evaluationDurationMs) {
+
         this.evaluationDurationMs =
                 evaluationDurationMs;
     }
@@ -209,6 +235,7 @@ public class ScenarioEvaluation {
 
     public void setEvaluationContext(
             Map<String, Object> evaluationContext) {
+
         this.evaluationContext =
                 evaluationContext;
     }

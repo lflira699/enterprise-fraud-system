@@ -10,6 +10,7 @@ import com.efs.modules.rules.entity.RuleExecution;
 import com.efs.modules.rules.repository.RuleExecutionRepository;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,11 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID evaluationId;
     private UUID executionId;
     private UUID transactionId;
@@ -58,6 +64,93 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         LocalDateTime now =
                 LocalDateTime.now();
+
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SERE-REP-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Evaluation Rule Execution Repository Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SERE-REP-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Evaluation Rule Execution Repository Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
 
         Customer customer =
                 new Customer();
@@ -106,6 +199,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
                 0
         );
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -123,7 +220,11 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -289,6 +390,14 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
                 savedCustomer.getCustomerId()
         );
 
+        evaluation.setOrganizationId(
+                organizationId
+        );
+
+        evaluation.setTenantId(
+                tenantId
+        );
+
         evaluation.setEvaluationStatus(
                 "COMPLETED"
         );
@@ -377,8 +486,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
         );
 
         Optional<ScenarioEvaluationRuleExecution> result =
-                repository.findByEvaluationRuleExecutionId(
-                        saved.getEvaluationRuleExecutionId()
+                repository.findScopedByEvaluationRuleExecutionId(
+                        saved.getEvaluationRuleExecutionId(),
+                        organizationId,
+                        tenantId
                 );
 
         assertTrue(
@@ -432,8 +543,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         List<ScenarioEvaluationRuleExecution> results =
                 repository
-                        .findByEvaluationIdOrderByCreatedAtAsc(
-                                evaluationId
+                        .findScopedByEvaluationId(
+                                evaluationId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -483,8 +596,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         List<ScenarioEvaluationRuleExecution> results =
                 repository
-                        .findByExecutionIdOrderByCreatedAtAsc(
-                                executionId
+                        .findScopedByExecutionId(
+                                executionId,
+                                organizationId,
+                                tenantId
                         );
 
         assertEquals(
@@ -569,8 +684,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         List<ScenarioEvaluationRuleExecution> results =
                 repository
-                        .findByEvaluationIdOrderByCreatedAtAsc(
-                                UUID.randomUUID()
+                        .findScopedByEvaluationId(
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         );
 
         assertTrue(
@@ -583,8 +700,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         List<ScenarioEvaluationRuleExecution> results =
                 repository
-                        .findByExecutionIdOrderByCreatedAtAsc(
-                                UUID.randomUUID()
+                        .findScopedByExecutionId(
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         );
 
         assertTrue(
@@ -684,8 +803,10 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         ScenarioEvaluation existing =
                 scenarioEvaluationRepository
-                        .findByEvaluationId(
-                                evaluationId
+                        .findScopedByEvaluationId(
+                                evaluationId,
+                                organizationId,
+                                tenantId
                         )
                         .orElseThrow();
 
@@ -706,6 +827,14 @@ class ScenarioEvaluationRuleExecutionRepositoryIntegrationTest {
 
         evaluation.setCustomerId(
                 existing.getCustomerId()
+        );
+
+        evaluation.setOrganizationId(
+                organizationId
+        );
+
+        evaluation.setTenantId(
+                tenantId
         );
 
         evaluation.setEvaluationStatus(

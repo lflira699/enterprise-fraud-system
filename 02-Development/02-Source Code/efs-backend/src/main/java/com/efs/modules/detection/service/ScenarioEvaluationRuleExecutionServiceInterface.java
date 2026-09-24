@@ -10,21 +10,29 @@ public interface ScenarioEvaluationRuleExecutionServiceInterface {
 
     ScenarioEvaluationRuleExecutionResponse
     createScenarioEvaluationRuleExecution(
-            ScenarioEvaluationRuleExecutionRequest request
+            ScenarioEvaluationRuleExecutionRequest request,
+            UUID organizationId,
+            UUID tenantId
     );
 
     ScenarioEvaluationRuleExecutionResponse
     getScenarioEvaluationRuleExecutionById(
-            UUID evaluationRuleExecutionId
+            UUID evaluationRuleExecutionId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationRuleExecutionResponse>
     getRuleExecutionsByEvaluation(
-            UUID evaluationId
+            UUID evaluationId,
+            UUID organizationId,
+            UUID tenantId
     );
 
     List<ScenarioEvaluationRuleExecutionResponse>
     getEvaluationsByRuleExecution(
-            UUID executionId
+            UUID executionId,
+            UUID organizationId,
+            UUID tenantId
     );
 }

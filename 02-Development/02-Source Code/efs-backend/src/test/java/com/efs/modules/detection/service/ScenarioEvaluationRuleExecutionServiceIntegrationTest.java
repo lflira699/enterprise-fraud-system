@@ -16,6 +16,7 @@ import com.efs.modules.rules.repository.RuleExecutionRepository;
 import com.efs.modules.transaction.entity.Transaction;
 import com.efs.modules.transaction.repository.TransactionRepository;
 import com.efs.shared.exception.ResourceNotFoundException;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,11 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    private UUID organizationId;
+    private UUID tenantId;
     private UUID evaluationId;
     private UUID executionId;
     private UUID scenarioId;
@@ -69,6 +75,93 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
 
         LocalDateTime now =
                 LocalDateTime.now();
+
+        organizationId =
+                UUID.randomUUID();
+
+        tenantId =
+                UUID.randomUUID();
+
+        String scopeSuffix =
+                UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.organization (
+                            organization_id,
+                            organization_code,
+                            legal_name,
+                            country_code,
+                            timezone,
+                            status
+                        )
+                        VALUES (
+                            :organizationId,
+                            :organizationCode,
+                            :legalName,
+                            'GT',
+                            'America/Guatemala',
+                            'ACTIVE'
+                        )
+                        """
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "organizationCode",
+                        "SERE-SVC-ORG-" + scopeSuffix
+                )
+                .setParameter(
+                        "legalName",
+                        "Scenario Evaluation Rule Execution Service Organization "
+                                + scopeSuffix
+                )
+                .executeUpdate();
+
+        entityManager
+                .createNativeQuery(
+                        """
+                        INSERT INTO administration.tenant (
+                            tenant_id,
+                            organization_id,
+                            tenant_code,
+                            tenant_name,
+                            status,
+                            environment
+                        )
+                        VALUES (
+                            :tenantId,
+                            :organizationId,
+                            :tenantCode,
+                            :tenantName,
+                            'ACTIVE',
+                            'TEST'
+                        )
+                        """
+                )
+                .setParameter(
+                        "tenantId",
+                        tenantId
+                )
+                .setParameter(
+                        "organizationId",
+                        organizationId
+                )
+                .setParameter(
+                        "tenantCode",
+                        "SERE-SVC-TEN-" + scopeSuffix
+                )
+                .setParameter(
+                        "tenantName",
+                        "Scenario Evaluation Rule Execution Service Tenant "
+                                + scopeSuffix
+                )
+                .executeUpdate();
 
         Customer customer =
                 new Customer();
@@ -117,6 +210,10 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                 0
         );
 
+        customer.setTenantId(
+                tenantId
+        );
+
         Customer savedCustomer =
                 customerRepository.saveAndFlush(
                         customer
@@ -137,7 +234,11 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
         );
 
         transaction.setOrganizationId(
-                UUID.randomUUID()
+                organizationId
+        );
+
+        transaction.setTenantId(
+                tenantId
         );
 
         transaction.setTransactionType(
@@ -331,7 +432,9 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
 
         ScenarioEvaluationRuleExecutionResponse response =
                 service.createScenarioEvaluationRuleExecution(
-                        request
+                        request,
+                        organizationId,
+                        tenantId
                 );
 
         assertNotNull(
@@ -371,12 +474,16 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                         buildRequest(
                                 evaluationId,
                                 executionId
-                        )
+                        ),
+                        organizationId,
+                        tenantId
                 );
 
         ScenarioEvaluationRuleExecutionResponse found =
                 service.getScenarioEvaluationRuleExecutionById(
-                        created.getEvaluationRuleExecutionId()
+                        created.getEvaluationRuleExecutionId(),
+                        organizationId,
+                        tenantId
                 );
 
         assertEquals(
@@ -406,7 +513,9 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                 ResourceNotFoundException.class,
                 () -> service
                         .getScenarioEvaluationRuleExecutionById(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
         );
     }
@@ -419,7 +528,9 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                         buildRequest(
                                 evaluationId,
                                 executionId
-                        )
+                        ),
+                        organizationId,
+                        tenantId
                 );
 
         RuleExecution secondExecution =
@@ -436,12 +547,16 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                         buildRequest(
                                 evaluationId,
                                 secondExecution.getExecutionId()
-                        )
+                        ),
+                        organizationId,
+                        tenantId
                 );
 
         List<ScenarioEvaluationRuleExecutionResponse> results =
                 service.getRuleExecutionsByEvaluation(
-                        evaluationId
+                        evaluationId,
+                        organizationId,
+                        tenantId
                 );
 
         assertEquals(
@@ -481,7 +596,9 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                         buildRequest(
                                 evaluationId,
                                 executionId
-                        )
+                        ),
+                        organizationId,
+                        tenantId
                 );
 
         ScenarioEvaluation secondEvaluation =
@@ -497,12 +614,16 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
                         buildRequest(
                                 secondEvaluation.getEvaluationId(),
                                 executionId
-                        )
+                        ),
+                        organizationId,
+                        tenantId
                 );
 
         List<ScenarioEvaluationRuleExecutionResponse> results =
                 service.getEvaluationsByRuleExecution(
-                        executionId
+                        executionId,
+                        organizationId,
+                        tenantId
                 );
 
         assertEquals(
@@ -539,14 +660,18 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
 
         assertTrue(
                 service.getRuleExecutionsByEvaluation(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
 
         assertTrue(
                 service.getEvaluationsByRuleExecution(
-                                UUID.randomUUID()
+                                UUID.randomUUID(),
+                                organizationId,
+                                tenantId
                         )
                         .isEmpty()
         );
@@ -591,6 +716,14 @@ class ScenarioEvaluationRuleExecutionServiceIntegrationTest {
 
         evaluation.setCustomerId(
                 customerId
+        );
+
+        evaluation.setOrganizationId(
+                organizationId
+        );
+
+        evaluation.setTenantId(
+                tenantId
         );
 
         evaluation.setEvaluationStatus(

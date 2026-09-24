@@ -2,10 +2,13 @@ package com.efs.modules.detection.controller;
 
 import com.efs.modules.detection.dto.ScenarioEvaluationRequest;
 import com.efs.modules.detection.dto.ScenarioEvaluationResponse;
-import com.efs.modules.detection.service.ScenarioEvaluationServiceInterface;
+import com.efs.modules.detection.service.ScenarioEvaluationAccessServiceInterface;
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,20 +18,35 @@ import java.util.UUID;
 @RequestMapping("/api/v1/detection/scenario-evaluations")
 public class ScenarioEvaluationController {
 
-    private final ScenarioEvaluationServiceInterface scenarioEvaluationService;
+    private final ScenarioEvaluationAccessServiceInterface
+            scenarioEvaluationAccessService;
+
+    private final SecurityContextProvider
+            securityContextProvider;
 
     public ScenarioEvaluationController(
-            ScenarioEvaluationServiceInterface scenarioEvaluationService) {
+            ScenarioEvaluationAccessServiceInterface
+                    scenarioEvaluationAccessService,
+            SecurityContextProvider securityContextProvider) {
 
-        this.scenarioEvaluationService = scenarioEvaluationService;
+        this.scenarioEvaluationAccessService =
+                scenarioEvaluationAccessService;
+
+        this.securityContextProvider =
+                securityContextProvider;
     }
 
     @PostMapping
-    public ResponseEntity<ScenarioEvaluationResponse> createScenarioEvaluation(
+    public ResponseEntity<ScenarioEvaluationResponse>
+    createScenarioEvaluation(
             @Valid @RequestBody ScenarioEvaluationRequest request) {
 
         ScenarioEvaluationResponse response =
-                scenarioEvaluationService.createScenarioEvaluation(request);
+                scenarioEvaluationAccessService
+                        .createScenarioEvaluation(
+                                request,
+                                currentContext()
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -41,8 +59,11 @@ public class ScenarioEvaluationController {
             @PathVariable UUID evaluationId) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
-                        .getScenarioEvaluationById(evaluationId)
+                scenarioEvaluationAccessService
+                        .getScenarioEvaluationById(
+                                evaluationId,
+                                currentContext()
+                        )
         );
     }
 
@@ -52,8 +73,11 @@ public class ScenarioEvaluationController {
             @PathVariable UUID scenarioId) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
-                        .getEvaluationsByScenario(scenarioId)
+                scenarioEvaluationAccessService
+                        .getEvaluationsByScenario(
+                                scenarioId,
+                                currentContext()
+                        )
         );
     }
 
@@ -63,9 +87,10 @@ public class ScenarioEvaluationController {
             @PathVariable UUID scenarioVersionId) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
+                scenarioEvaluationAccessService
                         .getEvaluationsByScenarioVersion(
-                                scenarioVersionId
+                                scenarioVersionId,
+                                currentContext()
                         )
         );
     }
@@ -76,8 +101,11 @@ public class ScenarioEvaluationController {
             @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
-                        .getEvaluationsByTransaction(transactionId)
+                scenarioEvaluationAccessService
+                        .getEvaluationsByTransaction(
+                                transactionId,
+                                currentContext()
+                        )
         );
     }
 
@@ -87,8 +115,11 @@ public class ScenarioEvaluationController {
             @PathVariable UUID customerId) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
-                        .getEvaluationsByCustomer(customerId)
+                scenarioEvaluationAccessService
+                        .getEvaluationsByCustomer(
+                                customerId,
+                                currentContext()
+                        )
         );
     }
 
@@ -98,8 +129,11 @@ public class ScenarioEvaluationController {
             @PathVariable String evaluationStatus) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
-                        .getEvaluationsByStatus(evaluationStatus)
+                scenarioEvaluationAccessService
+                        .getEvaluationsByStatus(
+                                evaluationStatus,
+                                currentContext()
+                        )
         );
     }
 
@@ -109,8 +143,26 @@ public class ScenarioEvaluationController {
             @PathVariable Boolean matched) {
 
         return ResponseEntity.ok(
-                scenarioEvaluationService
-                        .getEvaluationsByMatched(matched)
+                scenarioEvaluationAccessService
+                        .getEvaluationsByMatched(
+                                matched,
+                                currentContext()
+                        )
         );
+    }
+
+    private SecurityContext currentContext() {
+
+        return securityContextProvider
+                .getCurrentContext();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Void> handleAccessDenied(
+            AccessDeniedException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .build();
     }
 }
