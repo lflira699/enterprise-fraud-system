@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
 import AlertsPage from '../modules/alerts/pages/AlertsPage'
+import AuditPage from '../modules/audit/pages/AuditPage'
 import CasesPage from '../modules/cases/pages/CasesPage'
 import ConfigurationPage from '../modules/configuration/pages/ConfigurationPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
@@ -107,11 +108,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.audit}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.audit}
-            />
-          }
+          element={<AuditPage />}
         />
       </Routes>
     </AppLayout>

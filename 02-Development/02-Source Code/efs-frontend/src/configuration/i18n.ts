@@ -24,6 +24,50 @@ const resources = {
         audit: 'Auditoría',
       },
 
+      auditLog: {
+        title:
+          'Revisión de auditoría',
+        error:
+          'No fue posible cargar los eventos de auditoría.',
+        noRows:
+          'No hay eventos de auditoría disponibles.',
+
+        filters: {
+          userId:
+            'Usuario',
+          from:
+            'Desde',
+          to:
+            'Hasta',
+          entityType:
+            'Tipo de entidad',
+          entityId:
+            'ID de entidad',
+          action:
+            'Acción',
+          apply:
+            'Buscar',
+          clear:
+            'Limpiar',
+        },
+
+        columns: {
+          eventTimestamp:
+            'Fecha y hora',
+          eventType:
+            'Tipo de evento',
+          entityType:
+            'Tipo de entidad',
+          action:
+            'Acción',
+          sourceComponent:
+            'Componente',
+          eventResult:
+            'Resultado',
+          userId:
+            'Usuario',
+        },
+      },
       reports: {
         generation: {
           title:
