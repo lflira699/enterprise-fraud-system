@@ -93,6 +93,94 @@ const resources = {
         },
       },
 
+      systemConfiguration: {
+        title:
+          'Configuración del sistema',
+        loading:
+          'Cargando configuración.',
+        yes:
+          'Sí',
+        no:
+          'No',
+        fields: {
+          tenantId:
+            'ID de tenant',
+          configurationKey:
+            'Clave de configuración',
+          configurationValue:
+            'Valor',
+          configurationType:
+            'Tipo',
+          effectiveScope:
+            'Scope efectivo',
+          critical:
+            'Crítica',
+          justification:
+            'Justificación',
+          affectedEnvironment:
+            'Ambiente afectado',
+          riskAssessment:
+            'Evaluación de riesgo',
+          expectedResult:
+            'Resultado esperado',
+          rollbackPlan:
+            'Plan de reversión',
+          proposedValue:
+            'Valor propuesto',
+          changeRequestId:
+            'ID de solicitud de cambio',
+          rejectionReason:
+            'Motivo de rechazo',
+          versionNumber:
+            'Versión',
+          appliedBy:
+            'Aplicado por',
+          appliedAt:
+            'Aplicado en',
+        },
+        effective: {
+          title:
+            'Configuración efectiva',
+          tableLabel:
+            'Configuración efectiva',
+          noRows:
+            'No hay configuraciones efectivas disponibles.',
+          loadError:
+            'No fue posible cargar la configuración efectiva.',
+        },
+        changeRequest: {
+          createTitle:
+            'Nueva solicitud de cambio',
+          createAction:
+            'Crear solicitud',
+          createError:
+            'No fue posible crear la solicitud de cambio.',
+          reviewTitle:
+            'Gobierno de solicitudes de cambio',
+          lookupAction:
+            'Consultar solicitud',
+          loadError:
+            'No fue posible cargar la solicitud de cambio.',
+          approveAction:
+            'Aprobar',
+          rejectAction:
+            'Rechazar',
+          publishAction:
+            'Publicar',
+        },
+        versions: {
+          title:
+            'Historial de versiones aplicadas',
+          lookupAction:
+            'Consultar versiones',
+          tableLabel:
+            'Versiones de configuración',
+          noRows:
+            'No hay versiones aplicadas disponibles.',
+          loadError:
+            'No fue posible cargar el historial de versiones.',
+        },
+      },
       dashboard: {
         metrics: {
           criticalAlerts: 'Alertas críticas',

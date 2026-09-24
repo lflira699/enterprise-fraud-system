@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom'
 
 import AlertsPage from '../modules/alerts/pages/AlertsPage'
 import CasesPage from '../modules/cases/pages/CasesPage'
+import ConfigurationPage from '../modules/configuration/pages/ConfigurationPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
 import DetectionPage from '../modules/detection/pages/DetectionPage'
 import ReportsPage from '../modules/reports/pages/ReportsPage'
@@ -101,11 +102,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.configuration}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.configuration}
-            />
-          }
+          element={<ConfigurationPage />}
         />
 
         <Route
