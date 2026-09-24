@@ -8,6 +8,7 @@ import com.efs.modules.audit.entity.AuditEvent;
 import com.efs.modules.audit.mapper.AuditEventMapper;
 import com.efs.modules.audit.repository.AuditEventRepository;
 import com.efs.shared.exception.RequestValidationException;
+import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.pagination.PageResponse;
 import com.efs.shared.security.SecurityContext;
 import jakarta.persistence.criteria.Predicate;
@@ -279,6 +280,371 @@ public class AuditLogReviewService
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AuditEventResponse getAuditEventById(
+            UUID auditEventId,
+            SecurityContext securityContext) {
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put(
+                "auditEventId",
+                auditEventId == null
+                        ? null
+                        : auditEventId.toString()
+        );
+
+        requireAuditViewPermission(
+                securityContext,
+                criteria
+        );
+
+        UserAccountReference authorizedUser =
+                null;
+
+        AuditEvent auditEvent;
+
+        try {
+
+            authorizedUser =
+                    userAccountLookupService
+                            .getAuthorizedUser(
+                                    securityContext.getUserId()
+                            );
+
+            Specification<AuditEvent> specification =
+                    buildAuthorizedScope(
+                            authorizedUser
+                    ).and(
+                            (
+                                    root,
+                                    query,
+                                    criteriaBuilder
+                            ) ->
+                                    criteriaBuilder.equal(
+                                            root.get(
+                                                    "auditEventId"
+                                            ),
+                                            auditEventId
+                                    )
+                    );
+
+            auditEvent =
+                    auditEventRepository
+                            .findOne(
+                                    specification
+                            )
+                            .orElse(
+                                    null
+                            );
+        }
+        catch (RuntimeException exception) {
+
+            recordAudit(
+                    securityContext,
+                    authorizedUser,
+                    "FAILURE",
+                    REVIEW_FAILURE_REASON,
+                    criteria,
+                    exception
+            );
+
+            throw exception;
+        }
+
+        recordAudit(
+                securityContext,
+                authorizedUser,
+                "SUCCESS",
+                null,
+                criteria,
+                null
+        );
+
+        if (auditEvent == null) {
+            throw new ResourceNotFoundException(
+                    "Audit event not found: "
+                            + auditEventId
+            );
+        }
+
+        return auditEventMapper.toResponse(
+                auditEvent
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AuditEventResponse> getAuditEventsByEventType(
+            String eventType,
+            SecurityContext securityContext) {
+
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put(
+                "eventType",
+                eventType
+        );
+
+        return executeScopedListRead(
+                securityContext,
+                criteria,
+                (
+                        root,
+                        query,
+                        criteriaBuilder
+                ) ->
+                        criteriaBuilder.equal(
+                                root.get(
+                                        "eventType"
+                                ),
+                                eventType
+                        )
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AuditEventResponse> getAuditEventsByEntity(
+            String entityType,
+            UUID entityId,
+            SecurityContext securityContext) {
+
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put(
+                "entityType",
+                entityType
+        );
+
+        criteria.put(
+                "entityId",
+                entityId == null
+                        ? null
+                        : entityId.toString()
+        );
+
+        return executeScopedListRead(
+                securityContext,
+                criteria,
+                (
+                        root,
+                        query,
+                        criteriaBuilder
+                ) ->
+                        criteriaBuilder.and(
+                                criteriaBuilder.equal(
+                                        root.get(
+                                                "entityType"
+                                        ),
+                                        entityType
+                                ),
+                                criteriaBuilder.equal(
+                                        root.get(
+                                                "entityId"
+                                        ),
+                                        entityId
+                                )
+                        )
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AuditEventResponse> getAuditEventsByUserId(
+            UUID userId,
+            SecurityContext securityContext) {
+
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put(
+                "userId",
+                userId == null
+                        ? null
+                        : userId.toString()
+        );
+
+        return executeScopedListRead(
+                securityContext,
+                criteria,
+                (
+                        root,
+                        query,
+                        criteriaBuilder
+                ) ->
+                        criteriaBuilder.equal(
+                                root.get(
+                                        "userId"
+                                ),
+                                userId
+                        )
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AuditEventResponse> getAuditEventsByOrganizationId(
+            UUID organizationId,
+            SecurityContext securityContext) {
+
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put(
+                "organizationId",
+                organizationId == null
+                        ? null
+                        : organizationId.toString()
+        );
+
+        return executeScopedListRead(
+                securityContext,
+                criteria,
+                (
+                        root,
+                        query,
+                        criteriaBuilder
+                ) ->
+                        criteriaBuilder.equal(
+                                root.get(
+                                        "organizationId"
+                                ),
+                                organizationId
+                        )
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AuditEventResponse> getAuditEventsByCorrelationId(
+            UUID correlationId,
+            SecurityContext securityContext) {
+
+        Map<String, Object> criteria =
+                new LinkedHashMap<>();
+
+        criteria.put(
+                "correlationId",
+                correlationId == null
+                        ? null
+                        : correlationId.toString()
+        );
+
+        return executeScopedListRead(
+                securityContext,
+                criteria,
+                (
+                        root,
+                        query,
+                        criteriaBuilder
+                ) ->
+                        criteriaBuilder.equal(
+                                root.get(
+                                        "correlationId"
+                                ),
+                                correlationId
+                        )
+        );
+    }
+
+    private List<AuditEventResponse> executeScopedListRead(
+            SecurityContext securityContext,
+            Map<String, Object> criteria,
+            Specification<AuditEvent> requestedFilter) {
+
+        Objects.requireNonNull(
+                securityContext,
+                "securityContext is required"
+        );
+
+        requireAuditViewPermission(
+                securityContext,
+                criteria
+        );
+
+        UserAccountReference authorizedUser =
+                null;
+
+        try {
+
+            authorizedUser =
+                    userAccountLookupService
+                            .getAuthorizedUser(
+                                    securityContext.getUserId()
+                            );
+
+            Specification<AuditEvent> specification =
+                    buildAuthorizedScope(
+                            authorizedUser
+                    ).and(
+                            requestedFilter
+                    );
+
+            List<AuditEventResponse> response =
+                    auditEventRepository
+                            .findAll(
+                                    specification,
+                                    Sort.by(
+                                            Sort.Direction.DESC,
+                                            DEFAULT_SORT
+                                    )
+                            )
+                            .stream()
+                            .map(
+                                    auditEventMapper::toResponse
+                            )
+                            .toList();
+
+            recordAudit(
+                    securityContext,
+                    authorizedUser,
+                    "SUCCESS",
+                    null,
+                    criteria,
+                    null
+            );
+
+            return response;
+        }
+        catch (RuntimeException exception) {
+
+            recordAudit(
+                    securityContext,
+                    authorizedUser,
+                    "FAILURE",
+                    REVIEW_FAILURE_REASON,
+                    criteria,
+                    exception
+            );
+
+            throw exception;
+        }
+    }
+
+    private Specification<AuditEvent> buildAuthorizedScope(
+            UserAccountReference authorizedUser) {
+
+        return buildSpecification(
+                authorizedUser.organizationId(),
+                authorizedUser.tenantId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
     private void requireAuditViewPermission(
             SecurityContext securityContext,
             Map<String, Object> criteria) {

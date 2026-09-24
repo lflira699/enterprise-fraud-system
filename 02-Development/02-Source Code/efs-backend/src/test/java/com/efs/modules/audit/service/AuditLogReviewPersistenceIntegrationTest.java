@@ -2,6 +2,7 @@ package com.efs.modules.audit.service;
 
 import com.efs.modules.audit.dto.AuditEventResponse;
 import com.efs.shared.exception.RequestValidationException;
+import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.pagination.PageResponse;
 import com.efs.shared.security.SecurityContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -465,6 +467,255 @@ class AuditLogReviewPersistenceIntegrationTest {
         );
     }
 
+    @Test
+    void shouldHardenLegacyEventTypePersistenceScopeAndSuccessAudit() {
+
+        Integer successAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'eventType' =
+                              'UC043_SOURCE_EVENT'
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A
+                );
+
+        List<AuditEventResponse> response =
+                auditLogReviewService
+                        .getAuditEventsByEventType(
+                                "UC043_SOURCE_EVENT",
+                                authorizedContext()
+                        );
+
+        assertEquals(
+                1,
+                response.size()
+        );
+
+        assertEquals(
+                SOURCE_EVENT_A,
+                response.get(0)
+                        .getAuditEventId()
+        );
+
+        assertEquals(
+                ORGANIZATION_A,
+                response.get(0)
+                        .getOrganizationId()
+        );
+
+        Integer successAuditCountAfter =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'eventType' =
+                              'UC043_SOURCE_EVENT'
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A
+                );
+
+        assertEquals(
+                Integer.valueOf(
+                        successAuditCountBefore + 1
+                ),
+                successAuditCountAfter
+        );
+    }
+
+    @Test
+    void shouldHardenLegacyOrganizationPersistenceIsolationAndSuccessAudit() {
+
+        Integer successAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'organizationId' =
+                              ?
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A,
+                        ORGANIZATION_B.toString()
+                );
+
+        List<AuditEventResponse> response =
+                auditLogReviewService
+                        .getAuditEventsByOrganizationId(
+                                ORGANIZATION_B,
+                                authorizedContext()
+                        );
+
+        assertTrue(
+                response.isEmpty()
+        );
+
+        Integer successAuditCountAfter =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'organizationId' =
+                              ?
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A,
+                        ORGANIZATION_B.toString()
+                );
+
+        assertEquals(
+                Integer.valueOf(
+                        successAuditCountBefore + 1
+                ),
+                successAuditCountAfter
+        );
+    }
+
+    @Test
+    void shouldHardenLegacyIdPersistenceScopedNotFoundAndSuccessAudit() {
+
+        Integer successAuditCountBefore =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'auditEventId' =
+                              ?
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A,
+                        SOURCE_EVENT_B.toString()
+                );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () ->
+                        auditLogReviewService
+                                .getAuditEventById(
+                                        SOURCE_EVENT_B,
+                                        authorizedContext()
+                                )
+        );
+
+        Integer successAuditCountAfter =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_timestamp >= ?
+                          AND organization_id = ?
+                          AND tenant_id IS NULL
+                          AND event_type = 'AUDIT_LOG_REVIEW'
+                          AND entity_type = 'AUDIT_EVENT'
+                          AND entity_id IS NULL
+                          AND action = 'REVIEW'
+                          AND source_component = 'AUDIT'
+                          AND event_result = 'SUCCESS'
+                          AND event_details ->> 'permissionCode' =
+                              'audit.view'
+                          AND event_details
+                                  -> 'criteria'
+                                  ->> 'auditEventId' =
+                              ?
+                        """,
+                        Integer.class,
+                        USER_A,
+                        testStartedAt,
+                        ORGANIZATION_A,
+                        SOURCE_EVENT_B.toString()
+                );
+
+        assertEquals(
+                Integer.valueOf(
+                        successAuditCountBefore + 1
+                ),
+                successAuditCountAfter
+        );
+    }
     private SecurityContext authorizedContext() {
 
         return new SecurityContext(

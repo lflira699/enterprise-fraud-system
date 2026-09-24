@@ -1,5 +1,7 @@
 package com.efs.modules.audit.controller;
 
+import com.efs.shared.security.SecurityContext;
+import com.efs.shared.security.SecurityContextProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,15 +10,22 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -53,11 +62,34 @@ class AuditEventControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @BeforeEach
-    void setUp() {
+    @MockitoBean
+    private SecurityContextProvider securityContextProvider;
+
+    @BeforeTransaction
+    void prepareCommittedAuthorizationFixtures() {
 
         insertOrganization();
         insertUser();
+    }
+
+    @BeforeEach
+    void setUp() {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        USER_ID,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(
+                                "audit.view"
+                        ),
+                        Set.of()
+                )
+        );
     }
 
     @Test
@@ -389,19 +421,20 @@ class AuditEventControllerIntegrationTest {
                         status().isOk()
                 )
                 .andExpect(
-                        jsonPath("$.length()").value(2)
+                        jsonPath(
+                                "$[?(@.eventType == 'USER_ACTION')]",
+                                hasSize(2)
+                        )
                 )
                 .andExpect(
-                        jsonPath("$[0].userId")
-                                .value(
-                                        USER_ID.toString()
+                        jsonPath(
+                                "$[?(@.eventType == 'USER_ACTION')].userId",
+                                everyItem(
+                                        is(
+                                                USER_ID.toString()
+                                        )
                                 )
-                )
-                .andExpect(
-                        jsonPath("$[1].userId")
-                                .value(
-                                        USER_ID.toString()
-                                )
+                        )
                 );
     }
 
@@ -445,19 +478,20 @@ class AuditEventControllerIntegrationTest {
                         status().isOk()
                 )
                 .andExpect(
-                        jsonPath("$.length()").value(2)
+                        jsonPath(
+                                "$[?(@.eventType == 'ORGANIZATION_EVENT')]",
+                                hasSize(2)
+                        )
                 )
                 .andExpect(
-                        jsonPath("$[0].organizationId")
-                                .value(
-                                        ORGANIZATION_ID.toString()
+                        jsonPath(
+                                "$[?(@.eventType == 'ORGANIZATION_EVENT')].organizationId",
+                                everyItem(
+                                        is(
+                                                ORGANIZATION_ID.toString()
+                                        )
                                 )
-                )
-                .andExpect(
-                        jsonPath("$[1].organizationId")
-                                .value(
-                                        ORGANIZATION_ID.toString()
-                                )
+                        )
                 );
     }
 
@@ -535,6 +569,34 @@ class AuditEventControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldReturnForbiddenWhenAuditViewPermissionIsMissingForLegacyRead()
+            throws Exception {
+
+        when(
+                securityContextProvider
+                        .getCurrentContext()
+        ).thenReturn(
+                new SecurityContext(
+                        USER_ID,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(),
+                        Set.of()
+                )
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/audit/events/type/{eventType}",
+                                "MISSING_PERMISSION_TEST"
+                        )
+                )
+                .andExpect(
+                        status().isForbidden()
+                );
+    }
     private void insertAuditEvent(
             UUID auditEventId,
             String eventType,
@@ -608,6 +670,7 @@ class AuditEventControllerIntegrationTest {
                     status
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
                 """,
                 ORGANIZATION_ID,
                 "EFS-AUDIT-EVENT-API-ORG",
@@ -634,6 +697,7 @@ class AuditEventControllerIntegrationTest {
                     failed_login_attempts
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
                 """,
                 USER_ID,
                 ORGANIZATION_ID,

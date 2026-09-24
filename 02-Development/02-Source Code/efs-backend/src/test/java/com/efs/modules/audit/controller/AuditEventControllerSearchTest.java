@@ -6,6 +6,7 @@ import com.efs.modules.audit.service.AuditLogReviewServiceInterface;
 import com.efs.shared.pagination.PageResponse;
 import com.efs.shared.security.SecurityContext;
 import com.efs.shared.security.SecurityContextProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AuditEventControllerSearchTest {
@@ -42,6 +44,9 @@ class AuditEventControllerSearchTest {
                     "19191919-1919-1919-1919-191919191919"
             );
 
+    private AuditEventServiceInterface
+            auditEventService;
+
     private AuditLogReviewServiceInterface
             reviewService;
 
@@ -55,7 +60,7 @@ class AuditEventControllerSearchTest {
     @BeforeEach
     void setUp() {
 
-        AuditEventServiceInterface auditEventService =
+        auditEventService =
                 mock(
                         AuditEventServiceInterface.class
                 );
@@ -94,6 +99,14 @@ class AuditEventControllerSearchTest {
                         .getCurrentContext()
         ).thenReturn(
                 securityContext
+        );
+    }
+
+    @AfterEach
+    void shouldNotUseLegacyAuditEventServiceForReads() {
+
+        verifyNoInteractions(
+                auditEventService
         );
     }
 
@@ -240,6 +253,246 @@ class AuditEventControllerSearchTest {
                 50,
                 "eventTimestamp",
                 "ASC",
+                securityContext
+        );
+    }
+    @Test
+    void shouldDelegateLegacyIdReadUsingSecurityContext() {
+
+        UUID auditEventId =
+                UUID.randomUUID();
+
+        AuditEventResponse expected =
+                mock(
+                        AuditEventResponse.class
+                );
+
+        when(
+                reviewService.getAuditEventById(
+                        auditEventId,
+                        securityContext
+                )
+        ).thenReturn(
+                expected
+        );
+
+        ResponseEntity<AuditEventResponse> response =
+                controller.getAuditEventById(
+                        auditEventId
+                );
+
+        assertEquals(
+                200,
+                response.getStatusCode().value()
+        );
+
+        assertSame(
+                expected,
+                response.getBody()
+        );
+
+        verify(
+                securityContextProvider
+        ).getCurrentContext();
+
+        verify(
+                reviewService
+        ).getAuditEventById(
+                auditEventId,
+                securityContext
+        );
+    }
+
+    @Test
+    void shouldDelegateLegacyEventTypeReadUsingSecurityContext() {
+
+        List<AuditEventResponse> expected =
+                List.of();
+
+        when(
+                reviewService.getAuditEventsByEventType(
+                        "CASE_REVIEW",
+                        securityContext
+                )
+        ).thenReturn(
+                expected
+        );
+
+        ResponseEntity<List<AuditEventResponse>> response =
+                controller.getAuditEventsByEventType(
+                        "CASE_REVIEW"
+                );
+
+        assertSame(
+                expected,
+                response.getBody()
+        );
+
+        verify(
+                securityContextProvider
+        ).getCurrentContext();
+
+        verify(
+                reviewService
+        ).getAuditEventsByEventType(
+                "CASE_REVIEW",
+                securityContext
+        );
+    }
+
+    @Test
+    void shouldDelegateLegacyEntityReadUsingSecurityContext() {
+
+        List<AuditEventResponse> expected =
+                List.of();
+
+        when(
+                reviewService.getAuditEventsByEntity(
+                        "CASE",
+                        ENTITY_ID,
+                        securityContext
+                )
+        ).thenReturn(
+                expected
+        );
+
+        ResponseEntity<List<AuditEventResponse>> response =
+                controller.getAuditEventsByEntity(
+                        "CASE",
+                        ENTITY_ID
+                );
+
+        assertSame(
+                expected,
+                response.getBody()
+        );
+
+        verify(
+                securityContextProvider
+        ).getCurrentContext();
+
+        verify(
+                reviewService
+        ).getAuditEventsByEntity(
+                "CASE",
+                ENTITY_ID,
+                securityContext
+        );
+    }
+
+    @Test
+    void shouldDelegateLegacyUserReadUsingSecurityContext() {
+
+        List<AuditEventResponse> expected =
+                List.of();
+
+        when(
+                reviewService.getAuditEventsByUserId(
+                        USER_ID,
+                        securityContext
+                )
+        ).thenReturn(
+                expected
+        );
+
+        ResponseEntity<List<AuditEventResponse>> response =
+                controller.getAuditEventsByUserId(
+                        USER_ID
+                );
+
+        assertSame(
+                expected,
+                response.getBody()
+        );
+
+        verify(
+                securityContextProvider
+        ).getCurrentContext();
+
+        verify(
+                reviewService
+        ).getAuditEventsByUserId(
+                USER_ID,
+                securityContext
+        );
+    }
+
+    @Test
+    void shouldDelegateLegacyOrganizationReadUsingSecurityContext() {
+
+        UUID organizationId =
+                UUID.randomUUID();
+
+        List<AuditEventResponse> expected =
+                List.of();
+
+        when(
+                reviewService.getAuditEventsByOrganizationId(
+                        organizationId,
+                        securityContext
+                )
+        ).thenReturn(
+                expected
+        );
+
+        ResponseEntity<List<AuditEventResponse>> response =
+                controller.getAuditEventsByOrganizationId(
+                        organizationId
+                );
+
+        assertSame(
+                expected,
+                response.getBody()
+        );
+
+        verify(
+                securityContextProvider
+        ).getCurrentContext();
+
+        verify(
+                reviewService
+        ).getAuditEventsByOrganizationId(
+                organizationId,
+                securityContext
+        );
+    }
+
+    @Test
+    void shouldDelegateLegacyCorrelationReadUsingSecurityContext() {
+
+        UUID correlationId =
+                UUID.randomUUID();
+
+        List<AuditEventResponse> expected =
+                List.of();
+
+        when(
+                reviewService.getAuditEventsByCorrelationId(
+                        correlationId,
+                        securityContext
+                )
+        ).thenReturn(
+                expected
+        );
+
+        ResponseEntity<List<AuditEventResponse>> response =
+                controller.getAuditEventsByCorrelationId(
+                        correlationId
+                );
+
+        assertSame(
+                expected,
+                response.getBody()
+        );
+
+        verify(
+                securityContextProvider
+        ).getCurrentContext();
+
+        verify(
+                reviewService
+        ).getAuditEventsByCorrelationId(
+                correlationId,
                 securityContext
         );
     }

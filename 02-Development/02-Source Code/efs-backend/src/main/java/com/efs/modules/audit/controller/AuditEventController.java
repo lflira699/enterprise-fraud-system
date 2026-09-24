@@ -96,10 +96,16 @@ public class AuditEventController {
     public ResponseEntity<AuditEventResponse> getAuditEventById(
             @PathVariable UUID auditEventId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                auditEventService.getAuditEventById(
-                        auditEventId
-                )
+                auditLogReviewService
+                        .getAuditEventById(
+                                auditEventId,
+                                securityContext
+                        )
         );
     }
 
@@ -108,10 +114,16 @@ public class AuditEventController {
     getAuditEventsByEventType(
             @PathVariable String eventType) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                auditEventService.getAuditEventsByEventType(
-                        eventType
-                )
+                auditLogReviewService
+                        .getAuditEventsByEventType(
+                                eventType,
+                                securityContext
+                        )
         );
     }
 
@@ -121,11 +133,17 @@ public class AuditEventController {
             @PathVariable String entityType,
             @PathVariable UUID entityId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                auditEventService.getAuditEventsByEntity(
-                        entityType,
-                        entityId
-                )
+                auditLogReviewService
+                        .getAuditEventsByEntity(
+                                entityType,
+                                entityId,
+                                securityContext
+                        )
         );
     }
 
@@ -134,10 +152,16 @@ public class AuditEventController {
     getAuditEventsByUserId(
             @PathVariable UUID userId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                auditEventService.getAuditEventsByUserId(
-                        userId
-                )
+                auditLogReviewService
+                        .getAuditEventsByUserId(
+                                userId,
+                                securityContext
+                        )
         );
     }
 
@@ -146,10 +170,15 @@ public class AuditEventController {
     getAuditEventsByOrganizationId(
             @PathVariable UUID organizationId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                auditEventService
+                auditLogReviewService
                         .getAuditEventsByOrganizationId(
-                                organizationId
+                                organizationId,
+                                securityContext
                         )
         );
     }
@@ -159,10 +188,15 @@ public class AuditEventController {
     getAuditEventsByCorrelationId(
             @PathVariable UUID correlationId) {
 
+        SecurityContext securityContext =
+                securityContextProvider
+                        .getCurrentContext();
+
         return ResponseEntity.ok(
-                auditEventService
+                auditLogReviewService
                         .getAuditEventsByCorrelationId(
-                                correlationId
+                                correlationId,
+                                securityContext
                         )
         );
     }

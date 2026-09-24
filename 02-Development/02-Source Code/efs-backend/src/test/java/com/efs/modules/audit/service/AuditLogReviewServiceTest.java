@@ -8,6 +8,7 @@ import com.efs.modules.audit.entity.AuditEvent;
 import com.efs.modules.audit.mapper.AuditEventMapper;
 import com.efs.modules.audit.repository.AuditEventRepository;
 import com.efs.shared.exception.RequestValidationException;
+import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.pagination.PageResponse;
 import com.efs.shared.security.SecurityContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -835,6 +836,438 @@ class AuditLogReviewServiceTest {
         );
     }
 
+    @Test
+    void shouldHardenLegacyPermissionBeforeAuthorizedLookup() {
+
+        SecurityContext securityContext =
+                context(
+                        TENANT_ID,
+                        false
+                );
+
+        assertThrows(
+                AccessDeniedException.class,
+                () ->
+                        service.getAuditEventsByEventType(
+                                "CASE_REVIEW",
+                                securityContext
+                        )
+        );
+
+        verifyNoInteractions(
+                userAccountLookupService,
+                repository
+        );
+
+        AuditEventRequest audit =
+                captureAudit();
+
+        assertEquals(
+                "REJECTED",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                "MISSING_PERMISSION",
+                audit.getEventDetails()
+                        .get("reason")
+        );
+
+        assertEquals(
+                "audit.view",
+                audit.getEventDetails()
+                        .get("permissionCode")
+        );
+
+        assertNull(
+                audit.getOrganizationId()
+        );
+
+        assertNull(
+                audit.getTenantId()
+        );
+    }
+
+    @Test
+    void shouldHardenLegacyEventTypeWithOrganizationAndTenantScope() {
+
+        prepareAuthorizedUser(
+                TENANT_ID
+        );
+
+        when(
+                repository.findAll(
+                        any(Specification.class),
+                        any(Sort.class)
+                )
+        ).thenReturn(
+                List.of()
+        );
+
+        List<AuditEventResponse> response =
+                service.getAuditEventsByEventType(
+                        "CASE_REVIEW",
+                        context(
+                                TENANT_ID,
+                                true
+                        )
+                );
+
+        assertTrue(
+                response.isEmpty()
+        );
+
+        Specification<AuditEvent> specification =
+                captureLegacySpecification();
+
+        assertLegacyScopeAndFilters(
+                specification,
+                TENANT_ID,
+                "eventType",
+                "CASE_REVIEW",
+                null,
+                null
+        );
+
+        AuditEventRequest audit =
+                captureAudit();
+
+        assertEquals(
+                "SUCCESS",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                ORGANIZATION_ID,
+                audit.getOrganizationId()
+        );
+
+        assertEquals(
+                TENANT_ID,
+                audit.getTenantId()
+        );
+    }
+
+    @Test
+    void shouldHardenLegacyCorrelationWithOrganizationOnlyScope() {
+
+        UUID correlationId =
+                UUID.fromString(
+                        "20202020-2020-2020-2020-202020202020"
+                );
+
+        prepareAuthorizedUser(
+                null
+        );
+
+        when(
+                repository.findAll(
+                        any(Specification.class),
+                        any(Sort.class)
+                )
+        ).thenReturn(
+                List.of()
+        );
+
+        service.getAuditEventsByCorrelationId(
+                correlationId,
+                context(
+                        null,
+                        true
+                )
+        );
+
+        Specification<AuditEvent> specification =
+                captureLegacySpecification();
+
+        assertLegacyScopeAndFilters(
+                specification,
+                null,
+                "correlationId",
+                correlationId,
+                null,
+                null
+        );
+
+        AuditEventRequest audit =
+                captureAudit();
+
+        assertEquals(
+                "SUCCESS",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                ORGANIZATION_ID,
+                audit.getOrganizationId()
+        );
+
+        assertNull(
+                audit.getTenantId()
+        );
+    }
+
+    @Test
+    void shouldHardenLegacyEntityTypeAndEntityIdFilters() {
+
+        prepareAuthorizedUser(
+                TENANT_ID
+        );
+
+        when(
+                repository.findAll(
+                        any(Specification.class),
+                        any(Sort.class)
+                )
+        ).thenReturn(
+                List.of()
+        );
+
+        service.getAuditEventsByEntity(
+                "CASE",
+                ENTITY_ID,
+                context(
+                        TENANT_ID,
+                        true
+                )
+        );
+
+        Specification<AuditEvent> specification =
+                captureLegacySpecification();
+
+        assertLegacyScopeAndFilters(
+                specification,
+                TENANT_ID,
+                "entityType",
+                "CASE",
+                "entityId",
+                ENTITY_ID
+        );
+
+        captureAudit();
+    }
+
+    @Test
+    void shouldHardenLegacyUserFilter() {
+
+        UUID requestedUserId =
+                UUID.fromString(
+                        "21212121-2121-2121-2121-212121212121"
+                );
+
+        prepareAuthorizedUser(
+                TENANT_ID
+        );
+
+        when(
+                repository.findAll(
+                        any(Specification.class),
+                        any(Sort.class)
+                )
+        ).thenReturn(
+                List.of()
+        );
+
+        service.getAuditEventsByUserId(
+                requestedUserId,
+                context(
+                        TENANT_ID,
+                        true
+                )
+        );
+
+        Specification<AuditEvent> specification =
+                captureLegacySpecification();
+
+        assertLegacyScopeAndFilters(
+                specification,
+                TENANT_ID,
+                "userId",
+                requestedUserId,
+                null,
+                null
+        );
+
+        captureAudit();
+    }
+
+    @Test
+    void shouldHardenLegacyOrganizationFilterWithoutBroadeningAuthorizedScope() {
+
+        UUID requestedOrganizationId =
+                UUID.fromString(
+                        "22222222-2222-2222-2222-222222222222"
+                );
+
+        prepareAuthorizedUser(
+                TENANT_ID
+        );
+
+        when(
+                repository.findAll(
+                        any(Specification.class),
+                        any(Sort.class)
+                )
+        ).thenReturn(
+                List.of()
+        );
+
+        service.getAuditEventsByOrganizationId(
+                requestedOrganizationId,
+                context(
+                        TENANT_ID,
+                        true
+                )
+        );
+
+        Specification<AuditEvent> specification =
+                captureLegacySpecification();
+
+        assertLegacyScopeAndFilters(
+                specification,
+                TENANT_ID,
+                "organizationId",
+                requestedOrganizationId,
+                null,
+                null
+        );
+
+        captureAudit();
+    }
+
+    @Test
+    void shouldHardenLegacyIdAsScopedNotFoundWithSuccessAudit() {
+
+        prepareAuthorizedUser(
+                TENANT_ID
+        );
+
+        when(
+                repository.findOne(
+                        any(Specification.class)
+                )
+        ).thenReturn(
+                java.util.Optional.empty()
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () ->
+                        service.getAuditEventById(
+                                AUDIT_EVENT_ID,
+                                context(
+                                        TENANT_ID,
+                                        true
+                                )
+                        )
+        );
+
+        Specification<AuditEvent> specification =
+                captureLegacyIdSpecification();
+
+        assertLegacyScopeAndFilters(
+                specification,
+                TENANT_ID,
+                "auditEventId",
+                AUDIT_EVENT_ID,
+                null,
+                null
+        );
+
+        AuditEventRequest audit =
+                captureAudit();
+
+        assertEquals(
+                "SUCCESS",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                ORGANIZATION_ID,
+                audit.getOrganizationId()
+        );
+
+        assertEquals(
+                TENANT_ID,
+                audit.getTenantId()
+        );
+    }
+
+    @Test
+    void shouldHardenLegacyListRepositoryFailureAudit() {
+
+        prepareAuthorizedUser(
+                TENANT_ID
+        );
+
+        RuntimeException failure =
+                new IllegalStateException(
+                        "legacy repository failure"
+                );
+
+        when(
+                repository.findAll(
+                        any(Specification.class),
+                        any(Sort.class)
+                )
+        ).thenThrow(
+                failure
+        );
+
+        RuntimeException thrown =
+                assertThrows(
+                        RuntimeException.class,
+                        () ->
+                                service.getAuditEventsByEventType(
+                                        "CASE_REVIEW",
+                                        context(
+                                                TENANT_ID,
+                                                true
+                                        )
+                                )
+                );
+
+        assertSame(
+                failure,
+                thrown
+        );
+
+        AuditEventRequest audit =
+                captureAudit();
+
+        assertEquals(
+                "FAILURE",
+                audit.getEventResult()
+        );
+
+        assertEquals(
+                "AUDIT_LOG_REVIEW_FAILED",
+                audit.getEventDetails()
+                        .get("reason")
+        );
+
+        assertEquals(
+                IllegalStateException.class.getName(),
+                audit.getEventDetails()
+                        .get("errorType")
+        );
+
+        assertEquals(
+                "legacy repository failure",
+                audit.getEventDetails()
+                        .get("errorMessage")
+        );
+
+        assertEquals(
+                ORGANIZATION_ID,
+                audit.getOrganizationId()
+        );
+
+        assertEquals(
+                TENANT_ID,
+                audit.getTenantId()
+        );
+    }
     private void prepareAuthorizedUser(
             UUID tenantId) {
 
@@ -978,6 +1411,368 @@ class AuditLogReviewServiceTest {
         return captor.getValue();
     }
 
+    @SuppressWarnings({
+            "rawtypes",
+            "unchecked"
+    })
+    private Specification<AuditEvent>
+    captureLegacySpecification() {
+
+        ArgumentCaptor<Specification> specificationCaptor =
+                ArgumentCaptor.forClass(
+                        Specification.class
+                );
+
+        ArgumentCaptor<Sort> sortCaptor =
+                ArgumentCaptor.forClass(
+                        Sort.class
+                );
+
+        verify(repository)
+                .findAll(
+                        specificationCaptor.capture(),
+                        sortCaptor.capture()
+                );
+
+        assertEquals(
+                Sort.by(
+                        Sort.Direction.DESC,
+                        "eventTimestamp"
+                ),
+                sortCaptor.getValue()
+        );
+
+        return (Specification<AuditEvent>)
+                specificationCaptor.getValue();
+    }
+
+    @SuppressWarnings({
+            "rawtypes",
+            "unchecked"
+    })
+    private Specification<AuditEvent>
+    captureLegacyIdSpecification() {
+
+        ArgumentCaptor<Specification> captor =
+                ArgumentCaptor.forClass(
+                        Specification.class
+                );
+
+        verify(repository)
+                .findOne(
+                        captor.capture()
+                );
+
+        return (Specification<AuditEvent>)
+                captor.getValue();
+    }
+
+    @SuppressWarnings({
+            "rawtypes",
+            "unchecked"
+    })
+    private void assertLegacyScopeAndFilters(
+            Specification<AuditEvent> specification,
+            UUID tenantId,
+            String filterFieldOne,
+            Object filterValueOne,
+            String filterFieldTwo,
+            Object filterValueTwo) {
+
+        Root root =
+                mock(
+                        Root.class
+                );
+
+        CriteriaQuery query =
+                mock(
+                        CriteriaQuery.class
+                );
+
+        CriteriaBuilder criteriaBuilder =
+                mock(
+                        CriteriaBuilder.class
+                );
+
+        Path organizationPath =
+                mock(
+                        Path.class
+                );
+
+        Path tenantPath =
+                mock(
+                        Path.class
+                );
+
+        Predicate organizationPredicate =
+                mock(
+                        Predicate.class
+                );
+
+        Predicate tenantPredicate =
+                mock(
+                        Predicate.class
+                );
+
+        Predicate filterPredicateOne =
+                mock(
+                        Predicate.class
+                );
+
+        Predicate filterPredicateTwo =
+                mock(
+                        Predicate.class
+                );
+
+        Predicate scopePredicate =
+                mock(
+                        Predicate.class
+                );
+
+        Predicate requestedFilterPredicate =
+                mock(
+                        Predicate.class
+                );
+
+        Predicate finalPredicate =
+                mock(
+                        Predicate.class
+                );
+
+        when(
+                root.get(
+                        "organizationId"
+                )
+        ).thenReturn(
+                organizationPath
+        );
+
+        when(
+                criteriaBuilder.equal(
+                        organizationPath,
+                        ORGANIZATION_ID
+                )
+        ).thenReturn(
+                organizationPredicate
+        );
+
+        if (tenantId != null) {
+
+            when(
+                    root.get(
+                            "tenantId"
+                    )
+            ).thenReturn(
+                    tenantPath
+            );
+
+            when(
+                    criteriaBuilder.equal(
+                            tenantPath,
+                            tenantId
+                    )
+            ).thenReturn(
+                    tenantPredicate
+            );
+        }
+
+        Path filterPathOne =
+                null;
+
+        if (filterFieldOne != null) {
+
+            if (
+                    "organizationId".equals(
+                            filterFieldOne
+                    )
+            ) {
+                filterPathOne =
+                        organizationPath;
+            }
+            else if (
+                    "tenantId".equals(
+                            filterFieldOne
+                    )
+            ) {
+                filterPathOne =
+                        tenantPath;
+            }
+            else {
+
+                filterPathOne =
+                        mock(
+                                Path.class
+                        );
+
+                when(
+                        root.get(
+                                filterFieldOne
+                        )
+                ).thenReturn(
+                        filterPathOne
+                );
+            }
+
+            when(
+                    criteriaBuilder.equal(
+                            filterPathOne,
+                            filterValueOne
+                    )
+            ).thenReturn(
+                    filterPredicateOne
+            );
+        }
+
+        Path filterPathTwo =
+                null;
+
+        if (filterFieldTwo != null) {
+
+            if (
+                    "organizationId".equals(
+                            filterFieldTwo
+                    )
+            ) {
+                filterPathTwo =
+                        organizationPath;
+            }
+            else if (
+                    "tenantId".equals(
+                            filterFieldTwo
+                    )
+            ) {
+                filterPathTwo =
+                        tenantPath;
+            }
+            else {
+
+                filterPathTwo =
+                        mock(
+                                Path.class
+                        );
+
+                when(
+                        root.get(
+                                filterFieldTwo
+                        )
+                ).thenReturn(
+                        filterPathTwo
+                );
+            }
+
+            when(
+                    criteriaBuilder.equal(
+                            filterPathTwo,
+                            filterValueTwo
+                    )
+            ).thenReturn(
+                    filterPredicateTwo
+            );
+        }
+
+        /*
+         * buildAuthorizedScope() delegates to buildSpecification(),
+         * which combines organization/tenant predicates using the
+         * Predicate[] CriteriaBuilder.and overload.
+         */
+        when(
+                criteriaBuilder.and(
+                        any(Predicate[].class)
+                )
+        ).thenReturn(
+                scopePredicate
+        );
+
+        Predicate effectiveRequestedFilter =
+                filterPredicateOne;
+
+        /*
+         * The entity legacy route has two requested predicates.
+         * Its route-specific Specification combines them before
+         * Spring Data composes that filter with the authorized scope.
+         */
+        if (filterFieldTwo != null) {
+
+            when(
+                    criteriaBuilder.and(
+                            filterPredicateOne,
+                            filterPredicateTwo
+                    )
+            ).thenReturn(
+                    requestedFilterPredicate
+            );
+
+            effectiveRequestedFilter =
+                    requestedFilterPredicate;
+        }
+
+        /*
+         * Specification.and(...) performs a second composition:
+         * authorized scope AND requested route filter.
+         */
+        when(
+                criteriaBuilder.and(
+                        scopePredicate,
+                        effectiveRequestedFilter
+                )
+        ).thenReturn(
+                finalPredicate
+        );
+
+        Predicate result =
+                specification.toPredicate(
+                        root,
+                        query,
+                        criteriaBuilder
+                );
+
+        assertSame(
+                finalPredicate,
+                result
+        );
+
+        verify(criteriaBuilder)
+                .equal(
+                        organizationPath,
+                        ORGANIZATION_ID
+                );
+
+        if (tenantId != null) {
+
+            verify(criteriaBuilder)
+                    .equal(
+                            tenantPath,
+                            tenantId
+                    );
+        }
+        else {
+
+            verify(
+                    root,
+                    never()
+            ).get(
+                    "tenantId"
+            );
+        }
+
+        if (filterFieldOne != null) {
+
+            verify(criteriaBuilder)
+                    .equal(
+                            filterPathOne,
+                            filterValueOne
+                    );
+        }
+
+        if (filterFieldTwo != null) {
+
+            verify(criteriaBuilder)
+                    .equal(
+                            filterPathTwo,
+                            filterValueTwo
+                    );
+        }
+    }
     @SuppressWarnings({
             "rawtypes",
             "unchecked"
