@@ -88,4 +88,13 @@ class DomainEventRoutingKeyResolverTest {
                 () -> resolver.resolve(" ")
         );
     }
+
+    @Test
+    void shouldResolveFraudEventRegisteredRoutingKey() {
+
+        assertEquals(
+                "event.received.v1",
+                resolver.resolve("FraudEventRegistered")
+        );
+    }
 }
