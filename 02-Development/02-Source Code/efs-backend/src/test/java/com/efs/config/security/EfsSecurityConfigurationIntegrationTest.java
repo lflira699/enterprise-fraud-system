@@ -1,6 +1,7 @@
 package com.efs.config.security;
 
 import com.efs.shared.security.SecurityContextProvider;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -9,11 +10,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,13 +38,44 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         EfsSecurityConfigurationIntegrationTest
                 .SecurityProbeConfiguration.class
 )
+@Transactional
 class EfsSecurityConfigurationIntegrationTest {
+
+    private static final UUID ORGANIZATION_ID =
+            UUID.fromString(
+                    "19119119-1191-4191-8191-191191191191"
+            );
+
+    private static final UUID TENANT_ID =
+            UUID.fromString(
+                    "19219219-2192-4192-8192-192192192192"
+            );
+
+    private static final UUID USER_ID =
+            UUID.fromString(
+                    "19319319-3193-4193-8193-193193193193"
+            );
+
+    private static final UUID SESSION_ID =
+            UUID.fromString(
+                    "19419419-4194-4194-8194-194194194194"
+            );
 
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @BeforeEach
+    void setUp() {
+        insertOrganization();
+        insertTenant();
+        insertUser();
+    }
 
     @Test
     void shouldAllowHealthEndpointWithoutAuthentication()
@@ -75,17 +109,12 @@ class EfsSecurityConfigurationIntegrationTest {
     void shouldExposeAuthenticatedEfsIdentityToApplication()
             throws Exception {
 
-        UUID userId =
-                UUID.randomUUID();
-
         when(
                 jwtDecoder.decode(
                         "valid-token"
                 )
         ).thenReturn(
-                buildJwt(
-                        userId
-                )
+                buildJwt()
         );
 
         mockMvc.perform(
@@ -105,7 +134,7 @@ class EfsSecurityConfigurationIntegrationTest {
                                 "$.userId"
                         )
                                 .value(
-                                        userId.toString()
+                                        USER_ID.toString()
                                 )
                 );
     }
@@ -138,8 +167,7 @@ class EfsSecurityConfigurationIntegrationTest {
                 );
     }
 
-    private Jwt buildJwt(
-            UUID userId) {
+    private Jwt buildJwt() {
 
         Instant now =
                 Instant.now();
@@ -174,7 +202,15 @@ class EfsSecurityConfigurationIntegrationTest {
                 )
                 .claim(
                         "user_id",
-                        userId.toString()
+                        USER_ID.toString()
+                )
+                .claim(
+                        "tenant_id",
+                        TENANT_ID.toString()
+                )
+                .claim(
+                        "session_id",
+                        SESSION_ID.toString()
                 )
                 .claim(
                         "roles",
@@ -193,6 +229,83 @@ class EfsSecurityConfigurationIntegrationTest {
                         "rules.read"
                 )
                 .build();
+    }
+
+    private void insertOrganization() {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.organization (
+                    organization_id,
+                    organization_code,
+                    legal_name,
+                    country_code,
+                    timezone,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                ORGANIZATION_ID,
+                "EFS-SECURITY-ORG",
+                "EFS Security Test Organization",
+                "GT",
+                "America/Guatemala",
+                "ACTIVE"
+        );
+    }
+
+    private void insertTenant() {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.tenant (
+                    tenant_id,
+                    organization_id,
+                    tenant_code,
+                    tenant_name,
+                    status,
+                    environment
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                TENANT_ID,
+                ORGANIZATION_ID,
+                "EFS-SECURITY-TENANT",
+                "EFS Security Test Tenant",
+                "ACTIVE",
+                "TEST"
+        );
+    }
+
+    private void insertUser() {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    tenant_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status,
+                    failed_login_attempts
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                USER_ID,
+                ORGANIZATION_ID,
+                TENANT_ID,
+                "efs.security.test.user",
+                "EFS Security Test User",
+                "efs.security.test.user@example.com",
+                "OIDC",
+                false,
+                "ACTIVE",
+                0
+        );
     }
 
     @TestConfiguration
