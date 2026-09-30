@@ -7,10 +7,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
@@ -346,6 +348,140 @@ class UserSessionBindingServiceIntegrationTest {
                 () ->
                         userSessionBindingService
                                 .requireActiveSession(
+                                        ACTIVE_SESSION_ID,
+                                        null
+                                )
+        );
+    }
+
+    @Test
+    void shouldInvalidateActiveSessionAndRecordLogoutTime() {
+
+        userSessionBindingService.invalidateSession(
+                ACTIVE_SESSION_ID,
+                USER_ID
+        );
+
+        String status =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT session_status
+                        FROM administration.user_session
+                        WHERE session_id = ?
+                        """,
+                        String.class,
+                        ACTIVE_SESSION_ID
+                );
+
+        LocalDateTime logoutTime =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT logout_time
+                        FROM administration.user_session
+                        WHERE session_id = ?
+                        """,
+                        LocalDateTime.class,
+                        ACTIVE_SESSION_ID
+                );
+
+        assertEquals(
+                "INVALIDATED",
+                status
+        );
+
+        assertNotNull(
+                logoutTime
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        userSessionBindingService
+                                .requireActiveSession(
+                                        ACTIVE_SESSION_ID,
+                                        USER_ID
+                                )
+        );
+    }
+
+    @Test
+    void shouldRejectLogoutForSessionBoundToDifferentUser() {
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        userSessionBindingService
+                                .invalidateSession(
+                                        ACTIVE_SESSION_ID,
+                                        OTHER_USER_ID
+                                )
+        );
+    }
+
+    @Test
+    void shouldRejectLogoutForMissingSession() {
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        userSessionBindingService
+                                .invalidateSession(
+                                        NEW_SESSION_ID,
+                                        USER_ID
+                                )
+        );
+    }
+
+    @Test
+    void shouldRejectAlreadyInvalidatedSessionLogout() {
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        userSessionBindingService
+                                .invalidateSession(
+                                        INVALIDATED_SESSION_ID,
+                                        USER_ID
+                                )
+        );
+    }
+
+    @Test
+    void shouldRejectExpiredSessionLogout() {
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        userSessionBindingService
+                                .invalidateSession(
+                                        EXPIRED_SESSION_ID,
+                                        USER_ID
+                                )
+        );
+    }
+
+    @Test
+    void shouldRejectLogoutWithoutSessionId() {
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        userSessionBindingService
+                                .invalidateSession(
+                                        null,
+                                        USER_ID
+                                )
+        );
+    }
+
+    @Test
+    void shouldRejectLogoutWithoutUserId() {
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        userSessionBindingService
+                                .invalidateSession(
                                         ACTIVE_SESSION_ID,
                                         null
                                 )

@@ -80,6 +80,13 @@ public class UserSession {
         return logoutTime;
     }
 
+    public void invalidate(
+            LocalDateTime logoutTime) {
+
+        this.logoutTime = logoutTime;
+        this.sessionStatus = "INVALIDATED";
+    }
+
     public String getSessionStatus() {
         return sessionStatus;
     }
