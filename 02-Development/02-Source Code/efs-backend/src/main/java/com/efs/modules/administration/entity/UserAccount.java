@@ -207,6 +207,16 @@ public class UserAccount {
                 accountStatus;
     }
 
+    public void enable() {
+        this.accountStatus =
+                "ACTIVE";
+    }
+
+    public void disable() {
+        this.accountStatus =
+                "INACTIVE";
+    }
+
     public LocalDateTime getLastLogin() {
         return lastLogin;
     }
