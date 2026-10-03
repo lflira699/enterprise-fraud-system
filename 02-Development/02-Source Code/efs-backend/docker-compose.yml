@@ -1,24 +1,95 @@
 services:
+
   postgres:
-    image: postgres:18.4
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     container_name: efs-postgres
     restart: unless-stopped
+
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME_REQUIRED}
+      POSTGRES_USER: ${FLYWAY_USERNAME:?FLYWAY_USERNAME_REQUIRED}
+      POSTGRES_PASSWORD: ${FLYWAY_PASSWORD:?FLYWAY_PASSWORD_REQUIRED}
+
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME_REQUIRED}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD_REQUIRED}
+
     ports:
       - "5432:5432"
+
     volumes:
       - efs_postgres_data:/var/lib/postgresql
+      - ./scripts/database/10-create-runtime-user.sh:/docker-entrypoint-initdb.d/10-create-runtime-user.sh:ro
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+
 
   rabbitmq:
-    image: rabbitmq:4-management
+    image: rabbitmq:4.3.5-management@sha256:57bddb6fbc3498b5d8b5a14dc6f4506073ebcf94c66ba2a7678c335faa8dd631
     container_name: efs-rabbitmq
     restart: unless-stopped
+
+    environment:
+      EFS_RABBITMQ_USERNAME: ${EFS_RABBITMQ_USERNAME:?EFS_RABBITMQ_USERNAME_REQUIRED}
+      EFS_RABBITMQ_PASSWORD: ${EFS_RABBITMQ_PASSWORD:?EFS_RABBITMQ_PASSWORD_REQUIRED}
+
     ports:
       - "5672:5672"
       - "15672:15672"
 
+    volumes:
+      - efs_rabbitmq_data:/var/lib/rabbitmq
+      - ./scripts/deployment/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - -q
+        - ping
+
+
+  backend:
+    image: ${EFS_BACKEND_IMAGE:?EFS_BACKEND_IMAGE_REQUIRED}
+    container_name: efs-backend
+    restart: unless-stopped
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:?DB_NAME_REQUIRED}
+
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME_REQUIRED}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD_REQUIRED}
+
+      FLYWAY_USERNAME: ${FLYWAY_USERNAME:?FLYWAY_USERNAME_REQUIRED}
+      FLYWAY_PASSWORD: ${FLYWAY_PASSWORD:?FLYWAY_PASSWORD_REQUIRED}
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${EFS_RABBITMQ_USERNAME:?EFS_RABBITMQ_USERNAME_REQUIRED}
+      SPRING_RABBITMQ_PASSWORD: ${EFS_RABBITMQ_PASSWORD:?EFS_RABBITMQ_PASSWORD_REQUIRED}
+
+      EFS_LOG_FILE: /var/log/efs/efs-backend.json
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - ./runtime/logs:/var/log/efs
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/actuator/health || exit 1
+
+
 volumes:
   efs_postgres_data:
+  efs_rabbitmq_data:
