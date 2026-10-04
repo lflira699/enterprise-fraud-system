@@ -1,0 +1,211 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - '02-Development/02-Source Code/efs-backend/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '02-Development/02-Source Code/efs-backend/**'
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-24.04
+
+    env:
+      CI_ADMIN_PASSWORD: EfsCiAdmin-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_RUNTIME_PASSWORD: EfsCiApp-${{ github.run_id }}-${{ github.run_attempt }}
+
+    services:
+      postgres:
+        image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+        env:
+          POSTGRES_DB: efs
+          POSTGRES_USER: efs_admin
+          POSTGRES_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U efs_admin -d efs"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout committed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate runner and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          . /etc/os-release
+
+          if [ "${VERSION_ID}" != "24.04" ]; then
+            echo "Unsupported runner OS version: ${VERSION_ID}"
+            exit 1
+          fi
+
+          if [ -z "${JAVA_HOME_21_X64:-}" ]; then
+            echo "JAVA_HOME_21_X64 is not available"
+            exit 1
+          fi
+
+          export JAVA_HOME="${JAVA_HOME_21_X64}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+
+          java -version 2>&1 | tee /tmp/efs-java-version.txt
+
+          if ! grep -Eq 'version "21(\.|")' /tmp/efs-java-version.txt; then
+            echo "Java 21 compatibility guard failed"
+            exit 1
+          fi
+
+          mvn -version | tee /tmp/efs-maven-version.txt
+
+          if ! grep -Eq '^Apache Maven 3\.9\.16([[:space:]]|$)' /tmp/efs-maven-version.txt; then
+            echo "Maven 3.9.16 compatibility guard failed"
+            exit 1
+          fi
+
+      - name: Validate approved database bootstrap
+        shell: bash
+        working-directory: ./02-Development/02-Source Code/efs-backend
+        run: |
+          set -euo pipefail
+
+          echo "d50ae27542fe24983ba7488256eceea0967cc5a61cf59e580f251d21e9d6339c  scripts/database/10-create-runtime-user.sh" |
+            sha256sum -c -
+
+      - name: Bootstrap runtime database user
+        shell: bash
+        working-directory: ./02-Development/02-Source Code/efs-backend
+        run: |
+          set -euo pipefail
+
+          docker cp \
+            scripts/database/10-create-runtime-user.sh \
+            "${{ job.services.postgres.id }}:/tmp/10-create-runtime-user.sh"
+
+          docker exec \
+            --env POSTGRES_DB=efs \
+            --env POSTGRES_USER=efs_admin \
+            --env DB_USERNAME=efs_app \
+            --env DB_PASSWORD="${CI_RUNTIME_PASSWORD}" \
+            "${{ job.services.postgres.id }}" \
+            sh /tmp/10-create-runtime-user.sh
+
+          docker exec \
+            --env PGPASSWORD="${CI_RUNTIME_PASSWORD}" \
+            "${{ job.services.postgres.id }}" \
+            psql \
+            -h 127.0.0.1 \
+            -U efs_app \
+            -d efs \
+            -Atc 'SELECT 1;'
+
+      - name: Maven verify
+        shell: bash
+        working-directory: ./02-Development/02-Source Code/efs-backend
+        env:
+          DB_USERNAME: efs_app
+          DB_PASSWORD: ${{ env.CI_RUNTIME_PASSWORD }}
+          FLYWAY_USERNAME: efs_admin
+          FLYWAY_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
+          SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:${{ job.services.postgres.ports[5432] }}/efs
+          SPRING_RABBITMQ_HOST: 127.0.0.1
+          SPRING_RABBITMQ_PORT: '1'
+          SPRING_RABBITMQ_LISTENER_SIMPLE_AUTO_STARTUP: 'false'
+          MANAGEMENT_HEALTH_RABBIT_ENABLED: 'false'
+          EFS_OUTBOX_DISPATCH_ENABLED: 'false'
+        run: |
+          set -euo pipefail
+
+          export JAVA_HOME="${JAVA_HOME_21_X64}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+
+          mvn -B -ntp verify
+
+      - name: SpotBugs and FindSecBugs
+        shell: bash
+        working-directory: ./02-Development/02-Source Code/efs-backend
+        run: |
+          set -euo pipefail
+
+          export JAVA_HOME="${JAVA_HOME_21_X64}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+
+          mvn \
+            -B \
+            -ntp \
+            com.github.spotbugs:spotbugs-maven-plugin:4.10.4.1:spotbugs
+
+          test -s target/spotbugsXml.xml
+
+      - name: Install verified Trivy 0.75.0
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TRIVY_TEMP="${RUNNER_TEMP}/efs-trivy"
+
+          mkdir -p "${TRIVY_TEMP}"
+          cd "${TRIVY_TEMP}"
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --output trivy_0.75.0_checksums.txt \
+            https://github.com/aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_checksums.txt
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --output trivy_0.75.0_Linux-64bit.tar.gz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-64bit.tar.gz
+
+          echo "43a87485d39b60dae55cb1a14725dddd612040c0b1ec4caa88948c07d6c06219  trivy_0.75.0_checksums.txt" |
+            sha256sum -c -
+
+          echo "c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f  trivy_0.75.0_Linux-64bit.tar.gz" |
+            sha256sum -c -
+
+          grep \
+            '  trivy_0.75.0_Linux-64bit.tar.gz$' \
+            trivy_0.75.0_checksums.txt |
+            sha256sum -c -
+
+          mkdir -p bin
+
+          tar \
+            -xzf trivy_0.75.0_Linux-64bit.tar.gz \
+            -C bin \
+            trivy
+
+          "${TRIVY_TEMP}/bin/trivy" --version
+
+      - name: Trivy source and secret scan
+        shell: bash
+        working-directory: ./02-Development/02-Source Code/efs-backend
+        run: |
+          set -euo pipefail
+
+          "${RUNNER_TEMP}/efs-trivy/bin/trivy" \
+            fs \
+            --scanners vuln,secret \
+            --exit-code 0 \
+            .
