@@ -5,7 +5,10 @@ import com.efs.modules.administration.service.SystemConfigurationServiceInterfac
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -34,6 +37,12 @@ public class RiskScoringModelResolver {
                     "HIGH",
                     "CRITICAL"
             );
+
+    private static final String EVENT_ACTIVE_MODEL_KEY =
+            "EFS.RISK.EVENT.ACTIVE_MODEL";
+
+    private static final String EVENT_MODEL_PREFIX =
+            "EFS.RISK.EVENT.MODEL.";
 
     private static final String CUSTOMER_ACTIVE_MODEL_KEY =
             "EFS.RISK.CUSTOMER.ACTIVE_MODEL";
@@ -87,6 +96,38 @@ public class RiskScoringModelResolver {
         );
     }
 
+    public RiskScoringModel resolveEvent(
+            UUID organizationId,
+            UUID tenantId) {
+
+        String modelVersion =
+                requiredString(
+                        EVENT_ACTIVE_MODEL_KEY,
+                        organizationId,
+                        tenantId
+                );
+
+        String modelKeyPrefix =
+                EVENT_MODEL_PREFIX
+                        + modelVersion;
+
+        List<String> factorCodes =
+                requiredFactorCodes(
+                        modelKeyPrefix
+                                + ".FACTOR.CODES",
+                        organizationId,
+                        tenantId
+                );
+
+        return resolveModelByVersion(
+                modelVersion,
+                EVENT_MODEL_PREFIX,
+                factorCodes,
+                organizationId,
+                tenantId
+        );
+    }
+
     private RiskScoringModel resolveModel(
             String activeModelKey,
             String modelPrefix,
@@ -100,6 +141,22 @@ public class RiskScoringModelResolver {
                         organizationId,
                         tenantId
                 );
+
+        return resolveModelByVersion(
+                modelVersion,
+                modelPrefix,
+                factorCodes,
+                organizationId,
+                tenantId
+        );
+    }
+
+    private RiskScoringModel resolveModelByVersion(
+            String modelVersion,
+            String modelPrefix,
+            List<String> factorCodes,
+            UUID organizationId,
+            UUID tenantId) {
 
         String modelKeyPrefix =
                 modelPrefix
@@ -215,6 +272,68 @@ public class RiskScoringModelResolver {
         return new RiskScoringModel.Threshold(
                 riskLevel,
                 minimumScore
+        );
+    }
+
+    private List<String> requiredFactorCodes(
+            String configurationKey,
+            UUID organizationId,
+            UUID tenantId) {
+
+        String configuredCodes =
+                requiredString(
+                        configurationKey,
+                        organizationId,
+                        tenantId
+                );
+
+        String[] rawCodes =
+                configuredCodes.split(
+                        ",",
+                        -1
+                );
+
+        List<String> factorCodes =
+                new ArrayList<>();
+
+        Set<String> uniqueFactorCodes =
+                new LinkedHashSet<>();
+
+        for (String rawCode : rawCodes) {
+
+            String factorCode =
+                    rawCode.trim();
+
+            if (factorCode.isBlank()) {
+                throw new IllegalStateException(
+                        "Required event risk factor code is blank: "
+                                + configurationKey
+                );
+            }
+
+            if (!uniqueFactorCodes.add(
+                    factorCode)) {
+
+                throw new IllegalStateException(
+                        "Duplicate event risk factor code: "
+                                + factorCode
+                );
+            }
+
+            factorCodes.add(
+                    factorCode
+            );
+        }
+
+        if (factorCodes.isEmpty()) {
+            throw new IllegalStateException(
+                    "Event risk factor catalog is empty: "
+                            + configurationKey
+            );
+        }
+
+        return List.copyOf(
+                factorCodes
         );
     }
 
