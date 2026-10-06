@@ -1,3 +1,4 @@
+import AdministrationPage from '../modules/administration/pages/AdministrationPage'
 import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
@@ -91,11 +92,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.administration}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.administration}
-            />
-          }
+          element={<AdministrationPage />}
         />
 
         <Route

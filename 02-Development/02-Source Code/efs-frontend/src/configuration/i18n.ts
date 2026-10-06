@@ -24,6 +24,16 @@ const resources = {
         audit: 'Auditoría',
       },
 
+      systemHealth: {
+        title: 'Estado del sistema',
+        loading: 'Consultando estado del sistema',
+        error: 'No fue posible consultar el estado del sistema.',
+        overallStatus: 'Estado general',
+        informationStatus: 'Estado de la información',
+        checkedAt: 'Última verificación',
+        components: 'Componentes',
+        noComponents: 'No hay componentes disponibles para mostrar.',
+      },
       auditLog: {
         title:
           'Revisión de auditoría',
