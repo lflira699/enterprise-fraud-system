@@ -6,6 +6,7 @@ import AuditPage from '../modules/audit/pages/AuditPage'
 import CasesPage from '../modules/cases/pages/CasesPage'
 import ConfigurationPage from '../modules/configuration/pages/ConfigurationPage'
 import DashboardPage from '../modules/dashboard/pages/DashboardPage'
+import EventsPage from '../modules/events/pages/EventsPage'
 import DetectionPage from '../modules/detection/pages/DetectionPage'
 import ReportsPage from '../modules/reports/pages/ReportsPage'
 import RiskPage from '../modules/risk/pages/RiskPage'
@@ -46,11 +47,7 @@ function AppRouter() {
 
         <Route
           path={ROUTE_PATHS.events}
-          element={
-            <RouteBoundary
-              path={ROUTE_PATHS.events}
-            />
-          }
+          element={<EventsPage />}
         />
 
         <Route

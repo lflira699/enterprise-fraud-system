@@ -237,6 +237,61 @@ const resources = {
         },
       },
 
+      events: {
+        filters: {
+          title: 'Filtros',
+          transactionId:
+            'ID de transacción',
+          eventType:
+            'Tipo de evento',
+          sourceType:
+            'Tipo de origen',
+          sourceReference:
+            'Referencia de origen',
+          correlationId:
+            'ID de correlación',
+          occurredFrom:
+            'Ocurrido desde',
+          occurredTo:
+            'Ocurrido hasta',
+          receivedFrom:
+            'Recibido desde',
+          receivedTo:
+            'Recibido hasta',
+          apply:
+            'Aplicar filtros',
+          reset:
+            'Limpiar filtros',
+        },
+
+        list: {
+          title:
+            'Eventos de fraude',
+          error:
+            'No fue posible cargar los eventos.',
+          noRows:
+            'No hay eventos para los filtros seleccionados.',
+        },
+
+        columns: {
+          fraudEventId:
+            'ID de evento',
+          eventType:
+            'Tipo de evento',
+          sourceType:
+            'Tipo de origen',
+          sourceReference:
+            'Referencia de origen',
+          transactionId:
+            'ID de transacción',
+          correlationId:
+            'ID de correlación',
+          occurredAt:
+            'Ocurrido',
+          receivedAt:
+            'Recibido',
+        },
+      },
       rules: {
         list: {
           title:
