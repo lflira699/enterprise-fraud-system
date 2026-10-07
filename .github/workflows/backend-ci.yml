@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - '02-Development/02-Source Code/efs-backend/**'
+      - '.github/workflows/backend-ci.yml'
   push:
     branches:
       - main
     paths:
       - '02-Development/02-Source Code/efs-backend/**'
+      - '.github/workflows/backend-ci.yml'
 
 permissions:
   contents: read
