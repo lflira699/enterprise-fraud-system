@@ -2,7 +2,9 @@ package com.efs.modules.risk.service;
 
 import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
+import com.efs.modules.event.dto.FraudEventReference;
 import com.efs.modules.event.repository.FraudEventRepository;
+import com.efs.modules.event.service.FraudEventLookupServiceInterface;
 import com.efs.modules.risk.dto.EventRiskAssessmentResponse;
 import com.efs.modules.risk.entity.EventRiskAssessment;
 import com.efs.modules.risk.mapper.EventRiskAssessmentMapper;
@@ -41,6 +43,8 @@ class EventRiskAssessmentReviewTest {
     @Mock
     private FraudEventRepository fraudEventRepository;
 
+    private FraudEventLookupServiceInterface fraudEventLookupService;
+
     @Mock
     private RiskScoringModelResolver riskScoringModelResolver;
 
@@ -69,12 +73,39 @@ class EventRiskAssessmentReviewTest {
 
     @BeforeEach
     void setUp() {
+        fraudEventLookupService =
+                (
+                        lookupFraudEventId,
+                        lookupOrganizationId,
+                        lookupTenantId
+                ) ->
+                        fraudEventRepository
+                                .findByFraudEventIdAndOrganizationIdAndTenantId(
+                                        lookupFraudEventId,
+                                        lookupOrganizationId,
+                                        lookupTenantId
+                                )
+                                .map(
+                                        event ->
+                                                new FraudEventReference(
+                                                        event.getFraudEventId(),
+                                                        event.getOrganizationId(),
+                                                        event.getTenantId(),
+                                                        event.getCorrelationId()
+                                                )
+                                )
+                                .orElseThrow(
+                                        () ->
+                                                new com.efs.shared.exception.ResourceNotFoundException(
+                                                        "Fraud event not found."
+                                                )
+                                );
 
         service =
                 new EventRiskAssessmentService(
                         eventRiskAssessmentRepository,
                         eventRiskAssessmentMapper,
-                        fraudEventRepository,
+                        fraudEventLookupService,
                         riskScoringModelResolver,
                         riskCalculator,
                         securityContextProvider,

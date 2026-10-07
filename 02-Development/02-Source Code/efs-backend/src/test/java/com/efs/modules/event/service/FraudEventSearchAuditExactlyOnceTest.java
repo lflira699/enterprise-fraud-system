@@ -243,4 +243,97 @@ class FraudEventSearchAuditExactlyOnceTest {
                 domainEventOutboxService
         );
     }
+
+    @Test
+    void internalCanonicalLookupDoesNotUseReviewAuthorizationOrAudit() {
+
+        UUID fraudEventId =
+                UUID.randomUUID();
+
+        UUID organizationId =
+                UUID.randomUUID();
+
+        UUID tenantId =
+                UUID.randomUUID();
+
+        UUID correlationId =
+                UUID.randomUUID();
+
+        com.efs.modules.event.entity.FraudEvent fraudEvent =
+                org.mockito.Mockito.mock(
+                        com.efs.modules.event.entity.FraudEvent.class
+                );
+
+        when(
+                fraudEvent.getFraudEventId()
+        ).thenReturn(
+                fraudEventId
+        );
+
+        when(
+                fraudEvent.getOrganizationId()
+        ).thenReturn(
+                organizationId
+        );
+
+        when(
+                fraudEvent.getTenantId()
+        ).thenReturn(
+                tenantId
+        );
+
+        when(
+                fraudEvent.getCorrelationId()
+        ).thenReturn(
+                correlationId
+        );
+
+        when(
+                fraudEventRepository
+                        .findByFraudEventIdAndOrganizationIdAndTenantId(
+                                fraudEventId,
+                                organizationId,
+                                tenantId
+                        )
+        ).thenReturn(
+                java.util.Optional.of(
+                        fraudEvent
+                )
+        );
+
+        com.efs.modules.event.dto.FraudEventReference result =
+                service.lookupCanonicalEvent(
+                        fraudEventId,
+                        organizationId,
+                        tenantId
+                );
+
+        assertEquals(
+                fraudEventId,
+                result.fraudEventId()
+        );
+
+        assertEquals(
+                organizationId,
+                result.organizationId()
+        );
+
+        assertEquals(
+                tenantId,
+                result.tenantId()
+        );
+
+        assertEquals(
+                correlationId,
+                result.correlationId()
+        );
+
+        verifyNoInteractions(
+                userAccountLookupService
+        );
+
+        verifyNoInteractions(
+                auditEventService
+        );
+    }
 }

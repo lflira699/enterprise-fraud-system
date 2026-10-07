@@ -2,8 +2,8 @@ package com.efs.modules.risk.service;
 
 import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
-import com.efs.modules.event.entity.FraudEvent;
-import com.efs.modules.event.repository.FraudEventRepository;
+import com.efs.modules.event.dto.FraudEventReference;
+import com.efs.modules.event.service.FraudEventLookupServiceInterface;
 import com.efs.modules.risk.dto.EventRiskAssessmentRequest;
 import com.efs.modules.risk.dto.EventRiskAssessmentResponse;
 import com.efs.modules.risk.entity.EventRiskAssessment;
@@ -52,8 +52,8 @@ public class EventRiskAssessmentService
     private final EventRiskAssessmentMapper
             eventRiskAssessmentMapper;
 
-    private final FraudEventRepository
-            fraudEventRepository;
+    private final FraudEventLookupServiceInterface
+            fraudEventLookupService;
 
     private final RiskScoringModelResolver
             riskScoringModelResolver;
@@ -73,7 +73,7 @@ public class EventRiskAssessmentService
     public EventRiskAssessmentService(
             EventRiskAssessmentRepository eventRiskAssessmentRepository,
             EventRiskAssessmentMapper eventRiskAssessmentMapper,
-            FraudEventRepository fraudEventRepository,
+            FraudEventLookupServiceInterface fraudEventLookupService,
             RiskScoringModelResolver riskScoringModelResolver,
             RiskCalculator riskCalculator,
             SecurityContextProvider securityContextProvider,
@@ -86,8 +86,8 @@ public class EventRiskAssessmentService
         this.eventRiskAssessmentMapper =
                 eventRiskAssessmentMapper;
 
-        this.fraudEventRepository =
-                fraudEventRepository;
+        this.fraudEventLookupService =
+                fraudEventLookupService;
 
         this.riskScoringModelResolver =
                 riskScoringModelResolver;
@@ -182,22 +182,16 @@ public class EventRiskAssessmentService
                 );
             }
 
-            FraudEvent fraudEvent =
-                    fraudEventRepository
-                            .findByFraudEventIdAndOrganizationIdAndTenantId(
+            FraudEventReference fraudEvent =
+                    fraudEventLookupService
+                            .lookupCanonicalEvent(
                                     request.getFraudEventId(),
                                     organizationId,
                                     tenantId
-                            )
-                            .orElseThrow(
-                                    () ->
-                                            new ResourceNotFoundException(
-                                                    "Fraud event not found."
-                                            )
                             );
 
             correlationId =
-                    fraudEvent.getCorrelationId();
+                    fraudEvent.correlationId();
 
             if (correlationId == null) {
 
@@ -279,10 +273,10 @@ public class EventRiskAssessmentService
 
             EventRiskAssessment assessment =
                     new EventRiskAssessment(
-                            fraudEvent.getFraudEventId(),
-                            fraudEvent.getOrganizationId(),
-                            fraudEvent.getTenantId(),
-                            fraudEvent.getCorrelationId(),
+                            fraudEvent.fraudEventId(),
+                            fraudEvent.organizationId(),
+                            fraudEvent.tenantId(),
+                            fraudEvent.correlationId(),
                             calculation.modelName(),
                             calculation.modelVersion(),
                             calculation.overallRiskScore(),
@@ -988,17 +982,17 @@ public class EventRiskAssessmentService
     }
 
     private EventRiskAssessment findReusableAssessment(
-            FraudEvent fraudEvent,
+            FraudEventReference fraudEvent,
             RiskCalculationResult calculation,
             Map<String, BigDecimal> factorScores) {
 
         List<EventRiskAssessment> candidates =
                 eventRiskAssessmentRepository
                         .findByFraudEventIdAndOrganizationIdAndTenantIdAndCorrelationIdAndModelIdAndModelVersionOrderByAssessmentTimestampDesc(
-                                fraudEvent.getFraudEventId(),
-                                fraudEvent.getOrganizationId(),
-                                fraudEvent.getTenantId(),
-                                fraudEvent.getCorrelationId(),
+                                fraudEvent.fraudEventId(),
+                                fraudEvent.organizationId(),
+                                fraudEvent.tenantId(),
+                                fraudEvent.correlationId(),
                                 calculation.modelName(),
                                 calculation.modelVersion()
                         );

@@ -6,6 +6,7 @@ import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.audit.dto.AuditEventRequest;
 import com.efs.modules.audit.service.AuditEventServiceInterface;
+import com.efs.modules.event.dto.FraudEventReference;
 import com.efs.modules.event.dto.FraudEventRequest;
 import com.efs.modules.event.dto.FraudEventResponse;
 import com.efs.modules.event.entity.FraudEvent;
@@ -39,7 +40,8 @@ import java.util.UUID;
 
 @Service
 public class FraudEventService
-        implements FraudEventServiceInterface {
+        implements FraudEventServiceInterface,
+                   FraudEventLookupServiceInterface {
     private static final String FRAUD_EVENT_SEARCH_EVENT_TYPE =
             "FRAUD_EVENT_SEARCH";
 
@@ -303,6 +305,52 @@ public class FraudEventService
 
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public FraudEventReference lookupCanonicalEvent(
+            UUID fraudEventId,
+            UUID organizationId,
+            UUID tenantId) {
+
+        if (fraudEventId == null) {
+            throw new RequestValidationException(
+                    "fraudEventId is required."
+            );
+        }
+
+        if (organizationId == null) {
+            throw new RequestValidationException(
+                    "organizationId is required."
+            );
+        }
+
+        if (tenantId == null) {
+            throw new RequestValidationException(
+                    "tenantId is required."
+            );
+        }
+
+        FraudEvent fraudEvent =
+                fraudEventRepository
+                        .findByFraudEventIdAndOrganizationIdAndTenantId(
+                                fraudEventId,
+                                organizationId,
+                                tenantId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Fraud event not found."
+                                        )
+                        );
+
+        return new FraudEventReference(
+                fraudEvent.getFraudEventId(),
+                fraudEvent.getOrganizationId(),
+                fraudEvent.getTenantId(),
+                fraudEvent.getCorrelationId()
+        );
+    }
     @Override
     @Transactional(readOnly = true)
     public FraudEventResponse getEvent(
