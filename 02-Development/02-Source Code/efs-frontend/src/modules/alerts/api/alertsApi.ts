@@ -35,3 +35,10 @@ export function getAlerts(
     query,
   )
 }
+export function getAlertById(
+  alertId: string,
+): Promise<Alert> {
+  return httpClient.get<Alert>(
+    `${ALERTS_PATH}/${alertId}`,
+  )
+}

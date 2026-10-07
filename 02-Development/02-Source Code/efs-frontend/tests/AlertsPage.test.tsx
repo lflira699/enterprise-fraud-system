@@ -6,6 +6,12 @@ import {
   waitFor,
 } from '@testing-library/react'
 import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom'
+import {
   afterEach,
   beforeEach,
   describe,
@@ -30,6 +36,16 @@ vi.mock(
   () => ({
     DataGrid: (
       props: {
+        rows?: Array<{
+          alertId: string
+        }>
+        onRowClick?: (
+          params: {
+            row: {
+              alertId: string
+            }
+          },
+        ) => void
         onPaginationModelChange?: (
           model: {
             page: number
@@ -45,6 +61,19 @@ vi.mock(
       },
     ) => (
       <div>
+        {props.rows?.[0] && (
+          <button
+            type="button"
+            onClick={() =>
+              props.onRowClick?.({
+                row: props.rows![0],
+              })
+            }
+          >
+            Abrir primera alerta
+          </button>
+        )}
+
         <button
           type="button"
           onClick={() =>
@@ -80,6 +109,29 @@ const useAlertsQueryMock =
     useAlertsQuery,
   )
 
+function renderAlertsPage(
+  initialEntry:
+    | string
+    | {
+        pathname: string
+        state?: unknown
+      } = '/alerts',
+) {
+  return render(
+    <MemoryRouter
+      initialEntries={[
+        initialEntry,
+      ]}
+    >
+      <Routes>
+        <Route
+          path="/alerts"
+          element={<AlertsPage />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
 beforeEach(() => {
   useAlertsQueryMock
     .mockReset()
@@ -112,9 +164,7 @@ describe('AlertsPage', () => {
   it(
     'loads alerts using the canonical server defaults',
     () => {
-      render(
-        <AlertsPage />,
-      )
+      renderAlertsPage()
 
       expect(
         useAlertsQueryMock,
@@ -130,9 +180,7 @@ describe('AlertsPage', () => {
   it(
     'updates server pagination and sorting parameters',
     async () => {
-      render(
-        <AlertsPage />,
-      )
+      renderAlertsPage()
 
       fireEvent.click(
         screen.getByRole(
@@ -183,9 +231,7 @@ describe('AlertsPage', () => {
   it(
     'applies the canonical alert filters',
     async () => {
-      render(
-        <AlertsPage />,
-      )
+      renderAlertsPage()
 
       fireEvent.change(
         screen.getByLabelText(
@@ -331,6 +377,231 @@ describe('AlertsPage', () => {
           })
         },
       )
+    },
+  )
+
+  it(
+    'restores filters pagination and sorting from Alert Detail search context',
+    () => {
+      renderAlertsPage({
+        pathname: '/alerts',
+        state: {
+          alertSearchContext: {
+            filterDraft: {
+              status:
+                'IN_PROGRESS',
+              priority:
+                'HIGH',
+            },
+            appliedFilters: {
+              status:
+                'IN_PROGRESS',
+              priority:
+                'HIGH',
+            },
+            paginationModel: {
+              page: 2,
+              pageSize: 50,
+            },
+            sortModel: [
+              {
+                field:
+                  'riskScore',
+                sort: 'asc',
+              },
+            ],
+          },
+        },
+      })
+
+      expect(
+        useAlertsQueryMock,
+      ).toHaveBeenCalledWith({
+        status:
+          'IN_PROGRESS',
+        priority:
+          'HIGH',
+        page: 2,
+        size: 50,
+        sort: 'riskScore',
+        direction: 'ASC',
+      })
+
+      expect(
+        (
+          screen.getByLabelText(
+            'Estado',
+          ) as HTMLInputElement
+        ).value,
+      ).toBe(
+        'IN_PROGRESS',
+      )
+
+      expect(
+        (
+          screen.getByLabelText(
+            'Prioridad',
+          ) as HTMLInputElement
+        ).value,
+      ).toBe(
+        'HIGH',
+      )
+    },
+  )
+
+  it(
+    'navigates to Alert Detail carrying the current search context',
+    async () => {
+      useAlertsQueryMock
+        .mockReturnValue(
+          {
+            data: {
+              content: [
+                {
+                  alertId:
+                    '11111111-1111-1111-1111-111111111111',
+                },
+              ],
+              page: 0,
+              size: 25,
+              totalElements: 1,
+              totalPages: 1,
+              hasNext: false,
+              hasPrevious: false,
+            },
+            isError: false,
+            isFetching: false,
+          } as unknown as ReturnType<
+            typeof useAlertsQuery
+          >,
+        )
+
+      let observedState:
+        unknown = null
+
+      function DetailProbe() {
+        const location =
+          useLocation()
+
+        observedState =
+          location.state
+
+        return (
+          <div>
+            Alert Detail Probe
+          </div>
+        )
+      }
+
+      render(
+        <MemoryRouter
+          initialEntries={[
+            '/alerts',
+          ]}
+        >
+          <Routes>
+            <Route
+              path="/alerts"
+              element={<AlertsPage />}
+            />
+
+            <Route
+              path="/alerts/:alertId"
+              element={<DetailProbe />}
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+      fireEvent.change(
+        screen.getByLabelText(
+          'Estado',
+        ),
+        {
+          target: {
+            value:
+              'IN_PROGRESS',
+          },
+        },
+      )
+
+      fireEvent.click(
+        screen.getByRole(
+          'button',
+          {
+            name:
+              'Aplicar filtros',
+          },
+        ),
+      )
+
+      fireEvent.click(
+        screen.getByRole(
+          'button',
+          {
+            name:
+              'Cambiar página',
+          },
+        ),
+      )
+
+      fireEvent.click(
+        screen.getByRole(
+          'button',
+          {
+            name:
+              'Ordenar por riesgo',
+          },
+        ),
+      )
+
+      fireEvent.click(
+        screen.getByRole(
+          'button',
+          {
+            name:
+              'Abrir primera alerta',
+          },
+        ),
+      )
+
+      await screen.findByText(
+        'Alert Detail Probe',
+      )
+
+      expect(
+        observedState,
+      ).toEqual({
+        alertSearchContext: {
+          filterDraft: {
+            status:
+              'IN_PROGRESS',
+          },
+          appliedFilters: {
+            status:
+              'IN_PROGRESS',
+            priority: undefined,
+            riskLevel: undefined,
+            assignedTo: undefined,
+            createdFrom: undefined,
+            createdTo: undefined,
+            customerId: undefined,
+            scenarioCode: undefined,
+            caseId: undefined,
+          },
+          paginationModel: {
+            page: 0,
+            pageSize: 50,
+          },
+          sortModel: [
+            {
+              field:
+                'riskScore',
+              sort: 'asc',
+            },
+          ],
+        },
+      })
     },
   )
 })

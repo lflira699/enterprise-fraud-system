@@ -6,7 +6,10 @@ import {
   vi,
 } from 'vitest'
 
-import { getAlerts } from '../src/modules/alerts/api/alertsApi'
+import {
+  getAlertById,
+  getAlerts,
+} from '../src/modules/alerts/api/alertsApi'
 import { httpClient } from '../src/services/httpClient'
 
 afterEach(() => {
@@ -131,6 +134,42 @@ describe('alertsApi', () => {
           direction: 'ASC',
         },
       )
+    },
+  )
+
+  it(
+    'loads an alert by its stable alertId',
+    async () => {
+      const response = {
+        alertId:
+          '11111111-1111-1111-1111-111111111111',
+      }
+
+      const getMock =
+        vi.spyOn(
+          httpClient,
+          'get',
+        )
+          .mockResolvedValue(
+            response,
+          )
+
+      const result =
+        await getAlertById(
+          response.alertId,
+        )
+
+      expect(
+        getMock,
+      ).toHaveBeenCalledTimes(1)
+
+      expect(
+        getMock,
+      ).toHaveBeenCalledWith(
+        '/alerts/11111111-1111-1111-1111-111111111111',
+      )
+
+      expect(result).toBe(response)
     },
   )
 })

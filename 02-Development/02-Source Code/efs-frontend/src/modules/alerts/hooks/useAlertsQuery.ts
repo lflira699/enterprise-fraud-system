@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { getAlerts } from '../api/alertsApi'
+import {
+  getAlertById,
+  getAlerts,
+} from '../api/alertsApi'
 import type { AlertSearchParams } from '../types/alert'
 
 export const alertsQueryKeys = {
@@ -13,6 +16,15 @@ export const alertsQueryKeys = {
       ...alertsQueryKeys.all,
       'list',
       params,
+    ] as const
+  },
+  detail(
+    alertId: string,
+  ) {
+    return [
+      ...alertsQueryKeys.all,
+      'detail',
+      alertId,
     ] as const
   },
 }
@@ -30,5 +42,24 @@ export function useAlertsQuery(
       () => getAlerts(
         params,
       ),
+  })
+}
+export function useAlertQuery(
+  alertId: string | null,
+) {
+  return useQuery({
+    queryKey:
+      alertsQueryKeys.detail(
+        alertId ?? '',
+      ),
+
+    queryFn:
+      () => getAlertById(
+        alertId ?? '',
+      ),
+
+    enabled:
+      alertId !== null
+      && alertId !== '',
   })
 }

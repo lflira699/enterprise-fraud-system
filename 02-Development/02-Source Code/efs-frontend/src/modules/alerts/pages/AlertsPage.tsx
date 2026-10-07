@@ -17,7 +17,12 @@ import {
   type GridSortModel,
 } from '@mui/x-data-grid'
 import { useTranslation } from 'react-i18next'
+import {
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
 
+import { ROUTE_PATHS } from '../../../routing/routePaths'
 import { useAlertsQuery } from '../hooks/useAlertsQuery'
 import type {
   Alert as AlertRecord,
@@ -38,6 +43,16 @@ type AlertFilterDraft = Pick<
   | 'scenarioCode'
   | 'caseId'
 >
+type AlertSearchContext = {
+  filterDraft: AlertFilterDraft
+  appliedFilters: AlertFilterDraft
+  paginationModel: GridPaginationModel
+  sortModel: GridSortModel
+}
+
+type AlertsLocationState = {
+  alertSearchContext?: AlertSearchContext
+}
 
 const DEFAULT_PAGINATION_MODEL: GridPaginationModel = {
   page: 0,
@@ -126,28 +141,52 @@ function formatDateTime(
 function AlertsPage() {
   const { t } = useTranslation()
 
+  const location =
+    useLocation()
+
+  const navigate =
+    useNavigate()
+
+  const locationState =
+    location.state as AlertsLocationState | null
+
+  const searchContext =
+    locationState?.alertSearchContext
+
   const [
     filterDraft,
     setFilterDraft,
-  ] = useState<AlertFilterDraft>({})
+  ] = useState<AlertFilterDraft>(
+    () =>
+      searchContext?.filterDraft
+      ?? {},
+  )
 
   const [
     appliedFilters,
     setAppliedFilters,
-  ] = useState<AlertFilterDraft>({})
+  ] = useState<AlertFilterDraft>(
+    () =>
+      searchContext?.appliedFilters
+      ?? {},
+  )
 
   const [
     paginationModel,
     setPaginationModel,
   ] = useState<GridPaginationModel>(
-    DEFAULT_PAGINATION_MODEL,
+    () =>
+      searchContext?.paginationModel
+      ?? DEFAULT_PAGINATION_MODEL,
   )
 
   const [
     sortModel,
     setSortModel,
   ] = useState<GridSortModel>(
-    DEFAULT_SORT_MODEL,
+    () =>
+      searchContext?.sortModel
+      ?? DEFAULT_SORT_MODEL,
   )
 
   const activeSort =
@@ -397,6 +436,26 @@ function AlertsPage() {
     )
   }
 
+  function openAlertDetail(
+    alertId: string,
+  ) {
+    const alertSearchContext:
+      AlertSearchContext = {
+        filterDraft,
+        appliedFilters,
+        paginationModel,
+        sortModel,
+      }
+
+    void navigate(
+      `${ROUTE_PATHS.alerts}/${encodeURIComponent(alertId)}`,
+      {
+        state: {
+          alertSearchContext,
+        } satisfies AlertsLocationState,
+      },
+    )
+  }
   function handleSortModelChange(
     model: GridSortModel,
   ) {
@@ -728,6 +787,11 @@ function AlertsPage() {
                 handleSortModelChange
               }
               disableRowSelectionOnClick
+              onRowClick={(params) =>
+                openAlertDetail(
+                  params.row.alertId,
+                )
+              }
               localeText={{
                 noRowsLabel:
                   t(

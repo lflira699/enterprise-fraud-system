@@ -16,7 +16,10 @@ import {
 } from 'vitest'
 
 import * as alertsApi from '../src/modules/alerts/api/alertsApi'
-import { useAlertsQuery } from '../src/modules/alerts/hooks/useAlertsQuery'
+import {
+  useAlertQuery,
+  useAlertsQuery,
+} from '../src/modules/alerts/hooks/useAlertsQuery'
 import type { AlertSearchParams } from '../src/modules/alerts/types/alert'
 
 afterEach(() => {
@@ -110,6 +113,136 @@ describe('useAlertsQuery', () => {
       ).toEqual(
         response,
       )
+
+      queryClient.clear()
+    },
+  )
+})
+describe('useAlertQuery', () => {
+  it(
+    'loads an alert using its stable alertId',
+    async () => {
+      const alertId =
+        '11111111-1111-1111-1111-111111111111'
+
+      const response = {
+        alertId,
+      }
+
+      const getAlertByIdMock =
+        vi.spyOn(
+          alertsApi,
+          'getAlertById',
+        )
+          .mockResolvedValue(
+            response as never,
+          )
+
+      const queryClient =
+        new QueryClient({
+          defaultOptions: {
+            queries: {
+              retry: false,
+            },
+          },
+        })
+
+      function Wrapper({
+        children,
+      }: {
+        children: ReactNode
+      }) {
+        return (
+          <QueryClientProvider
+            client={queryClient}
+          >
+            {children}
+          </QueryClientProvider>
+        )
+      }
+
+      const { result } =
+        renderHook(
+          () => useAlertQuery(
+            alertId,
+          ),
+          {
+            wrapper: Wrapper,
+          },
+        )
+
+      await waitFor(
+        () => {
+          expect(
+            result.current.isSuccess,
+          ).toBe(true)
+        },
+      )
+
+      expect(
+        getAlertByIdMock,
+      ).toHaveBeenCalledTimes(1)
+
+      expect(
+        getAlertByIdMock,
+      ).toHaveBeenCalledWith(
+        alertId,
+      )
+
+      expect(
+        result.current.data,
+      ).toEqual(
+        response,
+      )
+
+      queryClient.clear()
+    },
+  )
+
+  it(
+    'does not load when alertId is absent',
+    () => {
+      const getAlertByIdMock =
+        vi.spyOn(
+          alertsApi,
+          'getAlertById',
+        )
+
+      const queryClient =
+        new QueryClient({
+          defaultOptions: {
+            queries: {
+              retry: false,
+            },
+          },
+        })
+
+      function Wrapper({
+        children,
+      }: {
+        children: ReactNode
+      }) {
+        return (
+          <QueryClientProvider
+            client={queryClient}
+          >
+            {children}
+          </QueryClientProvider>
+        )
+      }
+
+      renderHook(
+        () => useAlertQuery(
+          null,
+        ),
+        {
+          wrapper: Wrapper,
+        },
+      )
+
+      expect(
+        getAlertByIdMock,
+      ).not.toHaveBeenCalled()
 
       queryClient.clear()
     },

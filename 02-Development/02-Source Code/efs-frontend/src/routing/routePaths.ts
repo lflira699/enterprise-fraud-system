@@ -5,6 +5,7 @@ export const ROUTE_PATHS = {
   detection: '/detection',
   risk: '/risk',
   alerts: '/alerts',
+  alertDetail: '/alerts/:alertId',
   cases: '/cases',
   evidence: '/evidence',
   reports: '/reports',

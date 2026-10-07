@@ -425,6 +425,67 @@ const resources = {
           generatedAt: 'Generada',
           dueAt: 'Vencimiento',
         },
+
+        detail: {
+          title: 'Detalle de la alerta',
+          back: 'Volver al listado',
+          loading:
+            'Cargando detalle de la alerta.',
+          error:
+            'No fue posible cargar el detalle de la alerta.',
+          notFound:
+            'La alerta solicitada no está disponible o no existe.',
+          unauthorized:
+            'No cuenta con autorización para consultar esta alerta.',
+
+          fields: {
+            alertId: 'ID de alerta',
+            reference: 'Referencia',
+            status: 'Estado',
+            priority: 'Prioridad',
+            priorityScore:
+              'Puntaje de prioridad',
+            severity: 'Severidad',
+            riskScore:
+              'Puntaje de riesgo',
+            alertType:
+              'Tipo de alerta',
+            category: 'Categoría',
+            customerId:
+              'ID de cliente',
+            transactionId:
+              'ID de transacción',
+            decisionId:
+              'ID de decisión',
+            riskAssessmentId:
+              'ID de evaluación de riesgo',
+            scenarioId:
+              'ID de escenario',
+            ruleId:
+              'ID de regla',
+            assignedTo:
+              'Asignado a',
+            assignedTeam:
+              'Equipo asignado',
+            correlationId:
+              'ID de correlación',
+            title: 'Título',
+            description:
+              'Descripción',
+            generatedAt:
+              'Generada',
+            dueAt:
+              'Vencimiento',
+            closedAt:
+              'Cerrada',
+            closureReason:
+              'Motivo de cierre',
+            createdAt:
+              'Creada',
+            updatedAt:
+              'Actualizada',
+          },
+        },
       },
 
       cases: {

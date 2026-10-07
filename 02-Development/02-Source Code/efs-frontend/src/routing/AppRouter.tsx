@@ -2,6 +2,7 @@ import AdministrationPage from '../modules/administration/pages/AdministrationPa
 import { Box, Typography } from '@mui/material'
 import { Route, Routes } from 'react-router-dom'
 
+import AlertDetailPage from '../modules/alerts/pages/AlertDetailPage'
 import AlertsPage from '../modules/alerts/pages/AlertsPage'
 import AuditPage from '../modules/audit/pages/AuditPage'
 import CasesPage from '../modules/cases/pages/CasesPage'
@@ -69,6 +70,11 @@ function AppRouter() {
         <Route
           path={ROUTE_PATHS.alerts}
           element={<AlertsPage />}
+        />
+
+        <Route
+          path={ROUTE_PATHS.alertDetail}
+          element={<AlertDetailPage />}
         />
 
         <Route
