@@ -1,6 +1,8 @@
 package com.efs.modules.alert.service;
 
 import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.audit.dto.AuditEventRequest;
+import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.alert.dto.AlertAssignmentRequest;
 import com.efs.modules.alert.dto.AlertClosureRequest;
 import com.efs.modules.alert.dto.AlertHistoryResponse;
@@ -15,9 +17,12 @@ import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.security.SecurityContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -41,6 +46,18 @@ public class AlertAccessService
     private static final String CLOSE_PERMISSION =
             "alert.close";
 
+    private static final String ALERT_REVIEW_EVENT_TYPE =
+            "ALERT_REVIEW";
+
+    private static final String ALERT_REVIEW_ENTITY_TYPE =
+            "ALERT";
+
+    private static final String ALERT_REVIEW_ACTION =
+            "REVIEW";
+
+    private static final String ALERT_REVIEW_SOURCE_COMPONENT =
+            "ALERT";
+
     private final AlertServiceInterface
             alertService;
 
@@ -53,6 +70,9 @@ public class AlertAccessService
     private final TransactionScopeAuthorizationServiceInterface
             transactionScopeAuthorizationService;
 
+    private final AuditEventServiceInterface
+            auditEventService;
+
     public AlertAccessService(
             AlertServiceInterface alertService,
             AlertScopeAuthorizationServiceInterface
@@ -60,7 +80,8 @@ public class AlertAccessService
             TransactionDecisionServiceInterface
                     transactionDecisionService,
             TransactionScopeAuthorizationServiceInterface
-                    transactionScopeAuthorizationService) {
+                    transactionScopeAuthorizationService,
+            AuditEventServiceInterface auditEventService) {
 
         this.alertService =
                 alertService;
@@ -73,6 +94,9 @@ public class AlertAccessService
 
         this.transactionScopeAuthorizationService =
                 transactionScopeAuthorizationService;
+
+        this.auditEventService =
+                auditEventService;
     }
 
     @Override
@@ -124,27 +148,76 @@ public class AlertAccessService
                 );
     }
 
-    @Override
+        @Override
     public AlertResponse getAlertById(
             UUID alertId,
             SecurityContext securityContext) {
 
-        UserAccountReference actor =
-                alertScopeAuthorizationService
-                        .authorize(
-                                securityContext,
-                                VIEW_PERMISSION
-                        );
+        UserAccountReference actor;
 
-        requireVisible(
+        try {
+            actor =
+                    alertScopeAuthorizationService
+                            .authorize(
+                                    securityContext,
+                                    VIEW_PERMISSION
+                            );
+        } catch (AccessDeniedException exception) {
+            recordAlertReviewAudit(
+                    securityContext,
+                    alertId,
+                    "REJECTED",
+                    "MISSING_PERMISSION",
+                    null
+            );
+
+            throw exception;
+        }
+
+        AlertResponse response;
+
+        try {
+            requireVisible(
+                    alertId,
+                    actor
+            );
+
+            response =
+                    alertService
+                            .getAlertById(
+                                    alertId
+                            );
+        } catch (ResourceNotFoundException exception) {
+            recordAlertReviewAudit(
+                    securityContext,
+                    alertId,
+                    "REJECTED",
+                    "ALERT_NOT_FOUND",
+                    null
+            );
+
+            throw exception;
+        } catch (RuntimeException exception) {
+            recordAlertReviewAudit(
+                    securityContext,
+                    alertId,
+                    "FAILURE",
+                    "ALERT_REVIEW_FAILED",
+                    exception
+            );
+
+            throw exception;
+        }
+
+        recordAlertReviewAudit(
+                securityContext,
                 alertId,
-                actor
+                "SUCCESS",
+                null,
+                null
         );
 
-        return alertService
-                .getAlertById(
-                        alertId
-                );
+        return response;
     }
 
     @Override
@@ -359,6 +432,87 @@ public class AlertAccessService
                         actor.organizationId(),
                         actor.tenantId()
                 );
+    }
+    private void recordAlertReviewAudit(
+            SecurityContext securityContext,
+            UUID alertId,
+            String eventResult,
+            String reason,
+            RuntimeException exception) {
+
+        AuditEventRequest request =
+                new AuditEventRequest();
+
+        request.setTenantId(
+                securityContext.getTenantId()
+        );
+
+        request.setUserId(
+                securityContext.getUserId()
+        );
+
+        request.setSessionId(
+                securityContext.getSessionId()
+        );
+
+        request.setEventType(
+                ALERT_REVIEW_EVENT_TYPE
+        );
+
+        request.setEntityType(
+                ALERT_REVIEW_ENTITY_TYPE
+        );
+
+        request.setEntityId(
+                alertId
+        );
+
+        request.setAction(
+                ALERT_REVIEW_ACTION
+        );
+
+        request.setSourceComponent(
+                ALERT_REVIEW_SOURCE_COMPONENT
+        );
+
+        request.setEventResult(
+                eventResult
+        );
+
+        Map<String, Object> details =
+                new LinkedHashMap<>();
+
+        details.put(
+                "permissionCode",
+                VIEW_PERMISSION
+        );
+
+        if (reason != null) {
+            details.put(
+                    "reason",
+                    reason
+            );
+        }
+
+        if (exception != null) {
+            details.put(
+                    "errorType",
+                    exception.getClass().getName()
+            );
+
+            details.put(
+                    "errorMessage",
+                    exception.getMessage()
+            );
+        }
+
+        request.setEventDetails(
+                details
+        );
+
+        auditEventService.createAuditEvent(
+                request
+        );
     }
     private void requireVisible(
             UUID alertId,

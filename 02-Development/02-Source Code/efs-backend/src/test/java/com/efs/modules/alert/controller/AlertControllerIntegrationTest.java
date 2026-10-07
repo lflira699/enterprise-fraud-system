@@ -84,6 +84,10 @@ class AlertControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private com.efs.modules.audit.service.AuditEventServiceInterface
+            auditEventService;
+
     @MockitoBean
     private SecurityContextProvider
             securityContextProvider;
@@ -147,6 +151,31 @@ class AlertControllerIntegrationTest {
                 0
         );
 
+        jdbcTemplate.update(
+                """
+                INSERT INTO administration.user_account (
+                    user_id,
+                    organization_id,
+                    username,
+                    full_name,
+                    email,
+                    authentication_provider,
+                    mfa_enabled,
+                    account_status,
+                    failed_login_attempts
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                CREATED_BY,
+                ORGANIZATION_ID,
+                "efs.alert.controller.actor",
+                "EFS Alert Controller Actor",
+                "alert-controller@example.com",
+                "LOCAL",
+                false,
+                "ACTIVE",
+                0
+        );
         jdbcTemplate.update(
                 """
                 INSERT INTO administration.user_account (
@@ -432,6 +461,32 @@ class AlertControllerIntegrationTest {
                 historyBeforeReview,
                 historyAfterReview
         );
+
+        Integer alertReviewAuditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'ALERT_REVIEW'
+                          AND entity_type = 'ALERT'
+                          AND entity_id = ?
+                          AND action = 'REVIEW'
+                          AND source_component = 'ALERT'
+                          AND event_timestamp IS NOT NULL
+                          AND event_result = 'SUCCESS'
+                          AND user_id IS NOT NULL
+                          AND event_details ->> 'permissionCode' =
+                              'alert.view'
+                          AND event_details ->> 'reason' IS NULL
+                        """,
+                        Integer.class,
+                        alertId
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                alertReviewAuditCount
+        );
     }
 
     @Test
@@ -450,6 +505,33 @@ class AlertControllerIntegrationTest {
                 .andExpect(
                         status().isNotFound()
                 );
+
+        Integer alertReviewAuditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'ALERT_REVIEW'
+                          AND entity_type = 'ALERT'
+                          AND entity_id = ?
+                          AND action = 'REVIEW'
+                          AND source_component = 'ALERT'
+                          AND event_timestamp IS NOT NULL
+                          AND event_result = 'REJECTED'
+                          AND user_id IS NOT NULL
+                          AND event_details ->> 'permissionCode' =
+                              'alert.view'
+                          AND event_details ->> 'reason' =
+                              'ALERT_NOT_FOUND'
+                        """,
+                        Integer.class,
+                        unknownAlertId
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                alertReviewAuditCount
+        );
     }
 
     @Test
@@ -1665,7 +1747,96 @@ class AlertControllerIntegrationTest {
                 null
         );
 
+        LocalDateTime testStartedAt =
+                LocalDateTime.now();
+
         mockMvc.perform(
+                        get(
+                                "/api/v1/alerts/{alertId}",
+                                alertId
+                        )
+                                .header(
+                                        "X-Correlation-ID",
+                                        "uc010-forbidden-correlation"
+                                )
+                )
+                .andExpect(
+                        status().isForbidden()
+                )
+                .andExpect(
+                        jsonPath("$.timestamp").exists()
+                )
+                .andExpect(
+                        jsonPath("$.status").value(403)
+                )
+                .andExpect(
+                        jsonPath("$.errorCode").value(
+                                "IAM_PERMISSION_DENIED"
+                        )
+                )
+                .andExpect(
+                        jsonPath("$.message").value(
+                                "Access denied."
+                        )
+                )
+                .andExpect(
+                        jsonPath("$.correlationId").value(
+                                "uc010-forbidden-correlation"
+                        )
+                )
+                .andExpect(
+                        jsonPath("$.path").value(
+                                "/api/v1/alerts/" + alertId
+                        )
+                );
+
+        Integer alertReviewAuditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE event_type = 'ALERT_REVIEW'
+                          AND entity_type = 'ALERT'
+                          AND entity_id = ?
+                          AND action = 'REVIEW'
+                          AND source_component = 'ALERT'
+                          AND event_timestamp >= ?
+                          AND event_result = 'REJECTED'
+                          AND user_id = ?
+                          AND event_details ->> 'permissionCode' =
+                              'alert.view'
+                          AND event_details ->> 'reason' =
+                              'MISSING_PERMISSION'
+                        """,
+                        Integer.class,
+                        alertId,
+                        testStartedAt,
+                        CREATED_BY
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                alertReviewAuditCount
+        );
+    }
+
+    @Test
+    void shouldGenerateCorrelationIdForForbiddenAlertRequest()
+            throws Exception {
+
+        UUID alertId =
+                insertAlert(
+                        "NEW"
+                );
+
+        authorize(
+                Set.of(),
+                ORGANIZATION_ID,
+                null
+        );
+
+        org.springframework.test.web.servlet.MvcResult result =
+                mockMvc.perform(
                         get(
                                 "/api/v1/alerts/{alertId}",
                                 alertId
@@ -1673,9 +1844,39 @@ class AlertControllerIntegrationTest {
                 )
                 .andExpect(
                         status().isForbidden()
-                );
-    }
+                )
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists(
+                                "X-Correlation-ID"
+                        )
+                )
+                .andExpect(
+                        jsonPath("$.correlationId").exists()
+                )
+                .andReturn();
 
+        String responseCorrelationId =
+                result.getResponse()
+                        .getHeader(
+                                "X-Correlation-ID"
+                        );
+
+        String bodyCorrelationId =
+                new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readTree(
+                                result.getResponse()
+                                        .getContentAsString()
+                        )
+                        .get(
+                                "correlationId"
+                        )
+                        .asText();
+
+        assertEquals(
+                responseCorrelationId,
+                bodyCorrelationId
+        );
+    }
     @Test
     void shouldHideCrossOrganizationAlertById()
             throws Exception {
@@ -1702,6 +1903,134 @@ class AlertControllerIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldPersistFailureAuditWhenAlertRetrievalFails() {
+
+        UUID alertId =
+                UUID.randomUUID();
+
+        String failureMessage =
+                "UC010 forced alert review failure";
+
+        com.efs.modules.alert.service.AlertServiceInterface
+                localAlertService =
+                org.mockito.Mockito.mock(
+                        com.efs.modules.alert.service.AlertServiceInterface.class
+                );
+
+        com.efs.modules.alert.service.AlertScopeAuthorizationServiceInterface
+                localScopeAuthorizationService =
+                org.mockito.Mockito.mock(
+                        com.efs.modules.alert.service.AlertScopeAuthorizationServiceInterface.class
+                );
+
+        com.efs.modules.transaction.service.TransactionDecisionServiceInterface
+                localTransactionDecisionService =
+                org.mockito.Mockito.mock(
+                        com.efs.modules.transaction.service.TransactionDecisionServiceInterface.class
+                );
+
+        com.efs.modules.transaction.service.TransactionScopeAuthorizationServiceInterface
+                localTransactionScopeAuthorizationService =
+                org.mockito.Mockito.mock(
+                        com.efs.modules.transaction.service.TransactionScopeAuthorizationServiceInterface.class
+                );
+
+        com.efs.shared.security.SecurityContext
+                localSecurityContext =
+                new com.efs.shared.security.SecurityContext(
+                        CREATED_BY,
+                        null,
+                        null,
+                        java.util.Set.of(),
+                        java.util.Set.of("alert.view"),
+                        java.util.Set.of()
+                );
+
+        com.efs.modules.administration.dto.UserAccountReference
+                actor =
+                new com.efs.modules.administration.dto.UserAccountReference(
+                        CREATED_BY,
+                        ORGANIZATION_ID,
+                        null,
+                        "alert-controller@example.com"
+                );
+
+        when(
+                localScopeAuthorizationService.authorize(
+                        localSecurityContext,
+                        "alert.view"
+                )
+        ).thenReturn(
+                actor
+        );
+
+        when(
+                localAlertService.getAlertById(
+                        alertId
+                )
+        ).thenThrow(
+                new IllegalStateException(
+                        failureMessage
+                )
+        );
+
+        com.efs.modules.alert.service.AlertAccessService
+                localAccessService =
+                new com.efs.modules.alert.service.AlertAccessService(
+                        localAlertService,
+                        localScopeAuthorizationService,
+                        localTransactionDecisionService,
+                        localTransactionScopeAuthorizationService,
+                        auditEventService
+                );
+
+        IllegalStateException exception =
+                org.junit.jupiter.api.Assertions.assertThrows(
+                        IllegalStateException.class,
+                        () -> localAccessService.getAlertById(
+                                alertId,
+                                localSecurityContext
+                        )
+                );
+
+        assertEquals(
+                failureMessage,
+                exception.getMessage()
+        );
+
+        Integer alertReviewAuditCount =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit.audit_event
+                        WHERE user_id = ?
+                          AND event_type = 'ALERT_REVIEW'
+                          AND entity_type = 'ALERT'
+                          AND entity_id = ?
+                          AND action = 'REVIEW'
+                          AND source_component = 'ALERT'
+                          AND event_timestamp IS NOT NULL
+                          AND event_result = 'FAILURE'
+                          AND event_details ->> 'reason' =
+                              'ALERT_REVIEW_FAILED'
+                          AND event_details ->> 'permissionCode' =
+                              'alert.view'
+                          AND event_details ->> 'errorType' =
+                              'java.lang.IllegalStateException'
+                          AND event_details ->> 'errorMessage' = ?
+                        """,
+                        Integer.class,
+                        CREATED_BY,
+                        alertId,
+                        failureMessage
+                );
+
+        assertEquals(
+                Integer.valueOf(1),
+                alertReviewAuditCount
+        );
+    }
     private void authorize(
             Set<String> permissions,
             UUID authorizedOrganizationId,

@@ -12,6 +12,7 @@ import com.efs.shared.security.SecurityContext;
 import com.efs.shared.security.SecurityContextProvider;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,7 +27,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -203,11 +206,47 @@ private final AlertAccessServiceInterface
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Void> handleAccessDenied(
-            AccessDeniedException exception) {
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(
+            AccessDeniedException exception,
+            HttpServletRequest request) {
+
+        Map<String, Object> body =
+                new LinkedHashMap<>();
+
+        body.put(
+                "timestamp",
+                LocalDateTime.now()
+        );
+
+        body.put(
+                "status",
+                HttpStatus.FORBIDDEN.value()
+        );
+
+        body.put(
+                "errorCode",
+                "IAM_PERMISSION_DENIED"
+        );
+
+        body.put(
+                "message",
+                "Access denied."
+        );
+
+        body.put(
+                "correlationId",
+                request.getHeader(
+                        "X-Correlation-ID"
+                )
+        );
+
+        body.put(
+                "path",
+                request.getRequestURI()
+        );
 
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .build();
+                .body(body);
     }
 }

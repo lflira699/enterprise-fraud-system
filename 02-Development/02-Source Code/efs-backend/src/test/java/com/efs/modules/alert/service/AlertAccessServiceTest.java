@@ -1,6 +1,8 @@
 package com.efs.modules.alert.service;
 
 import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.audit.dto.AuditEventRequest;
+import com.efs.modules.audit.service.AuditEventServiceInterface;
 import com.efs.modules.alert.dto.AlertAssignmentRequest;
 import com.efs.modules.alert.dto.AlertClosureRequest;
 import com.efs.modules.alert.dto.AlertHistoryResponse;
@@ -15,6 +17,8 @@ import com.efs.shared.exception.ResourceNotFoundException;
 import com.efs.shared.security.SecurityContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Set;
@@ -73,6 +77,9 @@ class AlertAccessServiceTest {
     private TransactionScopeAuthorizationServiceInterface
             transactionScopeAuthorizationService;
 
+    private AuditEventServiceInterface
+            auditEventService;
+
     private AlertAccessService
             accessService;
 
@@ -105,12 +112,18 @@ class AlertAccessServiceTest {
                         TransactionScopeAuthorizationServiceInterface.class
                 );
 
+        auditEventService =
+                mock(
+                        AuditEventServiceInterface.class
+                );
+
         accessService =
                 new AlertAccessService(
                         alertService,
                         alertScopeAuthorizationService,
                         transactionDecisionService,
-                        transactionScopeAuthorizationService
+                        transactionScopeAuthorizationService,
+                        auditEventService
                 );
 
         securityContext =
@@ -785,6 +798,286 @@ class AlertAccessServiceTest {
                 "DESC",
                 ORGANIZATION_ID,
                 TENANT_ID
+        );
+    }
+    @Test
+    void shouldAuditSuccessfulAlertReview() {
+
+        AlertResponse response =
+                mock(
+                        AlertResponse.class
+                );
+
+        when(
+                alertScopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                "alert.view"
+                        )
+        ).thenReturn(
+                actor
+        );
+
+        when(
+                alertService.getAlertById(
+                        ALERT_ID
+                )
+        ).thenReturn(
+                response
+        );
+
+        assertSame(
+                response,
+                accessService.getAlertById(
+                        ALERT_ID,
+                        securityContext
+                )
+        );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest request =
+                captor.getValue();
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "ALERT_REVIEW",
+                request.getEventType()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "ALERT",
+                request.getEntityType()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                ALERT_ID,
+                request.getEntityId()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "REVIEW",
+                request.getAction()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "ALERT",
+                request.getSourceComponent()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "SUCCESS",
+                request.getEventResult()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "alert.view",
+                request.getEventDetails()
+                        .get("permissionCode")
+        );
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                request.getEventDetails()
+                        .containsKey("reason")
+        );
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                request.getEventDetails()
+                        .containsKey("errorType")
+        );
+    }
+
+    @Test
+    void shouldAuditMissingPermissionForAlertReview() {
+
+        when(
+                alertScopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                "alert.view"
+                        )
+        ).thenThrow(
+                new AccessDeniedException(
+                        "Missing required permission: alert.view"
+                )
+        );
+
+        assertThrows(
+                AccessDeniedException.class,
+                () ->
+                        accessService.getAlertById(
+                                ALERT_ID,
+                                securityContext
+                        )
+        );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest request =
+                captor.getValue();
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "REJECTED",
+                request.getEventResult()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "MISSING_PERMISSION",
+                request.getEventDetails()
+                        .get("reason")
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "alert.view",
+                request.getEventDetails()
+                        .get("permissionCode")
+        );
+    }
+
+    @Test
+    void shouldAuditNotFoundForAlertReview() {
+
+        when(
+                alertScopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                "alert.view"
+                        )
+        ).thenReturn(
+                actor
+        );
+
+        doThrow(
+                new ResourceNotFoundException(
+                        "Alert not found: " + ALERT_ID
+                )
+        ).when(
+                alertScopeAuthorizationService
+        ).requireVisibleAlert(
+                ALERT_ID,
+                actor,
+                "Alert not found: " + ALERT_ID
+        );
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () ->
+                        accessService.getAlertById(
+                                ALERT_ID,
+                                securityContext
+                        )
+        );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest request =
+                captor.getValue();
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "REJECTED",
+                request.getEventResult()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "ALERT_NOT_FOUND",
+                request.getEventDetails()
+                        .get("reason")
+        );
+    }
+
+    @Test
+    void shouldAuditUnexpectedFailureForAlertReview() {
+
+        when(
+                alertScopeAuthorizationService
+                        .authorize(
+                                securityContext,
+                                "alert.view"
+                        )
+        ).thenReturn(
+                actor
+        );
+
+        when(
+                alertService.getAlertById(
+                        ALERT_ID
+                )
+        ).thenThrow(
+                new IllegalStateException(
+                        "alert review failure"
+                )
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        accessService.getAlertById(
+                                ALERT_ID,
+                                securityContext
+                        )
+        );
+
+        ArgumentCaptor<AuditEventRequest> captor =
+                ArgumentCaptor.forClass(
+                        AuditEventRequest.class
+                );
+
+        verify(
+                auditEventService
+        ).createAuditEvent(
+                captor.capture()
+        );
+
+        AuditEventRequest request =
+                captor.getValue();
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "FAILURE",
+                request.getEventResult()
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "ALERT_REVIEW_FAILED",
+                request.getEventDetails()
+                        .get("reason")
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                IllegalStateException.class.getName(),
+                request.getEventDetails()
+                        .get("errorType")
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "alert review failure",
+                request.getEventDetails()
+                        .get("errorMessage")
         );
     }
 }
