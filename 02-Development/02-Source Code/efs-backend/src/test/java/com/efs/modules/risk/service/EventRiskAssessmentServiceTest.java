@@ -339,6 +339,62 @@ class EventRiskAssessmentServiceTest {
     }
 
     @Test
+    void rejectsUnavailableEventModelWithoutPersistence() {
+
+        EventRiskAssessmentRequest request =
+                request(
+                        Map.of(
+                                "VELOCITY",
+                                new BigDecimal("50.00")
+                        )
+                );
+
+        stubFraudEvent();
+
+        IllegalStateException modelUnavailable =
+                new IllegalStateException(
+                        "No active Event risk model is available."
+                );
+
+        when(
+                riskScoringModelResolver
+                        .resolveEvent(
+                                organizationId,
+                                tenantId
+                        )
+        ).thenThrow(
+                modelUnavailable
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        service.assess(
+                                request
+                        )
+        );
+
+        verify(
+                eventRiskAssessmentRepository,
+                never()
+        ).saveAndFlush(
+                any()
+        );
+
+        verify(
+                eventRiskAssessmentAuditService
+        ).recordRejected(
+                eq(organizationId),
+                eq(securityContext),
+                eq(fraudEventId),
+                eq(correlationId),
+                eq(null),
+                eq(null),
+                eq("EVENT_RISK_MODEL_UNAVAILABLE"),
+                any(IllegalStateException.class)
+        );
+    }
+    @Test
     void doesNotInvokeForbiddenDownstreamProcessing() {
 
         Set<String> forbiddenDependencyNames =
