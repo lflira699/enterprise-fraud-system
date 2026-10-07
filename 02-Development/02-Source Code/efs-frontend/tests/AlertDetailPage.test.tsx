@@ -22,6 +22,10 @@ import {
 import '../src/configuration/i18n'
 import { useAlertQuery } from '../src/modules/alerts/hooks/useAlertsQuery'
 import AlertDetailPage from '../src/modules/alerts/pages/AlertDetailPage'
+import {
+  usePlaybookExecutionsByAlertQuery,
+  usePlaybookExecutionStepsQuery,
+} from '../src/modules/playbook/hooks/usePlaybookQueries'
 import { HttpError } from '../src/services/httpClient'
 
 vi.mock(
@@ -31,9 +35,29 @@ vi.mock(
   }),
 )
 
+vi.mock(
+  '../src/modules/playbook/hooks/usePlaybookQueries',
+  () => ({
+    usePlaybookExecutionsByAlertQuery:
+      vi.fn(),
+    usePlaybookExecutionStepsQuery:
+      vi.fn(),
+  }),
+)
+
 const useAlertQueryMock =
   vi.mocked(
     useAlertQuery,
+  )
+
+const usePlaybookExecutionsMock =
+  vi.mocked(
+    usePlaybookExecutionsByAlertQuery,
+  )
+
+const usePlaybookStepsMock =
+  vi.mocked(
+    usePlaybookExecutionStepsQuery,
   )
 
 const ALERT_ID =
@@ -100,6 +124,30 @@ function renderAlertDetail() {
 
 beforeEach(() => {
   useAlertQueryMock.mockReset()
+  usePlaybookExecutionsMock.mockReset()
+  usePlaybookStepsMock.mockReset()
+
+  usePlaybookExecutionsMock.mockReturnValue(
+    {
+      data: [],
+      isError: false,
+      isFetching: false,
+      error: null,
+    } as unknown as ReturnType<
+      typeof usePlaybookExecutionsByAlertQuery
+    >,
+  )
+
+  usePlaybookStepsMock.mockReturnValue(
+    {
+      data: [],
+      isError: false,
+      isFetching: false,
+      error: null,
+    } as unknown as ReturnType<
+      typeof usePlaybookExecutionStepsQuery
+    >,
+  )
 })
 
 afterEach(() => {
@@ -320,5 +368,306 @@ describe(
         })
       },
     )
-  },
+
+    it(
+      'presents the valid empty playbook execution state for the alert',
+      () => {
+        useAlertQueryMock
+          .mockReturnValue(
+            {
+              data: ALERT,
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof useAlertQuery
+            >,
+          )
+
+        usePlaybookExecutionsMock
+          .mockReturnValue(
+            {
+              data: [],
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof usePlaybookExecutionsByAlertQuery
+            >,
+          )
+
+        renderAlertDetail()
+
+        expect(
+          usePlaybookExecutionsMock,
+        ).toHaveBeenCalledWith(
+          ALERT_ID,
+        )
+
+        expect(
+          screen.getByText(
+            'No existen ejecuciones de Playbook asociadas a esta alerta.',
+          ),
+        ).toBeTruthy()
+      },
+    )
+
+    it(
+      'presents multiple playbook executions and their steps without mutating them',
+      () => {
+        useAlertQueryMock
+          .mockReturnValue(
+            {
+              data: ALERT,
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof useAlertQuery
+            >,
+          )
+
+        usePlaybookExecutionsMock
+          .mockReturnValue(
+            {
+              data: [
+                {
+                  playbookExecutionId:
+                    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+                  playbookVersionId:
+                    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+                  alertId:
+                    ALERT_ID,
+                  scenarioId:
+                    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+                  status:
+                    'IN_PROGRESS',
+                  startedAt:
+                    '2026-10-07T11:00:00',
+                  completedAt:
+                    null,
+                  createdAt:
+                    '2026-10-07T11:00:00',
+                  updatedAt:
+                    '2026-10-07T11:05:00',
+                },
+                {
+                  playbookExecutionId:
+                    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+                  playbookVersionId:
+                    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+                  alertId:
+                    ALERT_ID,
+                  scenarioId:
+                    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+                  status:
+                    'COMPLETED',
+                  startedAt:
+                    '2026-10-07T09:00:00',
+                  completedAt:
+                    '2026-10-07T09:30:00',
+                  createdAt:
+                    '2026-10-07T09:00:00',
+                  updatedAt:
+                    '2026-10-07T09:30:00',
+                },
+              ],
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof usePlaybookExecutionsByAlertQuery
+            >,
+          )
+
+        usePlaybookStepsMock
+          .mockImplementation(
+            (
+              playbookExecutionId,
+            ) => ({
+              data:
+                playbookExecutionId
+                === 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+                  ? [
+                      {
+                        playbookExecutionStepId:
+                          '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+                        playbookExecutionId,
+                        playbookStepId:
+                          '22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+                        status:
+                          'IN_PROGRESS',
+                        result:
+                          'Review pending',
+                        startedAt:
+                          '2026-10-07T11:01:00',
+                        completedAt:
+                          null,
+                        createdAt:
+                          '2026-10-07T11:01:00',
+                        updatedAt:
+                          '2026-10-07T11:05:00',
+                      },
+                    ]
+                  : [],
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof usePlaybookExecutionStepsQuery
+            >),
+          )
+
+        renderAlertDetail()
+
+        expect(
+          screen.getAllByText(
+            'Ejecución de Playbook',
+          ).length,
+        ).toBe(2)
+
+        expect(
+          screen.getByText(
+            'Review pending',
+          ),
+        ).toBeTruthy()
+
+        expect(
+          usePlaybookStepsMock,
+        ).toHaveBeenCalledWith(
+          'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        )
+
+        expect(
+          usePlaybookStepsMock,
+        ).toHaveBeenCalledWith(
+          'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        )
+      },
+    )
+
+    it(
+      'isolates playbook execution retrieval failure from the loaded alert detail',
+      () => {
+        useAlertQueryMock
+          .mockReturnValue(
+            {
+              data: ALERT,
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof useAlertQuery
+            >,
+          )
+
+        usePlaybookExecutionsMock
+          .mockReturnValue(
+            {
+              data: undefined,
+              isError: true,
+              isFetching: false,
+              error:
+                new Error(
+                  'Playbook retrieval failed',
+                ),
+            } as unknown as ReturnType<
+              typeof usePlaybookExecutionsByAlertQuery
+            >,
+          )
+
+        renderAlertDetail()
+
+        expect(
+          screen.getByText(
+            'ALT-001',
+          ),
+        ).toBeTruthy()
+
+        expect(
+          screen.getByText(
+            'No fue posible cargar las ejecuciones de Playbook.',
+          ),
+        ).toBeTruthy()
+      },
+    )
+
+    it(
+      'isolates step retrieval failure within its playbook execution',
+      () => {
+        useAlertQueryMock
+          .mockReturnValue(
+            {
+              data: ALERT,
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof useAlertQuery
+            >,
+          )
+
+        usePlaybookExecutionsMock
+          .mockReturnValue(
+            {
+              data: [
+                {
+                  playbookExecutionId:
+                    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+                  playbookVersionId:
+                    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+                  alertId:
+                    ALERT_ID,
+                  scenarioId:
+                    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+                  status:
+                    'IN_PROGRESS',
+                  startedAt:
+                    '2026-10-07T11:00:00',
+                  completedAt:
+                    null,
+                  createdAt:
+                    '2026-10-07T11:00:00',
+                  updatedAt:
+                    '2026-10-07T11:05:00',
+                },
+              ],
+              isError: false,
+              isFetching: false,
+              error: null,
+            } as unknown as ReturnType<
+              typeof usePlaybookExecutionsByAlertQuery
+            >,
+          )
+
+        usePlaybookStepsMock
+          .mockReturnValue(
+            {
+              data: undefined,
+              isError: true,
+              isFetching: false,
+              error:
+                new Error(
+                  'Step retrieval failed',
+                ),
+            } as unknown as ReturnType<
+              typeof usePlaybookExecutionStepsQuery
+            >,
+          )
+
+        renderAlertDetail()
+
+        expect(
+          screen.getByText(
+            'ALT-001',
+          ),
+        ).toBeTruthy()
+
+        expect(
+          screen.getByText(
+            'No fue posible cargar los pasos de esta ejecución.',
+          ),
+        ).toBeTruthy()
+      },
+    )  },
 )

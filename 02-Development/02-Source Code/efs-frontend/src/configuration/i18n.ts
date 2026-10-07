@@ -438,6 +438,65 @@ const resources = {
           unauthorized:
             'No cuenta con autorización para consultar esta alerta.',
 
+          playbook: {
+            title:
+              'Ejecuciones de Playbook',
+            loading:
+              'Cargando ejecuciones de Playbook.',
+            error:
+              'No fue posible cargar las ejecuciones de Playbook.',
+            none:
+              'No existen ejecuciones de Playbook asociadas a esta alerta.',
+            execution:
+              'Ejecución de Playbook',
+            steps:
+              'Pasos de ejecución',
+            stepsLoading:
+              'Cargando pasos de ejecución.',
+            stepsError:
+              'No fue posible cargar los pasos de esta ejecución.',
+            noSteps:
+              'No existen pasos registrados para esta ejecución.',
+
+            fields: {
+              executionId:
+                'ID de ejecución',
+              versionId:
+                'ID de versión de Playbook',
+              scenarioId:
+                'ID de escenario',
+              status:
+                'Estado',
+              startedAt:
+                'Inicio',
+              completedAt:
+                'Finalización',
+              createdAt:
+                'Creada',
+              updatedAt:
+                'Actualizada',
+            },
+
+            stepFields: {
+              stepId:
+                'ID de paso de ejecución',
+              playbookStepId:
+                'ID de paso de Playbook',
+              status:
+                'Estado',
+              result:
+                'Resultado',
+              startedAt:
+                'Inicio',
+              completedAt:
+                'Finalización',
+              createdAt:
+                'Creado',
+              updatedAt:
+                'Actualizado',
+            },
+          },
+
           fields: {
             alertId: 'ID de alerta',
             reference: 'Referencia',

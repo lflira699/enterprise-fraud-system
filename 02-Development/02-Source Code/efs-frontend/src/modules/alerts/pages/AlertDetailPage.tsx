@@ -15,6 +15,11 @@ import {
 import { ROUTE_PATHS } from '../../../routing/routePaths'
 import { HttpError } from '../../../services/httpClient'
 import { useAlertQuery } from '../hooks/useAlertsQuery'
+import {
+  usePlaybookExecutionsByAlertQuery,
+  usePlaybookExecutionStepsQuery,
+} from '../../playbook/hooks/usePlaybookQueries'
+import type { PlaybookExecution } from '../../playbook/types/playbook'
 
 function formatDateTime(
   value: string | null,
@@ -94,6 +99,289 @@ function resolveErrorKey(
   return 'alerts.detail.error'
 }
 
+function PlaybookExecutionCard({
+  execution,
+}: {
+  execution: PlaybookExecution
+}) {
+  const { t } =
+    useTranslation()
+
+  const stepsQuery =
+    usePlaybookExecutionStepsQuery(
+      execution.playbookExecutionId,
+    )
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2,
+      }}
+    >
+      <Typography
+        component="h4"
+        variant="h6"
+      >
+        {t(
+          'alerts.detail.playbook.execution',
+        )}
+      </Typography>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 2,
+          mt: 2,
+        }}
+      >
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.executionId',
+          )}
+          value={
+            execution.playbookExecutionId
+          }
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.versionId',
+          )}
+          value={
+            execution.playbookVersionId
+          }
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.scenarioId',
+          )}
+          value={
+            execution.scenarioId
+          }
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.status',
+          )}
+          value={
+            execution.status
+          }
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.startedAt',
+          )}
+          value={formatDateTime(
+            execution.startedAt,
+          )}
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.completedAt',
+          )}
+          value={formatDateTime(
+            execution.completedAt,
+          )}
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.createdAt',
+          )}
+          value={formatDateTime(
+            execution.createdAt,
+          )}
+        />
+
+        <DetailField
+          label={t(
+            'alerts.detail.playbook.fields.updatedAt',
+          )}
+          value={formatDateTime(
+            execution.updatedAt,
+          )}
+        />
+      </Box>
+
+      <Box
+        sx={{
+          mt: 3,
+        }}
+      >
+        <Typography
+          component="h5"
+          variant="subtitle1"
+        >
+          {t(
+            'alerts.detail.playbook.steps',
+          )}
+        </Typography>
+
+        {stepsQuery.isFetching
+          && !stepsQuery.data
+          && (
+            <Typography
+              sx={{
+                mt: 1,
+              }}
+            >
+              {t(
+                'alerts.detail.playbook.stepsLoading',
+              )}
+            </Typography>
+          )}
+
+        {stepsQuery.isError && (
+          <MuiAlert
+            severity="error"
+            sx={{
+              mt: 1,
+            }}
+          >
+            {t(
+              'alerts.detail.playbook.stepsError',
+            )}
+          </MuiAlert>
+        )}
+
+        {stepsQuery.data
+          && stepsQuery.data.length === 0
+          && (
+            <Typography
+              sx={{
+                mt: 1,
+              }}
+            >
+              {t(
+                'alerts.detail.playbook.noSteps',
+              )}
+            </Typography>
+          )}
+
+        {stepsQuery.data
+          && stepsQuery.data.length > 0
+          && (
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2,
+                mt: 2,
+              }}
+            >
+              {stepsQuery.data.map(
+                (step) => (
+                  <Paper
+                    key={
+                      step.playbookExecutionStepId
+                    }
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns:
+                          'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: 2,
+                      }}
+                    >
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.stepId',
+                        )}
+                        value={
+                          step.playbookExecutionStepId
+                        }
+                      />
+
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.playbookStepId',
+                        )}
+                        value={
+                          step.playbookStepId
+                        }
+                      />
+
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.status',
+                        )}
+                        value={
+                          step.status
+                        }
+                      />
+
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.startedAt',
+                        )}
+                        value={formatDateTime(
+                          step.startedAt,
+                        )}
+                      />
+
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.completedAt',
+                        )}
+                        value={formatDateTime(
+                          step.completedAt,
+                        )}
+                      />
+
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.createdAt',
+                        )}
+                        value={formatDateTime(
+                          step.createdAt,
+                        )}
+                      />
+
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.updatedAt',
+                        )}
+                        value={formatDateTime(
+                          step.updatedAt,
+                        )}
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        mt: 2,
+                      }}
+                    >
+                      <DetailField
+                        label={t(
+                          'alerts.detail.playbook.stepFields.result',
+                        )}
+                        value={
+                          step.result
+                        }
+                      />
+                    </Box>
+                  </Paper>
+                ),
+              )}
+            </Box>
+          )}
+      </Box>
+    </Paper>
+  )
+}
+
 function AlertDetailPage() {
   const { t } =
     useTranslation()
@@ -116,6 +404,11 @@ function AlertDetailPage() {
 
   const alert =
     alertQuery.data
+
+  const playbookExecutionsQuery =
+    usePlaybookExecutionsByAlertQuery(
+      alert?.alertId ?? null,
+    )
 
   return (
     <Box>
@@ -423,6 +716,89 @@ function AlertDetailPage() {
             />
           </Box>
         </Paper>
+      )}
+
+      {alert && (
+        <Box
+          sx={{
+            mt: 3,
+          }}
+        >
+          <Typography
+            component="h3"
+            variant="h5"
+          >
+            {t(
+              'alerts.detail.playbook.title',
+            )}
+          </Typography>
+
+          {playbookExecutionsQuery.isFetching
+            && !playbookExecutionsQuery.data
+            && (
+              <Typography
+                sx={{
+                  mt: 2,
+                }}
+              >
+                {t(
+                  'alerts.detail.playbook.loading',
+                )}
+              </Typography>
+            )}
+
+          {playbookExecutionsQuery.isError && (
+            <MuiAlert
+              severity="error"
+              sx={{
+                mt: 2,
+              }}
+            >
+              {t(
+                'alerts.detail.playbook.error',
+              )}
+            </MuiAlert>
+          )}
+
+          {playbookExecutionsQuery.data
+            && playbookExecutionsQuery.data.length === 0
+            && (
+              <Typography
+                sx={{
+                  mt: 2,
+                }}
+              >
+                {t(
+                  'alerts.detail.playbook.none',
+                )}
+              </Typography>
+            )}
+
+          {playbookExecutionsQuery.data
+            && playbookExecutionsQuery.data.length > 0
+            && (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 2,
+                  mt: 2,
+                }}
+              >
+                {playbookExecutionsQuery.data.map(
+                  (execution) => (
+                    <PlaybookExecutionCard
+                      key={
+                        execution.playbookExecutionId
+                      }
+                      execution={
+                        execution
+                      }
+                    />
+                  ),
+                )}
+              </Box>
+            )}
+        </Box>
       )}
     </Box>
   )
