@@ -1,5 +1,7 @@
 package com.efs.config.security;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.administration.service.UserSessionBindingService;
 import com.efs.modules.audit.dto.AuditLoginRequest;
 import com.efs.modules.audit.service.AuditLoginServiceInterface;
@@ -11,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,6 +35,16 @@ class EfsJwtAuthenticationConverterTest {
                     "18318318-3183-4183-8183-183183183183"
             );
 
+    private static final UUID ORGANIZATION_ID =
+            UUID.fromString(
+                    "18418418-4184-4184-8184-184184184184"
+            );
+
+    private static final UUID TENANT_ID =
+            UUID.fromString(
+                    "18618618-6186-4186-8186-186186186186"
+            );
+
     private static final UUID SESSION_ID =
             UUID.fromString(
                     "18518518-5185-4185-8185-185185185185"
@@ -42,6 +55,9 @@ class EfsJwtAuthenticationConverterTest {
 
     private UserSessionBindingService
             userSessionBindingService;
+
+    private UserAccountLookupServiceInterface
+            userAccountLookupService;
 
     private AuditLoginServiceInterface
             auditLoginService;
@@ -65,6 +81,11 @@ class EfsJwtAuthenticationConverterTest {
                         UserSessionBindingService.class
                 );
 
+        userAccountLookupService =
+                mock(
+                        UserAccountLookupServiceInterface.class
+                );
+
         auditLoginService =
                 mock(
                         AuditLoginServiceInterface.class
@@ -74,6 +95,7 @@ class EfsJwtAuthenticationConverterTest {
                 new EfsJwtAuthenticationConverter(
                         securityContextMapper,
                         userSessionBindingService,
+                        userAccountLookupService,
                         auditLoginService
                 );
 
@@ -92,6 +114,52 @@ class EfsJwtAuthenticationConverterTest {
                 securityContext.getSessionId()
         ).thenReturn(
                 SESSION_ID
+        );
+        when(
+                securityContext.getTenantId()
+        ).thenReturn(
+                TENANT_ID
+        );
+
+        when(
+                securityContext.getScopes()
+        ).thenReturn(
+                Set.of(
+                        "openid"
+                )
+        );
+
+        when(
+                userAccountLookupService.getAuthorizedUser(
+                        USER_ID
+                )
+        ).thenReturn(
+                new UserAccountReference(
+                        USER_ID,
+                        ORGANIZATION_ID,
+                        TENANT_ID,
+                        "efs.development.investigator@example.invalid"
+                )
+        );
+
+        when(
+                userAccountLookupService.getAuthorizedRoleCodes(
+                        USER_ID
+                )
+        ).thenReturn(
+                Set.of(
+                        "EFS_DEVELOPMENT_INVESTIGATOR"
+                )
+        );
+
+        when(
+                userAccountLookupService.getAuthorizedPermissionCodes(
+                        USER_ID
+                )
+        ).thenReturn(
+                Set.of(
+                        "event.view"
+                )
         );
     }
 
@@ -118,9 +186,41 @@ class EfsJwtAuthenticationConverterTest {
                 authentication.isAuthenticated()
         );
 
-        assertSame(
-                securityContext,
-                authentication.getPrincipal()
+        SecurityContext authenticatedContext =
+                (SecurityContext)
+                        authentication.getPrincipal();
+
+        assertEquals(
+                USER_ID,
+                authenticatedContext.getUserId()
+        );
+
+        assertEquals(
+                TENANT_ID,
+                authenticatedContext.getTenantId()
+        );
+
+        assertEquals(
+                SESSION_ID,
+                authenticatedContext.getSessionId()
+        );
+
+        assertTrue(
+                authenticatedContext.hasRole(
+                        "EFS_DEVELOPMENT_INVESTIGATOR"
+                )
+        );
+
+        assertTrue(
+                authenticatedContext.hasPermission(
+                        "event.view"
+                )
+        );
+
+        assertTrue(
+                authenticatedContext.hasScope(
+                        "openid"
+                )
         );
 
         verify(

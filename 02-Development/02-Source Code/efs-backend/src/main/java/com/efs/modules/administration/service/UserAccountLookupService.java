@@ -3,10 +3,13 @@ package com.efs.modules.administration.service;
 import com.efs.modules.administration.dto.UserAccountReference;
 import com.efs.modules.administration.entity.UserAccount;
 import com.efs.modules.administration.repository.UserAccountRepository;
+import com.efs.modules.administration.repository.UserRoleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -20,11 +23,18 @@ public class UserAccountLookupService
     private final UserAccountRepository
             userAccountRepository;
 
+    private final UserRoleRepository
+            userRoleRepository;
+
     public UserAccountLookupService(
-            UserAccountRepository userAccountRepository) {
+            UserAccountRepository userAccountRepository,
+            UserRoleRepository userRoleRepository) {
 
         this.userAccountRepository =
                 userAccountRepository;
+
+        this.userRoleRepository =
+                userRoleRepository;
     }
 
     @Override
@@ -125,6 +135,50 @@ public class UserAccountLookupService
 
         return toReference(
                 userAccount
+        );
+    }
+
+    @Override
+    public Set<String> getAuthorizedRoleCodes(
+            UUID userId) {
+
+        UserAccountReference authorizedUser =
+                getAuthorizedUser(
+                        userId
+                );
+
+        LocalDateTime asOf =
+                LocalDateTime.now();
+
+        return Set.copyOf(
+                userRoleRepository
+                        .findActiveRoleCodesByUserId(
+                                userId,
+                                authorizedUser.organizationId(),
+                                asOf
+                        )
+        );
+    }
+
+    @Override
+    public Set<String> getAuthorizedPermissionCodes(
+            UUID userId) {
+
+        UserAccountReference authorizedUser =
+                getAuthorizedUser(
+                        userId
+                );
+
+        LocalDateTime asOf =
+                LocalDateTime.now();
+
+        return Set.copyOf(
+                userRoleRepository
+                        .findActivePermissionCodesByUserId(
+                                userId,
+                                authorizedUser.organizationId(),
+                                asOf
+                        )
         );
     }
 }

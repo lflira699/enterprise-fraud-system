@@ -44,20 +44,8 @@ class EfsJwtSecurityContextMapperTest {
                                 tenantId.toString()
                         )
                         .claim(
-                                "session_id",
+                                "sid",
                                 sessionId.toString()
-                        )
-                        .claim(
-                                "roles",
-                                List.of(
-                                        "RULE_ADMINISTRATOR"
-                                )
-                        )
-                        .claim(
-                                "permissions",
-                                List.of(
-                                        "RULE_HISTORY_READ"
-                                )
                         )
                         .claim(
                                 "scope",
@@ -86,15 +74,11 @@ class EfsJwtSecurityContextMapperTest {
         );
 
         assertTrue(
-                context.hasRole(
-                        "RULE_ADMINISTRATOR"
-                )
+                context.getRoles().isEmpty()
         );
 
         assertTrue(
-                context.hasPermission(
-                        "RULE_HISTORY_READ"
-                )
+                context.getPermissions().isEmpty()
         );
 
         assertTrue(
@@ -111,9 +95,12 @@ class EfsJwtSecurityContextMapperTest {
     }
 
     @Test
-    void shouldAllowOptionalTenantAndSessionClaimsToBeAbsent() {
+    void shouldAllowOptionalTenantClaimWhenSidIsPresent() {
 
         UUID userId =
+                UUID.randomUUID();
+
+        UUID sessionId =
                 UUID.randomUUID();
 
         Jwt jwt =
@@ -121,6 +108,10 @@ class EfsJwtSecurityContextMapperTest {
                         .claim(
                                 "user_id",
                                 userId.toString()
+                        )
+                        .claim(
+                                "sid",
+                                sessionId.toString()
                         )
                         .build();
 
@@ -138,7 +129,8 @@ class EfsJwtSecurityContextMapperTest {
                 context.getTenantId()
         );
 
-        assertNull(
+        assertEquals(
+                sessionId,
                 context.getSessionId()
         );
 
@@ -152,6 +144,25 @@ class EfsJwtSecurityContextMapperTest {
 
         assertTrue(
                 context.getScopes().isEmpty()
+        );
+    }
+
+    @Test
+    void shouldRejectMissingSid() {
+
+        Jwt jwt =
+                baseJwtBuilder()
+                        .claim(
+                                "user_id",
+                                UUID.randomUUID().toString()
+                        )
+                        .build();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> mapper.map(
+                        jwt
+                )
         );
     }
 

@@ -19,14 +19,10 @@ public class EfsJwtSecurityContextMapper {
     static final String CLAIM_TENANT_ID =
             "tenant_id";
 
-    static final String CLAIM_SESSION_ID =
-            "session_id";
+    static final String CLAIM_SID =
+            "sid";
 
-    static final String CLAIM_ROLES =
-            "roles";
 
-    static final String CLAIM_PERMISSIONS =
-            "permissions";
 
     static final String CLAIM_SCOPE =
             "scope";
@@ -48,18 +44,12 @@ public class EfsJwtSecurityContextMapper {
                         jwt,
                         CLAIM_TENANT_ID
                 ),
-                optionalUuidClaim(
+                requiredUuidClaim(
                         jwt,
-                        CLAIM_SESSION_ID
+                        CLAIM_SID
                 ),
-                stringSetClaim(
-                        jwt,
-                        CLAIM_ROLES
-                ),
-                stringSetClaim(
-                        jwt,
-                        CLAIM_PERMISSIONS
-                ),
+                Set.of(),
+                Set.of(),
                 stringSetClaim(
                         jwt,
                         CLAIM_SCOPE

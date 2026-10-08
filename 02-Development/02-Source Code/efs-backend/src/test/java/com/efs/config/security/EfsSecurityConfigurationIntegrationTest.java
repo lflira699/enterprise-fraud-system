@@ -209,20 +209,8 @@ class EfsSecurityConfigurationIntegrationTest {
                         TENANT_ID.toString()
                 )
                 .claim(
-                        "session_id",
+                        "sid",
                         SESSION_ID.toString()
-                )
-                .claim(
-                        "roles",
-                        List.of(
-                                "RULE_ADMINISTRATOR"
-                        )
-                )
-                .claim(
-                        "permissions",
-                        List.of(
-                                "RULE_HISTORY_READ"
-                        )
                 )
                 .claim(
                         "scope",

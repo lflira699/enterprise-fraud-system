@@ -52,4 +52,56 @@ public interface UserRoleRepository
             @Param("asOf")
             LocalDateTime asOf
     );
+
+    @Query("""
+            select distinct r.roleCode
+            from UserRole ur,
+                 Role r
+            where ur.userId = :userId
+              and ur.roleId = r.roleId
+              and r.organizationId = :organizationId
+              and ur.effectiveFrom <= :asOf
+              and (
+                    ur.effectiveTo is null
+                    or ur.effectiveTo > :asOf
+                  )
+              and r.status = 'ACTIVE'
+            order by r.roleCode
+            """)
+    List<String> findActiveRoleCodesByUserId(
+            @Param("userId")
+            UUID userId,
+            @Param("organizationId")
+            UUID organizationId,
+            @Param("asOf")
+            LocalDateTime asOf
+    );
+
+    @Query("""
+            select distinct p.permissionCode
+            from UserRole ur,
+                 Role r,
+                 RolePermission rp,
+                 Permission p
+            where ur.userId = :userId
+              and ur.roleId = r.roleId
+              and r.organizationId = :organizationId
+              and r.roleId = rp.roleId
+              and rp.permissionId = p.permissionId
+              and ur.effectiveFrom <= :asOf
+              and (
+                    ur.effectiveTo is null
+                    or ur.effectiveTo > :asOf
+                  )
+              and r.status = 'ACTIVE'
+            order by p.permissionCode
+            """)
+    List<String> findActivePermissionCodesByUserId(
+            @Param("userId")
+            UUID userId,
+            @Param("organizationId")
+            UUID organizationId,
+            @Param("asOf")
+            LocalDateTime asOf
+    );
 }

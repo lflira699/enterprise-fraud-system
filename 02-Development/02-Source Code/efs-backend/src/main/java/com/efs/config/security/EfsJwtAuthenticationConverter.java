@@ -1,5 +1,7 @@
 package com.efs.config.security;
 
+import com.efs.modules.administration.dto.UserAccountReference;
+import com.efs.modules.administration.service.UserAccountLookupServiceInterface;
 import com.efs.modules.administration.service.UserSessionBindingService;
 import com.efs.modules.audit.dto.AuditLoginRequest;
 import com.efs.modules.audit.service.AuditLoginServiceInterface;
@@ -11,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -33,12 +36,16 @@ public class EfsJwtAuthenticationConverter
     private final UserSessionBindingService
             userSessionBindingService;
 
+    private final UserAccountLookupServiceInterface
+            userAccountLookupService;
+
     private final AuditLoginServiceInterface
             auditLoginService;
 
     public EfsJwtAuthenticationConverter(
             EfsJwtSecurityContextMapper securityContextMapper,
             UserSessionBindingService userSessionBindingService,
+            UserAccountLookupServiceInterface userAccountLookupService,
             AuditLoginServiceInterface auditLoginService) {
 
         this.securityContextMapper =
@@ -46,6 +53,9 @@ public class EfsJwtAuthenticationConverter
 
         this.userSessionBindingService =
                 userSessionBindingService;
+
+        this.userAccountLookupService =
+                userAccountLookupService;
 
         this.auditLoginService =
                 auditLoginService;
@@ -65,16 +75,51 @@ public class EfsJwtAuthenticationConverter
                         jwt
                 );
 
+        SecurityContext authorizedContext;
+
         try {
 
+            UserAccountReference authorizedUser =
+                    userAccountLookupService
+                            .getAuthorizedUser(
+                                    context.getUserId()
+                            );
+
+            validateTenantBinding(
+                    context,
+                    authorizedUser
+            );
+
+            Set<String> roles =
+                    userAccountLookupService
+                            .getAuthorizedRoleCodes(
+                                    context.getUserId()
+                            );
+
+            Set<String> permissions =
+                    userAccountLookupService
+                            .getAuthorizedPermissionCodes(
+                                    context.getUserId()
+                            );
+
+            authorizedContext =
+                    new SecurityContext(
+                            context.getUserId(),
+                            authorizedUser.tenantId(),
+                            context.getSessionId(),
+                            roles,
+                            permissions,
+                            context.getScopes()
+                    );
+
             userSessionBindingService.establishSession(
-                    context.getSessionId(),
-                    context.getUserId()
+                    authorizedContext.getSessionId(),
+                    authorizedContext.getUserId()
             );
 
             userSessionBindingService.requireActiveSession(
-                    context.getSessionId(),
-                    context.getUserId()
+                    authorizedContext.getSessionId(),
+                    authorizedContext.getUserId()
             );
 
         } catch (RuntimeException exception) {
@@ -95,12 +140,27 @@ public class EfsJwtAuthenticationConverter
         );
 
         return new UsernamePasswordAuthenticationToken(
-                context,
+                authorizedContext,
                 null,
                 List.of()
         );
     }
 
+
+    private void validateTenantBinding(
+            SecurityContext context,
+            UserAccountReference authorizedUser) {
+
+        if (!Objects.equals(
+                context.getTenantId(),
+                authorizedUser.tenantId()
+        )) {
+
+            throw new IllegalStateException(
+                    "JWT tenant binding does not match EFS UserAccount"
+            );
+        }
+    }
     private void auditAuthentication(
             UUID userId,
             String loginResult,

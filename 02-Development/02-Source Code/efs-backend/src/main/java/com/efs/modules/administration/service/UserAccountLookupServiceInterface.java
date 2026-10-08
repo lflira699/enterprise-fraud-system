@@ -3,6 +3,7 @@ package com.efs.modules.administration.service;
 import com.efs.modules.administration.dto.UserAccountReference;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public interface UserAccountLookupServiceInterface {
@@ -14,6 +15,14 @@ public interface UserAccountLookupServiceInterface {
     );
 
     UserAccountReference getAuthorizedUser(
+            UUID userId
+    );
+
+    Set<String> getAuthorizedRoleCodes(
+            UUID userId
+    );
+
+    Set<String> getAuthorizedPermissionCodes(
             UUID userId
     );
 }
