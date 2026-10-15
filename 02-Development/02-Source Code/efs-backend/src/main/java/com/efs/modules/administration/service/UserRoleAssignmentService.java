@@ -16,7 +16,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,8 +117,8 @@ public class UserRoleAssignmentService {
                             actor
                     );
 
-            LocalDateTime now =
-                    LocalDateTime.now();
+            Instant now =
+                    Instant.now();
 
             if (
                 userRoleRepository
@@ -269,8 +269,8 @@ public class UserRoleAssignmentService {
                     actor
             );
 
-            LocalDateTime now =
-                    LocalDateTime.now();
+            Instant now =
+                    Instant.now();
 
             UserRole assignment =
                     userRoleRepository
@@ -385,8 +385,8 @@ public class UserRoleAssignmentService {
                     actor
             );
 
-            LocalDateTime now =
-                    LocalDateTime.now();
+            Instant now =
+                    Instant.now();
 
             List<UserRole> assignments =
                     userRoleRepository

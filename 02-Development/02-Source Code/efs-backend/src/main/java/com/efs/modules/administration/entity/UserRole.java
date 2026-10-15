@@ -6,7 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.ColumnDefault;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -41,12 +41,12 @@ public class UserRole {
             nullable = false
     )
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private LocalDateTime effectiveFrom;
+    private Instant effectiveFrom;
 
     @Column(
             name = "effective_to"
     )
-    private LocalDateTime effectiveTo;
+    private Instant effectiveTo;
 
     @Column(
             name = "assigned_by"
@@ -58,7 +58,7 @@ public class UserRole {
             nullable = false
     )
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private LocalDateTime assignedAt;
+    private Instant assignedAt;
 
     public UserRole() {
     }
@@ -96,23 +96,23 @@ public class UserRole {
                 roleId;
     }
 
-    public LocalDateTime getEffectiveFrom() {
+    public Instant getEffectiveFrom() {
         return effectiveFrom;
     }
 
     public void setEffectiveFrom(
-            LocalDateTime effectiveFrom) {
+            Instant effectiveFrom) {
 
         this.effectiveFrom =
                 effectiveFrom;
     }
 
-    public LocalDateTime getEffectiveTo() {
+    public Instant getEffectiveTo() {
         return effectiveTo;
     }
 
     public void setEffectiveTo(
-            LocalDateTime effectiveTo) {
+            Instant effectiveTo) {
 
         this.effectiveTo =
                 effectiveTo;
@@ -129,12 +129,12 @@ public class UserRole {
                 assignedBy;
     }
 
-    public LocalDateTime getAssignedAt() {
+    public Instant getAssignedAt() {
         return assignedAt;
     }
 
     public void setAssignedAt(
-            LocalDateTime assignedAt) {
+            Instant assignedAt) {
 
         this.assignedAt =
                 assignedAt;
