@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Generated;
+import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
+@Immutable
 @Table(name = "audit_event", schema = "audit")
 public class AuditEvent {
 
