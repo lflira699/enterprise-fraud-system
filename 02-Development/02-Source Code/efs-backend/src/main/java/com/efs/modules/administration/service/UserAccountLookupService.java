@@ -7,7 +7,7 @@ import com.efs.modules.administration.repository.UserRoleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -147,8 +147,8 @@ public class UserAccountLookupService
                         userId
                 );
 
-        LocalDateTime asOf =
-                LocalDateTime.now();
+        Instant asOf =
+                Instant.now();
 
         return Set.copyOf(
                 userRoleRepository
@@ -169,8 +169,8 @@ public class UserAccountLookupService
                         userId
                 );
 
-        LocalDateTime asOf =
-                LocalDateTime.now();
+        Instant asOf =
+                Instant.now();
 
         return Set.copyOf(
                 userRoleRepository

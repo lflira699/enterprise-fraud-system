@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.access.AccessDeniedException;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -81,7 +81,7 @@ class UserRoleAssignmentAssignTest {
                 fixture.userRoleRepository.findActiveAssignment(
                         any(UUID.class),
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 Optional.empty()
@@ -134,6 +134,18 @@ class UserRoleAssignmentAssignTest {
 
         assertNotNull(
                 result.getEffectiveFrom()
+        );
+        // RBAC_CANONICAL_UTC_REGRESSION_V1
+        org.junit.jupiter.api.Assertions.assertTrue(
+                java.time.Duration.between(
+                        java.time.Instant.now(
+                                java.time.Clock.systemUTC()
+                        ),
+                        result.getEffectiveFrom()
+                ).abs().compareTo(
+                        java.time.Duration.ofSeconds(30)
+                ) <= 0,
+                "RBAC effectiveFrom must represent canonical UTC time"
         );
 
         assertNotNull(
@@ -534,7 +546,7 @@ class UserRoleAssignmentAssignTest {
                 fixture.userRoleRepository.findActiveAssignment(
                         any(UUID.class),
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 Optional.of(

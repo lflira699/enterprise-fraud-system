@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.access.AccessDeniedException;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +63,7 @@ class UserRoleAssignmentRemoveTest {
                 fixture.userRoleRepository.findActiveAssignment(
                         any(UUID.class),
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 Optional.of(
@@ -409,7 +409,7 @@ class UserRoleAssignmentRemoveTest {
         ).findActiveAssignment(
                 any(UUID.class),
                 any(UUID.class),
-                any(LocalDateTime.class)
+                any(Instant.class)
         );
     }
 
@@ -435,7 +435,7 @@ class UserRoleAssignmentRemoveTest {
                 fixture.userRoleRepository.findActiveAssignment(
                         any(UUID.class),
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 Optional.empty()
@@ -661,7 +661,7 @@ class UserRoleAssignmentRemoveTest {
         );
 
         assignment.setEffectiveFrom(
-                LocalDateTime.now().minusDays(1)
+                Instant.now().minusSeconds(86400)
         );
 
         assignment.setEffectiveTo(

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.access.AccessDeniedException;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -70,7 +70,7 @@ class UserRoleAssignmentViewTest {
         when(
                 fixture.userRoleRepository.findActiveByUserId(
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 List.of(
@@ -146,7 +146,7 @@ class UserRoleAssignmentViewTest {
         when(
                 fixture.userRoleRepository.findActiveByUserId(
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 List.of()
@@ -264,7 +264,7 @@ class UserRoleAssignmentViewTest {
                 never()
         ).findActiveByUserId(
                 any(UUID.class),
-                any(LocalDateTime.class)
+                any(Instant.class)
         );
     }
 
@@ -304,7 +304,7 @@ class UserRoleAssignmentViewTest {
                 never()
         ).findActiveByUserId(
                 any(UUID.class),
-                any(LocalDateTime.class)
+                any(Instant.class)
         );
     }
 
@@ -333,7 +333,7 @@ class UserRoleAssignmentViewTest {
         when(
                 fixture.userRoleRepository.findActiveByUserId(
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenReturn(
                 List.of()
@@ -348,7 +348,7 @@ class UserRoleAssignmentViewTest {
                 fixture.userRoleRepository
         ).findActiveByUserId(
                 any(UUID.class),
-                any(LocalDateTime.class)
+                any(Instant.class)
         );
 
         verify(
@@ -384,7 +384,7 @@ class UserRoleAssignmentViewTest {
         when(
                 fixture.userRoleRepository.findActiveByUserId(
                         any(UUID.class),
-                        any(LocalDateTime.class)
+                        any(Instant.class)
                 )
         ).thenThrow(
                 new IllegalStateException(
