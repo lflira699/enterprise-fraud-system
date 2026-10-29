@@ -434,9 +434,9 @@ class UserSessionBindingServiceLogoutTest {
                         any(AuditEventRequest.class)
                 );
 
-        RuntimeException thrown =
+        UserSessionBindingService.LogoutSuccessAuditFailureException thrown =
                 assertThrows(
-                        RuntimeException.class,
+                        UserSessionBindingService.LogoutSuccessAuditFailureException.class,
                         () -> service.logout(
                                 securityContext
                         )
@@ -444,7 +444,7 @@ class UserSessionBindingServiceLogoutTest {
 
         assertSame(
                 auditFailure,
-                thrown
+                thrown.getCause()
         );
 
         ArgumentCaptor<AuditEventRequest> captor =

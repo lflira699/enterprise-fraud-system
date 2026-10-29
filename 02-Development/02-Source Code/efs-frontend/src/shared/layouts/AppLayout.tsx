@@ -2,11 +2,13 @@ import type { ReactNode } from 'react'
 import {
   AppBar,
   Box,
+  Button,
   Drawer,
   Toolbar,
   Typography,
 } from '@mui/material'
 import { useTranslation } from 'react-i18next'
+import { useAuthentication } from '../../security/AuthenticationProvider'
 
 const DRAWER_WIDTH = 240
 
@@ -20,6 +22,7 @@ function AppLayout({
   navigation,
 }: AppLayoutProps) {
   const { t } = useTranslation()
+  const { logout } = useAuthentication()
 
   return (
     <Box
@@ -42,6 +45,19 @@ function AppLayout({
           >
             {t('app.title')}
           </Typography>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          <Button
+            color="inherit"
+            onClick={() => {
+              void logout().catch(() => {
+                window.alert(t('app.logoutError'))
+              })
+            }}
+          >
+            {t('app.logout')}
+          </Button>
         </Toolbar>
       </AppBar>
 

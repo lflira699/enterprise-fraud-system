@@ -6,14 +6,28 @@ import {
   vi,
 } from 'vitest'
 
+const getValidAccessTokenMock = vi.hoisted(
+  () => vi.fn(),
+)
+
+vi.mock('../src/security/keycloak', () => ({
+  getValidAccessToken: getValidAccessTokenMock,
+}))
+
 import { getSystemHealth } from '../src/modules/administration/api/systemHealthApi'
 
 describe('System Health API', () => {
   afterEach(() => {
+    getValidAccessTokenMock.mockReset()
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it('retrieves system health from the canonical endpoint', async () => {
+    getValidAccessTokenMock.mockResolvedValue(
+      'test-access-token',
+    )
+
     const payload = {
       status: 'UP',
       informationStatus: 'COMPLETE',
@@ -61,5 +75,11 @@ describe('System Health API', () => {
     expect(
       requestInit.method,
     ).toBe('GET')
+
+    expect(
+      new Headers(requestInit.headers).get(
+        'Authorization',
+      ),
+    ).toBe('Bearer test-access-token')
   })
 })

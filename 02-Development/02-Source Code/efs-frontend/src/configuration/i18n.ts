@@ -6,6 +6,8 @@ const resources = {
     translation: {
       app: {
         title: 'Enterprise Fraud System',
+        logout: 'Cerrar sesión',
+        logoutError: 'No fue posible completar el cierre de sesión.',
       },
 
       navigation: {

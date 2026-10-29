@@ -33,9 +33,21 @@ public class AuthenticationController {
                 securityContextProvider
                         .getCurrentContext();
 
-        userSessionBindingService.logout(
-                securityContext
-        );
+        try {
+            userSessionBindingService.logout(
+                    securityContext
+            );
+        } catch (UserSessionBindingService.LogoutSuccessAuditFailureException exception) {
+            try {
+                userSessionBindingService.invalidateSession(
+                        securityContext.getSessionId(),
+                        securityContext.getUserId()
+                );
+            } catch (RuntimeException recoveryException) {
+                exception.addSuppressed(recoveryException);
+            }
+            throw exception;
+        }
 
         return ResponseEntity
                 .noContent()

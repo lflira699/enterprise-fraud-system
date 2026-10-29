@@ -8,6 +8,7 @@ import com.efs.modules.audit.service.AuditLoginServiceInterface;
 import com.efs.shared.security.SecurityContext;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
@@ -112,15 +113,22 @@ public class EfsJwtAuthenticationConverter
                             context.getScopes()
                     );
 
-            userSessionBindingService.establishSession(
-                    authorizedContext.getSessionId(),
-                    authorizedContext.getUserId()
-            );
+            try {
+                userSessionBindingService.establishSession(
+                        authorizedContext.getSessionId(),
+                        authorizedContext.getUserId()
+                );
 
-            userSessionBindingService.requireActiveSession(
-                    authorizedContext.getSessionId(),
-                    authorizedContext.getUserId()
-            );
+                userSessionBindingService.requireActiveSession(
+                        authorizedContext.getSessionId(),
+                        authorizedContext.getUserId()
+                );
+            } catch (IllegalStateException sessionException) {
+                throw new BadCredentialsException(
+                        sessionException.getMessage(),
+                        sessionException
+                );
+            }
 
         } catch (RuntimeException exception) {
 

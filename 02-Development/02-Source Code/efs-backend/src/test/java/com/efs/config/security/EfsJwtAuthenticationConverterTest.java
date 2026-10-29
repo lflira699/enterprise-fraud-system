@@ -9,6 +9,7 @@ import com.efs.shared.security.SecurityContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
@@ -331,9 +332,9 @@ class EfsJwtAuthenticationConverterTest {
                 USER_ID
         );
 
-        IllegalStateException thrown =
+        BadCredentialsException thrown =
                 assertThrows(
-                        IllegalStateException.class,
+                        BadCredentialsException.class,
                         () ->
                                 converter.convert(
                                         jwt
@@ -342,7 +343,7 @@ class EfsJwtAuthenticationConverterTest {
 
         assertSame(
                 rejection,
-                thrown
+                thrown.getCause()
         );
 
         org.mockito.ArgumentCaptor<AuditLoginRequest> captor =
@@ -417,9 +418,9 @@ class EfsJwtAuthenticationConverterTest {
                 USER_ID
         );
 
-        IllegalStateException thrown =
+        BadCredentialsException thrown =
                 assertThrows(
-                        IllegalStateException.class,
+                        BadCredentialsException.class,
                         () ->
                                 converter.convert(
                                         jwt
@@ -428,7 +429,7 @@ class EfsJwtAuthenticationConverterTest {
 
         assertSame(
                 rejection,
-                thrown
+                thrown.getCause()
         );
 
         org.mockito.ArgumentCaptor<AuditLoginRequest> captor =

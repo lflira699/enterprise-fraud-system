@@ -226,7 +226,7 @@ public class UserSessionBindingService {
                     exception
             );
 
-            throw exception;
+            throw new LogoutSuccessAuditFailureException(exception);
         }
     }
 
@@ -352,6 +352,14 @@ public class UserSessionBindingService {
                     "Active EFS user session is not available: "
                             + sessionId
             );
+        }
+    }
+
+    public static final class LogoutSuccessAuditFailureException
+            extends RuntimeException {
+
+        public LogoutSuccessAuditFailureException(RuntimeException cause) {
+            super("EFS logout success audit failed", cause);
         }
     }
 

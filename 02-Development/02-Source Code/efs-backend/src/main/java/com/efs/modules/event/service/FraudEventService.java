@@ -739,7 +739,7 @@ public class FraudEventService
                     null,
                     null,
                     searchCriteria,
-                    false
+                    true
             );
 
             return new PageResponse<>(
@@ -771,7 +771,7 @@ public class FraudEventService
                     reason,
                     null,
                     searchCriteria,
-                    false
+                    true
             );
 
             throw ex;

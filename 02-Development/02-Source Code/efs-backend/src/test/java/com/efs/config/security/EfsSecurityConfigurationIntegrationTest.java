@@ -1,5 +1,6 @@
 package com.efs.config.security;
 
+import com.efs.modules.administration.service.UserSessionBindingService;
 import com.efs.shared.security.SecurityContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,14 +59,20 @@ class EfsSecurityConfigurationIntegrationTest {
 
     private static final UUID SESSION_ID =
             UUID.fromString(
-                    "19419419-4194-4194-8194-194194194194"
+                    "3b6c99aa-6035-8e5a-ac03-9fc109ecd881"
             );
+
+    private static final String SID =
+            "keycloak-session-integration";
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private UserSessionBindingService userSessionBindingService;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -167,6 +174,49 @@ class EfsSecurityConfigurationIntegrationTest {
                 );
     }
 
+    @Test
+    void shouldRejectPreviouslyInvalidatedEfsSession()
+            throws Exception {
+
+        when(
+                jwtDecoder.decode(
+                        "valid-token"
+                )
+        ).thenReturn(
+                buildJwt()
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/security/probe"
+                        )
+                                .header(
+                                        HttpHeaders.AUTHORIZATION,
+                                        "Bearer valid-token"
+                                )
+                )
+                .andExpect(
+                        status().isOk()
+                );
+
+        userSessionBindingService.invalidateSession(
+                SESSION_ID,
+                USER_ID
+        );
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/security/probe"
+                        )
+                                .header(
+                                        HttpHeaders.AUTHORIZATION,
+                                        "Bearer valid-token"
+                                )
+                )
+                .andExpect(
+                        status().isUnauthorized()
+                );
+    }
     private Jwt buildJwt() {
 
         Instant now =
@@ -210,7 +260,7 @@ class EfsSecurityConfigurationIntegrationTest {
                 )
                 .claim(
                         "sid",
-                        SESSION_ID.toString()
+                        SID
                 )
                 .claim(
                         "scope",

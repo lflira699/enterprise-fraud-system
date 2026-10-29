@@ -1,6 +1,6 @@
 import AdministrationPage from '../modules/administration/pages/AdministrationPage'
 import { Box, Typography } from '@mui/material'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AlertDetailPage from '../modules/alerts/pages/AlertDetailPage'
 import AlertsPage from '../modules/alerts/pages/AlertsPage'
@@ -42,6 +42,15 @@ function AppRouter() {
       navigation={<AppNavigation />}
     >
       <Routes>
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to={ROUTE_PATHS.dashboard}
+              replace
+            />
+          }
+        />
         <Route
           path={ROUTE_PATHS.dashboard}
           element={<DashboardPage />}

@@ -6,6 +6,14 @@ import {
   vi,
 } from 'vitest'
 
+const getValidAccessTokenMock = vi.hoisted(
+  () => vi.fn().mockResolvedValue('test-access-token'),
+)
+
+vi.mock('../src/security/keycloak', () => ({
+  getValidAccessToken: getValidAccessTokenMock,
+}))
+
 import {
   HttpError,
   httpClient,

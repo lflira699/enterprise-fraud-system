@@ -14,6 +14,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -80,5 +84,69 @@ class AuthenticationControllerTest {
                 .logout(
                         securityContext
                 );
+    }
+    @Test
+    void logoutShouldRecoverOnlyAfterSuccessAuditFailure() {
+        when(securityContextProvider.getCurrentContext())
+                .thenReturn(securityContext);
+        RuntimeException original = new RuntimeException("success audit failure");
+        UserSessionBindingService.LogoutSuccessAuditFailureException failure =
+                new UserSessionBindingService.LogoutSuccessAuditFailureException(original);
+        doThrow(failure).when(userSessionBindingService).logout(securityContext);
+
+        AuthenticationController controller =
+                new AuthenticationController(userSessionBindingService, securityContextProvider);
+        RuntimeException thrown = assertThrows(
+                UserSessionBindingService.LogoutSuccessAuditFailureException.class,
+                controller::logout
+        );
+        assertSame(failure, thrown);
+        assertSame(original, thrown.getCause());
+        verify(userSessionBindingService).invalidateSession(
+                securityContext.getSessionId(), securityContext.getUserId()
+        );
+    }
+
+    @Test
+    void logoutShouldNeverRecoverRejectedSession() {
+        when(securityContextProvider.getCurrentContext())
+                .thenReturn(securityContext);
+        IllegalStateException rejected = new IllegalStateException("invalid session");
+        doThrow(rejected).when(userSessionBindingService).logout(securityContext);
+
+        AuthenticationController controller =
+                new AuthenticationController(userSessionBindingService, securityContextProvider);
+        IllegalStateException thrown = assertThrows(
+                IllegalStateException.class,
+                controller::logout
+        );
+        assertSame(rejected, thrown);
+        verify(userSessionBindingService, never()).invalidateSession(
+                securityContext.getSessionId(), securityContext.getUserId()
+        );
+    }
+
+    @Test
+    void logoutShouldPreserveOriginalErrorIfRecoveryAlsoFails() {
+        when(securityContextProvider.getCurrentContext())
+                .thenReturn(securityContext);
+        RuntimeException original = new RuntimeException("success audit failure");
+        RuntimeException recovery = new RuntimeException("recovery failure");
+        UserSessionBindingService.LogoutSuccessAuditFailureException failure =
+                new UserSessionBindingService.LogoutSuccessAuditFailureException(original);
+        doThrow(failure).when(userSessionBindingService).logout(securityContext);
+        doThrow(recovery).when(userSessionBindingService).invalidateSession(
+                securityContext.getSessionId(), securityContext.getUserId()
+        );
+
+        AuthenticationController controller =
+                new AuthenticationController(userSessionBindingService, securityContextProvider);
+        RuntimeException thrown = assertThrows(
+                UserSessionBindingService.LogoutSuccessAuditFailureException.class,
+                controller::logout
+        );
+        assertSame(failure, thrown);
+        assertSame(original, thrown.getCause());
+        assertSame(recovery, thrown.getSuppressed()[0]);
     }
 }

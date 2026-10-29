@@ -112,14 +112,14 @@ class FraudEventSearchAuditExactlyOnceTest {
         verify(
                 auditEventService,
                 times(1)
-        ).createAuditEvent(
+        ).createAuditEventRequiresNew(
                 auditCaptor.capture()
         );
 
         verify(
                 auditEventService,
                 never()
-        ).createAuditEventRequiresNew(
+        ).createAuditEvent(
                 any(AuditEventRequest.class)
         );
 

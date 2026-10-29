@@ -1,4 +1,31 @@
+import { getValidAccessToken } from '../security/keycloak'
+
 const API_BASE_PATH = '/api/v1'
+
+type AuthenticationFailureListener = () => void
+
+const authenticationFailureListeners =
+  new Set<AuthenticationFailureListener>()
+
+export function subscribeToAuthenticationFailure(
+  listener: AuthenticationFailureListener,
+): () => void {
+  authenticationFailureListeners.add(listener)
+
+  return () => {
+    authenticationFailureListeners.delete(listener)
+  }
+}
+
+function notifyAuthenticationFailure(): void {
+  for (const listener of authenticationFailureListeners) {
+    try {
+      listener()
+    } catch {
+      // Listener errors must not replace the HTTP failure.
+    }
+  }
+}
 
 export type ApiErrorPayload = {
   timestamp?: string
@@ -96,9 +123,9 @@ async function parseResponseBody(
   }
 }
 
-function buildHeaders(
+async function buildHeaders(
   init: RequestInit,
-) {
+): Promise<Headers> {
   const headers =
     new Headers(init.headers)
 
@@ -125,6 +152,23 @@ function buildHeaders(
     )
   }
 
+  const accessToken =
+    await getValidAccessToken()
+
+  if (!accessToken) {
+    notifyAuthenticationFailure()
+    throw new HttpError(
+      401,
+      'Authentication required',
+      null,
+    )
+  }
+
+  headers.set(
+    'Authorization',
+    `Bearer ${accessToken}`,
+  )
+
   return headers
 }
 
@@ -142,11 +186,15 @@ async function executeRequest(
       {
         ...init,
         headers:
-          buildHeaders(init),
+          await buildHeaders(init),
       },
     )
 
   if (!response.ok) {
+    if (response.status === 401) {
+      notifyAuthenticationFailure()
+    }
+
     const responseBody =
       await parseResponseBody(
         response,

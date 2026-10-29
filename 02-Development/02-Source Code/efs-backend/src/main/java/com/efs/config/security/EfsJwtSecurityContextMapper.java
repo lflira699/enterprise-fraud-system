@@ -4,6 +4,10 @@ import com.efs.shared.security.SecurityContext;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -21,6 +25,15 @@ public class EfsJwtSecurityContextMapper {
 
     static final String CLAIM_SID =
             "sid";
+
+    private static final String CLAIM_ISSUER =
+            "iss";
+
+    private static final String SESSION_BINDING_DOMAIN =
+            "EFS-IDP-SESSION-BINDING";
+
+    private static final int SESSION_BINDING_VERSION =
+            1;
 
 
 
@@ -44,10 +57,7 @@ public class EfsJwtSecurityContextMapper {
                         jwt,
                         CLAIM_TENANT_ID
                 ),
-                requiredUuidClaim(
-                        jwt,
-                        CLAIM_SID
-                ),
+                deriveSessionId(jwt),
                 Set.of(),
                 Set.of(),
                 stringSetClaim(
@@ -57,6 +67,130 @@ public class EfsJwtSecurityContextMapper {
         );
     }
 
+    private UUID deriveSessionId(
+            Jwt jwt) {
+
+        String issuer =
+                requiredStringClaim(
+                        jwt,
+                        CLAIM_ISSUER
+                );
+
+        String sid =
+                requiredStringClaim(
+                        jwt,
+                        CLAIM_SID
+                );
+
+        MessageDigest digest =
+                sessionBindingDigest();
+
+        updateLengthDelimited(
+                digest,
+                SESSION_BINDING_DOMAIN
+        );
+
+        digest.update(
+                ByteBuffer.allocate(Integer.BYTES)
+                        .putInt(SESSION_BINDING_VERSION)
+                        .array()
+        );
+
+        updateLengthDelimited(
+                digest,
+                issuer
+        );
+
+        updateLengthDelimited(
+                digest,
+                sid
+        );
+
+        byte[] uuidBytes =
+                java.util.Arrays.copyOf(
+                        digest.digest(),
+                        16
+                );
+
+        uuidBytes[6] =
+                (byte) (
+                        (uuidBytes[6] & 0x0f)
+                                | 0x80
+                );
+
+        uuidBytes[8] =
+                (byte) (
+                        (uuidBytes[8] & 0x3f)
+                                | 0x80
+                );
+
+        ByteBuffer buffer =
+                ByteBuffer.wrap(
+                        uuidBytes
+                );
+
+        return new UUID(
+                buffer.getLong(),
+                buffer.getLong()
+        );
+    }
+
+    private String requiredStringClaim(
+            Jwt jwt,
+            String claimName) {
+
+        Object value =
+                jwt.getClaim(
+                        claimName
+                );
+
+        if (!(value instanceof String stringValue)
+                || stringValue.isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "JWT claim '"
+                            + claimName
+                            + "' must contain a non-empty string"
+            );
+        }
+
+        return stringValue;
+    }
+
+    private MessageDigest sessionBindingDigest() {
+
+        try {
+            return MessageDigest.getInstance(
+                    "SHA-256"
+            );
+        }
+        catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(
+                    "SHA-256 is not available",
+                    exception
+            );
+        }
+    }
+
+    private void updateLengthDelimited(
+            MessageDigest digest,
+            String value) {
+
+        byte[] bytes =
+                value.getBytes(
+                        StandardCharsets.UTF_8
+                );
+
+        digest.update(
+                ByteBuffer.allocate(Integer.BYTES)
+                        .putInt(bytes.length)
+                        .array()
+        );
+
+        digest.update(
+                bytes
+        );
+    }
     private UUID requiredUuidClaim(
             Jwt jwt,
             String claimName) {
