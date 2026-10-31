@@ -468,6 +468,55 @@ class EfsJwtAuthenticationConverterTest {
     }
 
     @Test
+    void shouldAuditRejectedUnknownInstitutionalIdentityWithoutForeignKeyReference() {
+
+        Jwt jwt = jwt();
+
+        when(
+                securityContextMapper.map(jwt)
+        ).thenReturn(securityContext);
+
+        IllegalStateException missingUser =
+                new IllegalStateException(
+                        "EFS institutional user not found"
+                );
+
+        when(
+                userAccountLookupService.getAuthorizedUser(USER_ID)
+        ).thenThrow(missingUser);
+
+        IllegalStateException thrown = assertThrows(
+                IllegalStateException.class,
+                () -> converter.convert(jwt)
+        );
+
+        assertSame(missingUser, thrown);
+
+        org.mockito.ArgumentCaptor<AuditLoginRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(
+                        AuditLoginRequest.class
+                );
+
+        verify(auditLoginService).createAuditLogin(
+                captor.capture()
+        );
+
+        AuditLoginRequest request = captor.getValue();
+
+        assertEquals(null, request.getUserId());
+        assertEquals("FAILURE", request.getLoginResult());
+        assertEquals(
+                missingUser.getMessage(),
+                request.getFailureReason()
+        );
+
+        verify(
+                userSessionBindingService,
+                never()
+        ).establishSession(any(), any());
+    }
+
+    @Test
     void shouldNotCreateLoginAuditWhenSecurityContextCannotBeResolved() {
 
         Jwt jwt =

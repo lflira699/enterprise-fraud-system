@@ -77,6 +77,7 @@ public class EfsJwtAuthenticationConverter
                 );
 
         SecurityContext authorizedContext;
+        UUID verifiedUserId = null;
 
         try {
 
@@ -85,6 +86,7 @@ public class EfsJwtAuthenticationConverter
                             .getAuthorizedUser(
                                     context.getUserId()
                             );
+            verifiedUserId = context.getUserId();
 
             validateTenantBinding(
                     context,
@@ -133,7 +135,7 @@ public class EfsJwtAuthenticationConverter
         } catch (RuntimeException exception) {
 
             auditAuthentication(
-                    context.getUserId(),
+                    verifiedUserId,
                     LOGIN_FAILURE,
                     exception.getMessage()
             );
